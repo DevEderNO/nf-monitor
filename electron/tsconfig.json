@@ -8,6 +8,6 @@
     "allowSyntheticDefaultImports": true,
     "baseUrl": "../"
   },
-  "include": ["electron"],
+  "include": ["electron", "electron/**/*.*"],
   "references": [{ "path": "../tsconfig.node.json" }]
 }

@@ -10,7 +10,7 @@ export default function App() {
   return (
     <AppProvider>
       <Routes>
-        <Route element={<Layout></Layout>}>
+        <Route element={<Layout />}>
           <Route path="/*" element={<Signin />} />
           <Route
             path="/dashboard"

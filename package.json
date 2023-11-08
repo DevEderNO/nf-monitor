@@ -54,5 +54,11 @@
     "vite-plugin-electron": "^0.14.0",
     "vite-plugin-electron-renderer": "^0.14.5"
   },
+  "author": {
+    "name": "DevEderNo",
+    "email": "ederneves_oliveira@hotmail.com",
+    "url": "http://www.sittax.com.br"
+  },
+  "description": "O NFMonitor é um sistema da empresa Sittax que tem como objetivo ler diretórios, encontrar arquivos de notas fiscais nos formatos xml, pdf e zip, e enviá-los para o Sittax",
   "main": "dist-electron/main.js"
 }
