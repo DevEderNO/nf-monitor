@@ -6,8 +6,11 @@ import {
   StateReducer,
   initialState,
 } from "./state-reducer";
-import AsyncStorage from "@react-native-community/async-storage";
 import { useNavigate } from "react-router-dom";
+import { IDirectory } from "@/interfaces/directory";
+import { IAuth } from "@/interfaces/auth";
+import { IExecution } from "@/interfaces/db-historic";
+import { format, parseISO } from "date-fns";
 
 interface StateContextData {
   state: IState;
@@ -23,24 +26,55 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
   useEffect(() => {
     async function loadStoragedData() {
       dispatch({ type: ActionType.Loading, payload: true });
-      const [[, token], [, user], [, directories]] =
-        await AsyncStorage.multiGet([
-          "@NFMonitor:token",
-          "@NFMonitor:user",
-          "@NFMonitor:directories",
-        ]);
+
+      const auth: IAuth = await window.ipcRenderer.invoke("get-auth");
+      const directories: IDirectory[] = await window.ipcRenderer.invoke(
+        "get-directories"
+      );
+      const timeForProcessing: IDirectory[] = await window.ipcRenderer.invoke(
+        "get-timeForProcessing"
+      );
 
       if (directories) {
         dispatch({
           type: ActionType.Directories,
-          payload: JSON.parse(directories),
+          payload: directories,
         });
       }
 
-      if (token && user) {
+      if (timeForProcessing) {
+        dispatch({
+          type: ActionType.TimeForProcessing,
+          payload: timeForProcessing,
+        });
+      }
+      const historic: IExecution[] = await window.ipcRenderer.invoke(
+        "get-historic"
+      );
+      if (historic.length > 0) {
+        dispatch({
+          type: ActionType.Historic,
+          payload: historic.map(
+            (x) =>
+              `${format(
+                parseISO(x.startDate.toString()),
+                "dd/MM/yyyy HH:mm:ss"
+              )}${
+                x.endDate
+                  ? format(
+                      parseISO(x.endDate.toString()),
+                      " - dd/MM/yyyy HH:mm:ss"
+                    )
+                  : ""
+              }`
+          ),
+        });
+      }
+
+      if (auth.token && auth.user) {
         dispatch({
           type: ActionType.Auth,
-          payload: { ...initialState.auth, token, usuario: JSON.parse(user) },
+          payload: auth,
         });
         navigate("/dashboard");
       }
@@ -50,25 +84,6 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
 
     loadStoragedData();
   }, []);
-
-  useEffect(() => {
-    async function loadStoragedData() {
-      dispatch({ type: ActionType.Loading, payload: true });
-      const [[, directories]] = await AsyncStorage.multiGet([
-        "@NFMonitor:directories",
-      ]);
-
-      if (directories && state?.auth?.token) {
-        dispatch({
-          type: ActionType.Directories,
-          payload: JSON.parse(directories),
-        });
-      }
-      dispatch({ type: ActionType.Loading, payload: false });
-    }
-
-    loadStoragedData();
-  }, [state?.auth?.token]);
 
   return (
     <StateContext.Provider value={{ state, dispatch }}>

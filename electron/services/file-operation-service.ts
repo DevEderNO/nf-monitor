@@ -5,6 +5,9 @@ import AdmZip from "adm-zip";
 import { IFileInfo } from "../interfaces/file-info";
 import { IFile } from "../interfaces/file";
 import { IDb } from "../interfaces/db";
+import { IDirectory } from "../interfaces/directory";
+import { IDbHistoric, IExecution } from "../interfaces/db-historic";
+import { IUser } from "../interfaces/user";
 
 export function listDirectory(directoryPath: string): IFileInfo[] {
   const directoryContents = fs.readdirSync(directoryPath);
@@ -27,32 +30,30 @@ export function listDirectory(directoryPath: string): IFileInfo[] {
   return filesAndFolders;
 }
 
-export function selectDirectories(win: BrowserWindow) {
+export function selectDirectories(win: BrowserWindow): IDirectory[] {
   const result = dialog.showOpenDialogSync(win, {
     properties: ["openDirectory", "multiSelections"],
   });
   if (result) {
-    const dados = result.map((x) => {
+    const dados: IDirectory[] = result.map((x) => {
       return {
-        path: x,
+        path: x.split("\\").join("/").toString(),
         modifiedtime: fs.statSync(x).mtime,
         size: fs.statSync(x).size,
       };
     });
     return dados;
   }
-  return result;
+  return [];
 }
 
-export function validXmlAndPdf(fileInfo: IFileInfo): Buffer | null {
+export function validXmlAndPdf(fileInfo: IFileInfo): IFileInfo | null {
   if (fileInfo.extension === ".xml") {
     const data = fs.readFileSync(fileInfo.filepath, "utf-8");
-    return data.trim().startsWith("<") ? Buffer.from(data, "utf-8") : null;
+    return data.trim().startsWith("<") ? fileInfo : null;
   } else if (fileInfo.extension === ".pdf") {
-    const data = fs.readFileSync(fileInfo.filepath, "utf-8");
-    return /Nº da Declaração:\\s+(\\d+)/.test(data)
-      ? Buffer.from(data, "utf-8")
-      : null;
+    const data = fs.readFileSync(fileInfo.filepath, "base64");
+    return /Nº da Declaração:\\s+(\\d+)/.test(data) ? fileInfo : null;
   }
   return null;
 }
@@ -100,26 +101,85 @@ export function getFilesZip(fileInfo: IFileInfo): IFile[] {
   return [];
 }
 
-export function getDb(): string {
+export function getDb(): IDb {
   try {
-    return fs.readFileSync(path.join(__dirname, "db.json"), "utf-8");
+    return JSON.parse(
+      fs.readFileSync(
+        path.join(
+          process.env["VITE_DEV_SERVER_URL"] ? __dirname : process.cwd(),
+          "db.json"
+        ),
+        "utf-8"
+      )
+    );
   } catch (error) {
-    return JSON.stringify({
+    return {
       configuration: {},
       directories: [],
       directoriesAndSubDirectories: [],
       files: [],
-    });
+      auth: {
+        token: "",
+        user: {} as IUser,
+      },
+      timeForProcessing: "",
+    };
+  }
+}
+
+export function getDbHistoric(): IDbHistoric {
+  try {
+    return JSON.parse(
+      fs.readFileSync(
+        path.join(
+          process.env["VITE_DEV_SERVER_URL"] ? __dirname : process.cwd(),
+          "dbHistoric.json"
+        ),
+        "utf-8"
+      )
+    );
+  } catch (error) {
+    return {
+      executions: [],
+    };
+  }
+}
+export function findHistoric(id: string): IExecution {
+  try {
+    const db: IDbHistoric = getDbHistoric();
+    const execution = db.executions.find((x) => x?.id === id);
+    if (!execution) throw new Error("Registro de execução não localizado");
+    return execution;
+  } catch (error) {
+    console.log("findHistoric", error);
+    throw error;
   }
 }
 
 export function saveDb(db: IDb) {
   try {
     fs.writeFileSync(
-      path.join(__dirname, "db.json"),
-      JSON.stringify(db, null, 2)
+      path.join(
+        process.env["VITE_DEV_SERVER_URL"] ? __dirname : process.cwd(),
+        "db.json"
+      ),
+      JSON.stringify(db, null, 0)
     );
   } catch (error) {
-    console.log("error", error);
+    console.log("saveDb", error);
+  }
+}
+
+export function saveDbHistoric(db: IDbHistoric) {
+  try {
+    fs.writeFileSync(
+      path.join(
+        process.env["VITE_DEV_SERVER_URL"] ? __dirname : process.cwd(),
+        "dbHistoric.json"
+      ),
+      JSON.stringify(db, null, 0)
+    );
+  } catch (error) {
+    console.log("saveDbHistoric", error);
   }
 }

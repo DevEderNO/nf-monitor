@@ -5,6 +5,7 @@ import { Layout } from "@components/Layout";
 import { AppProvider } from "@hooks/index";
 import { Directories } from "@pages/Directories";
 import { RequireAuth } from "@components/auth/RequireAuth";
+import { Configuration } from "./pages/Configuration";
 
 export default function App() {
   return (
@@ -25,6 +26,14 @@ export default function App() {
             element={
               <RequireAuth>
                 <Directories />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/configuration"
+            element={
+              <RequireAuth>
+                <Configuration />
               </RequireAuth>
             }
           />

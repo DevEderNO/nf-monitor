@@ -1,4 +1,3 @@
-import { IDirectory } from "../interfaces/directory";
 import {
   WSMessage,
   WSMessageType,
@@ -18,6 +17,7 @@ import {
   startDiscovery,
   stopDiscovery,
 } from "./discovery-service";
+import { IProcessamento } from "electron/interfaces/processamento";
 
 export function createWebsocket() {
   const port = 4444;
@@ -41,7 +41,7 @@ export function createWebsocket() {
         const request: WSMessage = JSON.parse(message.utf8Data);
         switch (request.message.type) {
           case WSMessageType.StartDiscovery:
-            wsStartDiscovery(connection, message);
+            startDiscovery(connection);
             break;
           case WSMessageType.PauseDiscovery:
             pauseDiscovery();
@@ -53,7 +53,7 @@ export function createWebsocket() {
             stopDiscovery();
             break;
           case WSMessageType.StartProcess:
-            wsStartProcess(connection);
+            wsStartProcess(connection, message);
             break;
           case WSMessageType.PauseProcess:
             pauseProcess();
@@ -69,15 +69,13 @@ export function createWebsocket() {
         }
       }
 
-      function wsStartDiscovery(connection: connection, message: IUtf8Message) {
-        const requestTyped: WSMessageTyped<IDirectory[]> = JSON.parse(
-          message.utf8Data
-        );
-        startDiscovery(connection, requestTyped.message.data);
-      }
-
-      function wsStartProcess(connection: connection) {
-        startProcess(connection);
+      function wsStartProcess(connection: connection, message: IUtf8Message) {
+        const {
+          message: {
+            data: { id },
+          },
+        }: WSMessageTyped<IProcessamento> = JSON.parse(message.utf8Data);
+        startProcess(connection, id!);
       }
     });
   });

@@ -1,18 +1,17 @@
-import { IDirectory } from "../interfaces/directory";
-import AsyncStorage from "@react-native-community/async-storage";
+import { IDirectory } from "@interfaces/directory";
 import {
   IProcessamento,
   ProcessamentoStatus,
 } from "../interfaces/processamento";
+import { IAuth } from "@/interfaces/auth";
 
 export interface IState {
-  auth: {
-    token: string;
-    usuario: any;
-  };
+  auth: IAuth;
   directories: IDirectory[];
   loading: boolean;
   processamento: IProcessamento;
+  timeForProcessing: string;
+  historic: string[];
 }
 
 export interface IAction {
@@ -21,10 +20,7 @@ export interface IAction {
 }
 
 export const initialState: IState = {
-  auth: {
-    token: "",
-    usuario: {},
-  },
+  auth: {} as IAuth,
   directories: [],
   loading: false,
   processamento: {
@@ -32,6 +28,8 @@ export const initialState: IState = {
     progress: 0,
     status: ProcessamentoStatus.Stopped,
   },
+  timeForProcessing: "00:00",
+  historic: [],
 };
 
 export enum ActionType {
@@ -39,23 +37,18 @@ export enum ActionType {
   Directories,
   Loading,
   Processamento,
+  ClearMessages,
   Clear,
+  TimeForProcessing,
+  Historic,
 }
 
 export const StateReducer = (state: IState, action: IAction): IState => {
   switch (action.type) {
     case ActionType.Auth:
-      AsyncStorage.setItem("@NFMonitor:token", action.payload?.token).then();
-      AsyncStorage.setItem(
-        "@NFMonitor:user",
-        JSON.stringify(action.payload?.usuario)
-      ).then();
+      window.ipcRenderer.send("set-auth", action.payload);
       return { ...state, auth: action.payload };
     case ActionType.Directories:
-      AsyncStorage.setItem(
-        "@NFMonitor:directories",
-        JSON.stringify(action.payload)
-      ).then();
       return { ...state, directories: action.payload };
     case ActionType.Loading:
       return { ...state, loading: action.payload };
@@ -71,9 +64,19 @@ export const StateReducer = (state: IState, action: IAction): IState => {
           status: action.payload.status,
         },
       };
+    case ActionType.TimeForProcessing:
+      window.ipcRenderer.send("set-timeForProcessing", action.payload);
+      return { ...state, timeForProcessing: action.payload };
+    case ActionType.Historic:
+      return { ...state, historic: action.payload };
     case ActionType.Clear:
-      AsyncStorage.multiRemove(["@NFMonitor:token", "@NFMonitor:user"]).then();
+      window.ipcRenderer.send("remove-auth");
       return { ...initialState };
+    case ActionType.ClearMessages:
+      return {
+        ...state,
+        processamento: { ...state.processamento, messages: [] },
+      };
     default:
       return state;
   }

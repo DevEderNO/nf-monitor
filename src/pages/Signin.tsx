@@ -46,7 +46,6 @@ export function Signin() {
       await signIn(values);
       navigate("/dashboard", { replace: true });
     } catch (error) {
-      console.log(error);
       toast({
         title: "Algo deu errado 😯 verifique suas credências",
         description: "",
@@ -128,8 +127,12 @@ export function Signin() {
             </h1>
           </div>
         </div>
-        <div className="col flex items-end">
-          <img src={logoWoman} alt="logo-woman" />
+        <div className="col flex items-end w-11/12">
+          <img
+            src={logoWoman}
+            alt="logo-woman"
+            style={{ maxHeight: "calc(100vh - 10px)" }}
+          />
         </div>
       </div>
       <Toaster />

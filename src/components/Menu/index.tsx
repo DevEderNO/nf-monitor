@@ -36,6 +36,16 @@ const Menu: React.FC = () => {
           });
         },
       },
+      {
+        label: "Configuração",
+        selected: location.pathname === "/configuration",
+        onClick: () => {
+          navigate("/configuration", {
+            replace: true,
+            state: { from: location },
+          });
+        },
+      },
     ],
     [location, navigate]
   );
@@ -87,7 +97,7 @@ function menuItemRender(
     <Button
       key={key}
       variant={"link"}
-      className="flex gap-1 items-center w-[100px]"
+      className="flex gap-1 items-center px-2"
       onClick={onClick}
     >
       {selected ? (
@@ -97,7 +107,7 @@ function menuItemRender(
           className="rounded-md object-cover h-5 rotate-180"
         />
       ) : (
-        <div className="h-5"></div>
+        <div className="h-5 w-2"></div>
       )}
       {label}
       {selected ? (
@@ -107,7 +117,7 @@ function menuItemRender(
           className="rounded-md object-cover h-5"
         />
       ) : (
-        <div className="h-5"></div>
+        <div className="h-5 w-2"></div>
       )}
     </Button>
   );

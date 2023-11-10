@@ -8,6 +8,7 @@ import { useAppState } from "@hooks/state";
 import { WSMessageType } from "../interfaces/ws-message";
 import { ProcessamentoStatus } from "@/interfaces/processamento";
 import { StopIcon } from "@radix-ui/react-icons";
+import { ActionType } from "@/hooks/state-reducer";
 
 interface IStepProcess {
   [key: string]: {
@@ -22,6 +23,7 @@ export function Dashboard() {
   const { client, processTask } = useSocket();
   const {
     state: { processamento, directories },
+    dispatch,
   } = useAppState();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -89,6 +91,7 @@ export function Dashboard() {
       label: "Re-localizar",
       icon: <Play />,
       onClick: () => {
+        dispatch({ type: ActionType.ClearMessages });
         client?.send(
           JSON.stringify({
             type: "message",
@@ -145,6 +148,7 @@ export function Dashboard() {
       label: "Enviar",
       icon: <Play />,
       onClick: () => {
+        dispatch({ type: ActionType.ClearMessages });
         client?.send(
           JSON.stringify({
             type: "message",

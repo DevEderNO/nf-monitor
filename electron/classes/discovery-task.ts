@@ -5,13 +5,17 @@ import {
 import { IDirectory } from "../interfaces/directory";
 import {
   getDb,
+  getDbHistoric,
   listDirectory,
   saveDb,
+  saveDbHistoric,
 } from "../services/file-operation-service";
 import { connection } from "websocket";
 import { WSMessageType, WSMessageTyped } from "../interfaces/ws-message";
 import { IFileInfo } from "../interfaces/file-info";
 import { IDb } from "../interfaces/db";
+import { IDbHistoric, IExecution } from "../interfaces/db-historic";
+import { randomUUID } from "crypto";
 
 export class DiscoveryTask {
   isPaused: boolean;
@@ -19,12 +23,16 @@ export class DiscoveryTask {
   db: IDb;
   directoriesAndSubDirectories: IDirectory[];
   files: IFileInfo[];
+  execution: IExecution;
+  connection: connection | null;
   constructor() {
     this.isPaused = false;
     this.isCancelled = false;
     this.db = {} as IDb;
     this.directoriesAndSubDirectories = [];
     this.files = [];
+    this.execution = {} as IExecution;
+    this.connection = null;
   }
 
   pause() {
@@ -39,46 +47,67 @@ export class DiscoveryTask {
     this.isCancelled = true;
   }
 
-  async run(connection: connection, directories: IDirectory[]) {
+  async run(connection: connection) {
     this.isCancelled = false;
     this.isPaused = false;
-    this.sendMessageStartTask(connection);
-    this.db = { ...JSON.parse(getDb()) };
-    this.directoriesAndSubDirectories = this.db.directoriesAndSubDirectories;
+    this.execution.startDate = new Date();
+    this.execution.id = randomUUID();
+    this.execution.log = [];
+    this.connection = connection;
+    await this.sendMessageClient([
+      "Tarefa de descoberta dos arquivos iniciada.",
+    ]);
+    this.db = { ...getDb() };
     this.files = this.db.files;
-    if (this.directoriesAndSubDirectories.length === 0)
-      this.directoriesAndSubDirectories = directories;
-    await this.discoveryDirectories(directories, connection);
+    await this.discoveryDirectories(this.db.directories);
     saveDb({
       ...this.db,
       directoriesAndSubDirectories: this.directoriesAndSubDirectories,
       files: this.files,
     });
-    this.sendMessageEndTask(connection);
+    await this.sendMessageClient(
+      ["Concluído processo de descoberta dos arquivos"],
+      0,
+      ProcessamentoStatus.Concluded
+    );
   }
 
-  private async discoveryDirectories(
-    directories: IDirectory[],
-    connection: connection
-  ) {
+  private async discoveryDirectories(directories: IDirectory[]) {
     for (let index = 0; index < directories.length; index++) {
       if (this.isCancelled) {
-        this.sendMessageCanceledTask(connection);
+        await this.sendMessageClient(
+          ["Tarefa de descoberta dos arquivos cancelada."],
+          0,
+          ProcessamentoStatus.Stopped
+        );
         return;
       }
       if (this.isPaused) {
-        this.sendMessagePausedTask(connection);
+        await this.sendMessageClient(
+          ["Tarefa de descoberta dos arquivos pausada."],
+          0,
+          ProcessamentoStatus.Paused
+        );
         await new Promise((resolve) => {
           setTimeout(resolve, 500);
         });
         index--;
       } else {
         const filesInfo = listDirectory(directories[index].path);
-        this.sendMessageDiscoveryFiles(
-          filesInfo,
-          directories,
-          index,
-          connection
+        await this.sendMessageClient(
+          [
+            `🔍 Foram encontrados ${
+              filesInfo.filter((x) => x.isDirectory).length
+            } 📁 | ${
+              filesInfo.filter((x) => x.extension === ".xml").length
+            } XML | ${
+              filesInfo.filter((x) => x.extension === ".pdf").length
+            } PDF | ${
+              filesInfo.filter((x) => x.extension === ".zip").length
+            } Zip no diretório ${directories[index].path}`,
+          ],
+          0,
+          ProcessamentoStatus.Paused
         );
         const subDirectories = filesInfo
           .filter((x) => x.isDirectory)
@@ -115,104 +144,43 @@ export class DiscoveryTask {
         if (filesFiltered.length > 0) {
           this.files = [...this.files, ...filesFiltered];
         }
-        await this.discoveryDirectories(subDirectories, connection);
+        await this.discoveryDirectories(subDirectories);
       }
     }
   }
 
-  private sendMessageDiscoveryFiles(
-    files: IFileInfo[],
-    directories: IDirectory[],
-    index: number,
-    connection: connection
+  private async sendMessageClient(
+    messages: string[],
+    progress = 0,
+    status = ProcessamentoStatus.Running
   ) {
-    const response = {
-      type: "message",
-      message: {
-        type: WSMessageType.Discovery,
-        data: {
-          messages: [
-            `🔍 Foram encontrados ${
-              files.filter((x) => x.isDirectory).length
-            } 📁 | ${
-              files.filter((x) => x.extension === ".xml").length
-            } XML | ${
-              files.filter((x) => x.extension === ".pdf").length
-            } PDF | ${
-              files.filter((x) => x.extension === ".zip").length
-            } Zip no diretório ${directories[index].path}`,
-          ],
-          progress: 0,
-          status: ProcessamentoStatus.Running,
-        },
-      },
-    };
-    connection.sendUTF(JSON.stringify(response));
-  }
+    messages.forEach((x) => this.execution.log?.push(x));
+    if (
+      [ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(
+        status
+      )
+    ) {
+      const dbHistoric: IDbHistoric = getDbHistoric();
+      dbHistoric.executions.push(this.execution);
+      saveDbHistoric(dbHistoric);
+      await new Promise((resolve) => {
+        setTimeout(resolve, 500);
+      });
+    }
 
-  private sendMessagePausedTask(connection: connection) {
-    console.log("Tarefa de descoberta dos arquivos pausada.");
-    const response = {
-      type: "message",
-      message: {
-        type: WSMessageType.Discovery,
-        data: {
-          messages: ["Tarefa de descoberta dos arquivos pausada."],
-          progress: 0,
-          status: ProcessamentoStatus.Stopped,
+    this.connection?.sendUTF(
+      JSON.stringify({
+        type: "message",
+        message: {
+          type: WSMessageType.Discovery,
+          data: {
+            messages,
+            progress,
+            status,
+            id: this.execution?.id,
+          },
         },
-      },
-    };
-    connection.sendUTF(JSON.stringify(response));
-    return response;
-  }
-
-  private sendMessageCanceledTask(connection: connection) {
-    console.log("Tarefa de descoberta dos arquivos cancelada.");
-    const response = {
-      type: "message",
-      message: {
-        type: WSMessageType.Discovery,
-        data: {
-          messages: ["Tarefa de descoberta dos arquivos cancelada."],
-          progress: 0,
-          status: ProcessamentoStatus.Stopped,
-        },
-      },
-    };
-    connection.sendUTF(JSON.stringify(response));
-    return response;
-  }
-
-  private sendMessageStartTask(connection: connection) {
-    console.log("Tarefa de descoberta dos arquivos iniciada.");
-    const response: WSMessageTyped<IProcessamento> = {
-      type: "message",
-      message: {
-        type: WSMessageType.Discovery,
-        data: {
-          messages: ["Tarefa de descoberta dos arquivos iniciada."],
-          progress: 0,
-          status: ProcessamentoStatus.Running,
-        },
-      },
-    };
-    connection.sendUTF(JSON.stringify(response));
-  }
-
-  private sendMessageEndTask(connection: connection) {
-    console.log("Concluído processo de descoberta dos arquivos");
-    const response = {
-      type: "message",
-      message: {
-        type: WSMessageType.Discovery,
-        data: {
-          messages: ["Concluído processo de descoberta dos arquivos"],
-          progress: 0,
-          status: ProcessamentoStatus.Concluded,
-        },
-      },
-    };
-    connection.sendUTF(JSON.stringify(response));
+      } as WSMessageTyped<IProcessamento>)
+    );
   }
 }

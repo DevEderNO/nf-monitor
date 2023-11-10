@@ -18,39 +18,26 @@ export function Directories() {
   const { state, dispatch } = useAppState();
   const handleSelectDirectories = useCallback(async () => {
     const filepaths: IDirectory[] = await window.ipcRenderer.invoke(
-      "open-dialog"
+      "select-directories"
     );
-    if (filepaths?.length > 0) {
-      const filepathsSelecteds: IDirectory[] = filepaths.map((x) => ({
-        path: x.path.split("\\").join("/").toString(),
-        modifiedtime: x.modifiedtime,
-        size: x.size,
-      }));
-      if (state?.directories?.length <= 0) {
-        dispatch({
-          type: ActionType.Directories,
-          payload: filepathsSelecteds,
-        });
-      } else {
-        dispatch({
-          type: ActionType.Directories,
-          payload: [...new Set(state.directories.concat(filepathsSelecteds))],
-        });
-      }
-    }
-  }, [dispatch, state.directories]);
+    dispatch({
+      type: ActionType.Directories,
+      payload: filepaths,
+    });
+  }, [dispatch]);
 
   const handleRemoveDirectory = useCallback(
-    (item: string) => {
-      const obj = state?.directories?.find((x) => x.path === item);
-      if (obj) {
-        dispatch({
-          type: ActionType.Directories,
-          payload: state.directories.filter((x) => x.path !== obj.path),
-        });
-      }
+    async (item: string) => {
+      const directories = await window.ipcRenderer.invoke(
+        "remove-directory",
+        item
+      );
+      dispatch({
+        type: ActionType.Directories,
+        payload: directories,
+      });
     },
-    [dispatch, state.directories]
+    [dispatch]
   );
 
   return (

@@ -3,8 +3,8 @@ import { ProcessTask } from "../classes/process-task";
 
 const task = new ProcessTask();
 
-export function startProcess(connection: connection) {
-  task.run(connection);
+export function startProcess(connection: connection, id: string) {
+  task.run(connection, id);
 }
 export function pauseProcess() {
   task.pause();

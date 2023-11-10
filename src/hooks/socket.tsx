@@ -8,6 +8,8 @@ import {
 } from "@interfaces/ws-message";
 import { ActionType } from "./state-reducer";
 import { IProcessamento, ProcessamentoStatus } from "@interfaces/processamento";
+import { format, parseISO } from "date-fns";
+import { IExecution } from "@/interfaces/db-historic";
 
 interface SocketContextData {
   client: w3cwebsocket | undefined;
@@ -38,7 +40,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
           setProcessStatus("discovery");
           const {
             message: {
-              data: { messages, progress, status },
+              data: { messages, progress, status, id },
             },
           }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
           dispatch({
@@ -50,10 +52,11 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
             },
           });
           if (status === ProcessamentoStatus.Concluded) {
-            const request: WSMessage = {
+            const request: WSMessageTyped<IProcessamento> = {
               type: "message",
               message: {
                 type: WSMessageType.StartProcess,
+                data: { id } as IProcessamento,
               },
             };
             cli?.send(JSON.stringify(request));
@@ -74,6 +77,31 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
               status,
             },
           });
+          if (status === ProcessamentoStatus.Concluded) {
+            window.ipcRenderer
+              .invoke("get-historic")
+              .then((historic: IExecution[]) => {
+                if (historic.length > 0) {
+                  dispatch({
+                    type: ActionType.Historic,
+                    payload: historic.map(
+                      (x) =>
+                        `${format(
+                          parseISO(x.startDate.toString()),
+                          "dd/MM/yyyy HH:mm:ss"
+                        )}${
+                          x.endDate
+                            ? format(
+                                parseISO(x.endDate.toString()),
+                                " - dd/MM/yyyy HH:mm:ss"
+                              )
+                            : ""
+                        }`
+                    ),
+                  });
+                }
+              });
+          }
         }
       }
     };

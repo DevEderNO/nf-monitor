@@ -1,10 +1,7 @@
-import { app, BrowserWindow, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, Menu, nativeImage, Tray } from "electron";
 import path from "node:path";
-import {
-  listDirectory,
-  selectDirectories,
-} from "./services/file-operation-service";
 import { createWebsocket } from "./services/websocket-service";
+import { registerListeners } from "./listeners";
 
 // The built directory structure
 //
@@ -21,6 +18,7 @@ process.env.VITE_PUBLIC = app.isPackaged
   : path.join(process.env.DIST, "../public");
 
 let win: BrowserWindow | null;
+let tray: Tray;
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 
@@ -46,9 +44,48 @@ function createWindow() {
   } else {
     // win.loadFile('dist/index.html')
     win.loadFile(path.join(process.env.DIST, "index.html"));
-    const menu = Menu.buildFromTemplate([]);
-    Menu.setApplicationMenu(menu);
+    // const menu = Menu.buildFromTemplate([]);
+    // Menu.setApplicationMenu(menu);
   }
+
+  const icon = nativeImage.createFromPath(
+    path.join(process.env.VITE_PUBLIC, "sittax.png")
+  );
+  tray = new Tray(icon);
+  tray.setTitle("NFMonitor");
+  tray.setToolTip("NFMonitor");
+  const contextMenu = Menu.buildFromTemplate([{ label: "Sair", role: "quit" }]);
+  tray.setContextMenu(contextMenu);
+
+  tray.on("click", () => {
+    if (win) {
+      if (win.isVisible()) {
+        win.hide();
+      } else {
+        win.show();
+      }
+    }
+  });
+
+  win.on("close", (event) => {
+    if (win) {
+      event.preventDefault();
+      win.hide();
+    }
+  });
+
+  app.on("before-quit", () => {
+    if (win) {
+      win.removeAllListeners("close");
+      win.close();
+    }
+  });
+
+  app.on("activate", () => {
+    if (win) {
+      win.show();
+    }
+  });
 }
 
 createWebsocket();
@@ -72,20 +109,6 @@ app.on("activate", () => {
 });
 
 app.whenReady().then(() => {
-  registerListeners();
+  registerListeners(win);
   createWindow();
 });
-
-async function registerListeners() {
-  ipcMain.on("message", (_, message) => {
-    console.log(message);
-  });
-
-  ipcMain.handle("open-dialog", async () => {
-    return selectDirectories(win!);
-  });
-
-  ipcMain.handle("list-directory", async (_, directoryPath) => {
-    return listDirectory(directoryPath);
-  });
-}

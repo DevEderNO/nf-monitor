@@ -1,14 +1,10 @@
 import { connection } from "websocket";
 import { DiscoveryTask } from "../classes/discovery-task";
-import { IDirectory } from "@interfaces/directory";
 
 const task = new DiscoveryTask();
 
-export function startDiscovery(
-  connection: connection,
-  directories: IDirectory[]
-) {
-  task.run(connection, directories);
+export function startDiscovery(connection: connection) {
+  task.run(connection);
 }
 export function pauseDiscovery() {
   task.pause();
