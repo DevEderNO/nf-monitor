@@ -21,8 +21,12 @@ export const AuthContext = createContext<AuthContextData>(
 );
 
 interface ILogin {
-  token: string;
-  usuario: IUser;
+  Escritorio: {
+    Id: string;
+    Nome: string;
+    Usuarios: IUser[];
+  };
+  Token: string;
 }
 
 const AuthProvider = ({ children }: React.PropsWithChildren) => {
@@ -33,52 +37,51 @@ const AuthProvider = ({ children }: React.PropsWithChildren) => {
     async ({ user, password }: SignInCredentials) => {
       dispatch({ type: ActionType.Loading, payload: true });
       try {
-        const response = await apiAuth.post<ILogin>("auth/login", {
-          usuario: user,
-          senha: password,
+        const response = await apiAuth.get<ILogin>(`auth/logar-nfe-monitor`, {
+          params: {
+            usuario: user,
+            senha: password,
+          },
         });
 
         const {
-          token,
-          usuario: {
-            id,
-            nome,
-            sobrenome,
-            cpf,
-            email,
-            phoneNumber,
-            ativo,
-            emailConfirmed,
-            accessFailedCount,
-            dataDeCriacao,
-            lockoutEnd,
-            eUsuarioEmpresa,
-            role,
-            termoPendente,
-            temQueVotarNps,
-          },
+          Token,
+          Escritorio: { Usuarios },
         } = response.data;
 
+        const {
+          Id,
+          Nome,
+          Sobrenome,
+          Cpf,
+          Email,
+          PhoneNumber,
+          Ativo,
+          EmailConfirmed,
+          AccessFailedCount,
+          DataDeCriacao,
+          LockoutEnd,
+          EUsuarioEmpresa,
+          Role,
+        } = Usuarios[0];
         dispatch({
           type: ActionType.Auth,
           payload: {
-            token,
+            token: Token,
             user: {
-              id,
-              nome,
-              sobrenome,
-              cpf,
-              email,
-              phoneNumber,
-              ativo,
-              emailConfirmed,
-              accessFailedCount,
-              dataDeCriacao,
-              lockoutEnd,
-              eUsuarioEmpresa,
-              role: { name: role.name },
-              termoPendente,
-              temQueVotarNps,
+              Id,
+              Nome,
+              Sobrenome,
+              Cpf,
+              Email,
+              PhoneNumber,
+              Ativo,
+              EmailConfirmed,
+              AccessFailedCount,
+              DataDeCriacao,
+              LockoutEnd,
+              EUsuarioEmpresa,
+              Role,
             },
           },
         });
