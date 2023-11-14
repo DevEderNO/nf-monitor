@@ -26,6 +26,6 @@ release
 *.sw?
 
 # Enviroments
-.env 
-.env.dev
-.env.prod
+.env.development
+.env.production
+.env

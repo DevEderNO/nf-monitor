@@ -9,24 +9,41 @@ import { IDirectory } from "../interfaces/directory";
 import { IDbHistoric, IExecution } from "../interfaces/db-historic";
 import { IUser } from "../interfaces/user";
 
-export function listDirectory(directoryPath: string): IFileInfo[] {
-  const directoryContents = fs.readdirSync(directoryPath);
-  const filesAndFolders: IFileInfo[] = directoryContents.map((item) => {
-    const itemPath = path.join(directoryPath, item);
-    const isDirectory = fs.statSync(itemPath).isDirectory();
-    const isFile = fs.statSync(itemPath).isFile();
-    return {
-      name: item,
-      isDirectory,
-      isFile,
-      filepath: itemPath.split("\\").join("/").toString(),
-      extension: !isDirectory ? path.extname(item) : "",
-      modifiedtime: fs.statSync(itemPath).mtime,
-      size: fs.statSync(itemPath).size,
-      wasSend: false,
-      isValid: false,
-    };
-  });
+export function listDirectory(
+  directoryPath: string,
+  callback?: (message: string) => void
+): IFileInfo[] {
+  const filesAndFolders: IFileInfo[] = [];
+  try {
+    const directoryContents = fs.readdirSync(directoryPath);
+    for (let index = 0; index < directoryContents.length; index++) {
+      const element = directoryContents[index];
+      const itemPath = path.join(directoryPath, element);
+      try {
+        const isDirectory = fs.statSync(itemPath).isDirectory();
+        const isFile = fs.statSync(itemPath).isFile();
+        filesAndFolders.push({
+          name: element,
+          isDirectory,
+          isFile,
+          filepath: itemPath.split("\\").join("/").toString(),
+          extension: !isDirectory ? path.extname(element) : "",
+          modifiedtime: fs.statSync(itemPath).mtime,
+          size: fs.statSync(itemPath).size,
+          wasSend: false,
+          isValid: false,
+        });
+      } catch (_) {
+        if (callback) {
+          callback(`A pasta/arquivo não pode ser lido ${itemPath}`);
+        }
+      }
+    }
+  } catch (_) {
+    if (callback) {
+      callback(`A pasta não pode ser lida ${directoryPath}`);
+    }
+  }
   return filesAndFolders;
 }
 

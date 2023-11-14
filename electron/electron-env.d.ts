@@ -18,8 +18,6 @@ declare namespace NodeJS {
     DIST: string;
     /** /dist/ or /public/ */
     VITE_PUBLIC: string;
-    VITE_API_AUTH_URL: string;
-    VITE_API_UPLOAD_URL: string;
   }
 }
 

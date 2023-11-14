@@ -73,6 +73,10 @@ export class ProcessTask {
           currentProgress,
           ProcessamentoStatus.Stopped
         );
+        this.isCancelled = false;
+        this.isPaused = false;
+        this.hasError = false;
+        this.progress = 0;
         return;
       }
       if (this.isPaused) {
