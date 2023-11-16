@@ -8,6 +8,7 @@ import { IDb } from "../interfaces/db";
 import { IDirectory } from "../interfaces/directory";
 import { IDbHistoric, IExecution } from "../interfaces/db-historic";
 import { IUser } from "../interfaces/user";
+import { isBefore, addMonths } from "date-fns";
 
 export function listDirectory(
   directoryPath: string,
@@ -66,8 +67,23 @@ export function selectDirectories(win: BrowserWindow): IDirectory[] {
 
 export function validXmlAndPdf(fileInfo: IFileInfo): IFileInfo | null {
   if (fileInfo.extension === ".xml") {
-    const data = fs.readFileSync(fileInfo.filepath, "utf-8");
-    return data.trim().startsWith("<") ? fileInfo : null;
+    const data = fs.readFileSync(fileInfo.filepath, "utf-8")?.trim();
+    if (!data.startsWith("<")) return null;
+    const chaveAcesso = /\\d{44}/.exec(data);
+    if (
+      chaveAcesso &&
+      isBefore(
+        new Date(
+          2000 + Number(chaveAcesso.slice(2, 4)),
+          Number(chaveAcesso.slice(4, 6)),
+          1
+        ),
+        addMonths(new Date(), -3)
+      )
+    ) {
+      return null;
+    }
+    return fileInfo;
   } else if (fileInfo.extension === ".pdf") {
     const data = fs.readFileSync(fileInfo.filepath, "base64");
     return /Nº da Declaração:\\s+(\\d+)/.test(data) ? fileInfo : null;
@@ -138,6 +154,10 @@ export function getDb(): IDb {
       auth: {
         token: "",
         user: {} as IUser,
+        credentials: {
+          user: "",
+          password: "",
+        },
       },
       timeForProcessing: "",
     };

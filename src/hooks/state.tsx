@@ -47,10 +47,13 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
           type: ActionType.TimeForProcessing,
           payload: timeForProcessing,
         });
+        window.ipcRenderer.send("initialize-job");
       }
+
       const historic: IExecution[] = await window.ipcRenderer.invoke(
         "get-historic"
       );
+      
       if (historic.length > 0) {
         dispatch({
           type: ActionType.Historic,

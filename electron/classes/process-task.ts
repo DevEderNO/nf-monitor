@@ -15,14 +15,17 @@ import { connection } from "websocket";
 import { IFileInfo } from "../interfaces/file-info";
 import { WSMessageType, WSMessageTyped } from "../interfaces/ws-message";
 import { IDb } from "../interfaces/db";
-import { api } from "../lib/axios";
+import { api, apiAuth } from "../lib/axios";
 import FormData from "form-data";
 import { createReadStream } from "fs";
 import { IDbHistoric, IExecution } from "../interfaces/db-historic";
+import { decrypt } from "../lib/cryptography";
 
 export class ProcessTask {
   isPaused: boolean;
+  pausedMessage: string | null;
   isCancelled: boolean;
+  cancelledMessage: string | null;
   connection: connection | null;
   progress: number;
   db: IDb;
@@ -38,6 +41,8 @@ export class ProcessTask {
     this.files = [];
     this.hasError = false;
     this.execution = {} as IExecution;
+    this.pausedMessage = null;
+    this.cancelledMessage = null;
   }
 
   pause() {
@@ -46,6 +51,7 @@ export class ProcessTask {
 
   resume() {
     this.isPaused = false;
+    this.pausedMessage = null;
   }
 
   cancel() {
@@ -53,12 +59,8 @@ export class ProcessTask {
   }
 
   async run(connection: connection, id: string) {
-    this.isCancelled = false;
-    this.isPaused = false;
-    this.hasError = false;
-    this.progress = 0;
-    this.connection = connection;
-    this.db = { ...getDb() };
+    this.initializeProperties(connection);
+    this.db = getDb();
     this.files = this.db.files;
     this.execution = findHistoric(id);
     await this.sendMessageClient([
@@ -66,30 +68,54 @@ export class ProcessTask {
     ]);
     const progressIncrement = 100 / this.files.length;
     let currentProgress = 0;
+    const password = decrypt(this.db.auth.credentials.password);
+    const resp = await apiAuth.get<{ Token: string }>(
+      `auth/logar-nfe-monitor`,
+      {
+        params: {
+          usuario: this.db.auth.credentials.user,
+          senha: password,
+        },
+      }
+    );
+    this.db.auth.token = resp.data.Token;
+    saveDb(this.db);
     for (let index = 0; index < this.files.length; index++) {
       if (this.isCancelled) {
-        await this.sendMessageClient(
-          ["Tarefa de envio de arquivo para o Sittax foi cancelada."],
-          currentProgress,
-          ProcessamentoStatus.Stopped
-        );
+        if (this.cancelledMessage === null) {
+          this.cancelledMessage =
+            "Tarefa de envio de arquivo para o Sittax foi cancelada.";
+          await this.sendMessageClient(
+            [this.cancelledMessage],
+            currentProgress,
+            ProcessamentoStatus.Stopped
+          );
+        }
         this.isCancelled = false;
         this.isPaused = false;
         this.hasError = false;
         this.progress = 0;
+        saveDb({ ...this.db, files: this.files });
         return;
       }
       if (this.isPaused) {
+        if (this.pausedMessage === null) {
+          this.pausedMessage =
+            "Tarefa de envio de arquivo para o Sittax foi pausada.";
+          await this.sendMessageClient(
+            [this.pausedMessage],
+            currentProgress,
+            ProcessamentoStatus.Paused
+          );
+        }
         await new Promise((resolve) => {
           setTimeout(resolve, 500);
         });
         index--;
-        await this.sendMessageClient(
-          ["Tarefa de envio de arquivo para o Sittax foi pausada."],
-          currentProgress,
-          ProcessamentoStatus.Paused
-        );
       } else {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 10);
+        });
         currentProgress = this.progress + progressIncrement * (index + 1);
         const element = this.files[index];
         if (element.wasSend) {
@@ -132,6 +158,16 @@ export class ProcessTask {
     );
   }
 
+  private initializeProperties(connection: connection) {
+    this.isCancelled = false;
+    this.cancelledMessage = null;
+    this.isPaused = false;
+    this.pausedMessage = null;
+    this.hasError = false;
+    this.progress = 0;
+    this.connection = connection;
+  }
+
   private async sendXmlAndPdfSittax(index: number, currentProgress: number) {
     const validFile = validXmlAndPdf(this.files[index]);
     if (validFile) {
@@ -156,7 +192,6 @@ export class ProcessTask {
           currentProgress
         );
       } catch (error) {
-        console.log(error);
         this.hasError = true;
         await this.sendMessageClient(
           [`❌ Erro ao enviar ${this.files[index].filepath}`],
@@ -197,7 +232,6 @@ export class ProcessTask {
         this.files[index].wasSend = true;
         this.files[index].dataSend = new Date();
       } catch (error) {
-        console.log(error);
         this.hasError = true;
         await this.sendMessageClient(
           [`❌ Erro ao enviar ${this.files[index].filepath}`],
@@ -228,8 +262,8 @@ export class ProcessTask {
       const dbHistoric: IDbHistoric = getDbHistoric();
       this.execution.endDate = new Date();
       dbHistoric.executions = [
-        ...dbHistoric.executions.filter((x) => x.id !== this.execution.id),
         this.execution,
+        ...dbHistoric.executions.filter((x) => x.id !== this.execution.id),
       ];
       saveDbHistoric(dbHistoric);
       await new Promise((resolve) => {

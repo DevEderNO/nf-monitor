@@ -31,7 +31,7 @@ export function Dashboard() {
     if (textareaRef.current) {
       textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
     }
-  }, [processamento?.messages]);
+  }, [processamento]);
 
   const discovery: IStepProcess = {
     Running: {
@@ -180,43 +180,21 @@ export function Dashboard() {
   return (
     <div className="p-4 m-4 flex flex-col gap-4 border rounded-md flex-1">
       <div className="flex gap-3">
-        {processamento.status !== ProcessamentoStatus.Concluded && (
-          <Button
-            className="flex gap-1"
-            onClick={
-              processTask === "discovery"
-                ? discovery[processamento.status].onClick
-                : send[processamento.status].onClick
-            }
-          >
-            {processTask === "discovery"
-              ? discovery[processamento.status].icon
-              : send[processamento.status].icon}
-            {processTask === "discovery"
-              ? discovery[processamento.status].label
-              : send[processamento.status].label}
-          </Button>
-        )}
-        {processTask === "send" &&
-          processamento.status === ProcessamentoStatus.Concluded && (
-            <Button
-              className="flex gap-1"
-              onClick={discovery[processamento.status].onClick}
-            >
-              {discovery[processamento.status].icon}
-              {discovery[processamento.status].label}
-            </Button>
-          )}
-        {processTask === "send" &&
-          processamento.status === ProcessamentoStatus.Concluded && (
-            <Button
-              className="flex gap-1"
-              onClick={send[processamento.status].onClick}
-            >
-              {send[processamento.status].icon}
-              {send[processamento.status].label}
-            </Button>
-          )}
+        <Button
+          className="flex gap-1"
+          onClick={
+            processTask === "discovery"
+              ? discovery[processamento.status].onClick
+              : send[processamento.status].onClick
+          }
+        >
+          {processTask === "discovery"
+            ? discovery[processamento.status].icon
+            : send[processamento.status].icon}
+          {processTask === "discovery"
+            ? discovery[processamento.status].label
+            : send[processamento.status].label}
+        </Button>
         {processamento.status === ProcessamentoStatus.Paused && (
           <Button
             className="flex gap-1"
@@ -237,7 +215,12 @@ export function Dashboard() {
           ref={textareaRef}
           className="flex flex-1 h-full cursor-default resize-none"
           readOnly
-          value={processamento?.messages?.join("\n")}
+          value={processamento?.messages
+            ?.slice(
+              processamento?.messages?.length - 1000,
+              processamento?.messages?.length - 1
+            )
+            ?.join("\n")}
         />
         <Progress value={processamento?.progress} />
       </div>

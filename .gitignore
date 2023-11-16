@@ -28,4 +28,3 @@ release
 # Enviroments
 .env.development
 .env.production
-.env

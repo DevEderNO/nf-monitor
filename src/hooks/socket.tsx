@@ -28,12 +28,8 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
   );
 
   useEffect(() => {
-    if (client?._connection?.connected) return;
-    const cli = new w3cwebsocket("ws://127.0.0.1:4444");
-    cli.onopen = () => {
-      console.log("WebSocket client connected");
-    };
-    cli.onmessage = (message) => {
+    if (!client) return;
+    client.onmessage = (message) => {
       if (typeof message.data === "string") {
         const response: WSMessage = JSON.parse(message.data);
         if (response.message.type === WSMessageType.Discovery) {
@@ -51,7 +47,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
               status,
             },
           });
-          if (status === ProcessamentoStatus.Concluded) {
+          if ([ProcessamentoStatus.Concluded].includes(status)) {
             const request: WSMessageTyped<IProcessamento> = {
               type: "message",
               message: {
@@ -59,7 +55,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
                 data: { id } as IProcessamento,
               },
             };
-            cli?.send(JSON.stringify(request));
+            client?.send(JSON.stringify(request));
           }
         }
         if (response.message.type === WSMessageType.Process) {
@@ -77,7 +73,13 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
               status,
             },
           });
-          if (status === ProcessamentoStatus.Concluded) {
+          if (
+            [
+              ProcessamentoStatus.Concluded,
+              ProcessamentoStatus.Stopped,
+            ].includes(status)
+          ) {
+            setProcessStatus("discovery");
             window.ipcRenderer
               .invoke("get-historic")
               .then((historic: IExecution[]) => {
@@ -105,7 +107,14 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
         }
       }
     };
-    setClient(cli);
+  }, [client, dispatch]);
+
+  useEffect(() => {
+    const cli = new w3cwebsocket("ws://127.0.0.1:4444");
+    setClient(() => cli);
+    return () => {
+      cli.close();
+    };
   }, []);
 
   return (

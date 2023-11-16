@@ -19,7 +19,9 @@ import { randomUUID } from "crypto";
 
 export class DiscoveryTask {
   isPaused: boolean;
+  pausedMessage: string | null;
   isCancelled: boolean;
+  cancelledMessage: string | null;
   db: IDb;
   directoriesAndSubDirectories: IDirectory[];
   files: IFileInfo[];
@@ -33,6 +35,8 @@ export class DiscoveryTask {
     this.files = [];
     this.execution = {} as IExecution;
     this.connection = null;
+    this.pausedMessage = null;
+    this.cancelledMessage = null;
   }
 
   pause() {
@@ -41,6 +45,7 @@ export class DiscoveryTask {
 
   resume() {
     this.isPaused = false;
+    this.pausedMessage = null;
   }
 
   cancel() {
@@ -48,12 +53,7 @@ export class DiscoveryTask {
   }
 
   async run(connection: connection) {
-    this.isCancelled = false;
-    this.isPaused = false;
-    this.execution.startDate = new Date();
-    this.execution.id = randomUUID();
-    this.execution.log = [];
-    this.connection = connection;
+    this.initializeProperties(connection);
     await this.sendMessageClient([
       "Tarefa de descoberta dos arquivos iniciada.",
     ]);
@@ -65,34 +65,57 @@ export class DiscoveryTask {
       directoriesAndSubDirectories: this.directoriesAndSubDirectories,
       files: this.files,
     });
-    await this.sendMessageClient(
-      ["Concluído processo de descoberta dos arquivos"],
-      0,
-      ProcessamentoStatus.Concluded
-    );
+    if (!this.isCancelled) {
+      await this.sendMessageClient(
+        ["Concluído processo de descoberta dos arquivos"],
+        0,
+        ProcessamentoStatus.Concluded
+      );
+    }
+  }
+
+  private initializeProperties(connection: connection) {
+    this.isCancelled = false;
+    this.cancelledMessage = null;
+    this.isPaused = false;
+    this.pausedMessage = null;
+    this.execution.startDate = new Date();
+    this.execution.id = randomUUID();
+    this.execution.log = [];
+    this.connection = connection;
   }
 
   private async discoveryDirectories(directories: IDirectory[]) {
     for (let index = 0; index < directories.length; index++) {
       if (this.isCancelled) {
-        await this.sendMessageClient(
-          ["Tarefa de descoberta dos arquivos cancelada."],
-          0,
-          ProcessamentoStatus.Stopped
-        );
+        if (this.cancelledMessage === null) {
+          this.cancelledMessage =
+            "Tarefa de descoberta dos arquivos cancelada.";
+          await this.sendMessageClient(
+            [this.cancelledMessage],
+            0,
+            ProcessamentoStatus.Stopped
+          );
+        }
         return;
       }
       if (this.isPaused) {
-        await this.sendMessageClient(
-          ["Tarefa de descoberta dos arquivos pausada."],
-          0,
-          ProcessamentoStatus.Paused
-        );
+        if (this.pausedMessage === null) {
+          this.pausedMessage = "Tarefa de descoberta dos arquivos pausada.";
+          await this.sendMessageClient(
+            [this.pausedMessage],
+            0,
+            ProcessamentoStatus.Paused
+          );
+        }
         await new Promise((resolve) => {
           setTimeout(resolve, 500);
         });
         index--;
       } else {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 10);
+        });
         const filesInfo = listDirectory(directories[index].path);
         await this.sendMessageClient(
           [
@@ -107,7 +130,7 @@ export class DiscoveryTask {
             } Zip no diretório ${directories[index].path}`,
           ],
           0,
-          ProcessamentoStatus.Paused
+          ProcessamentoStatus.Running
         );
         const subDirectories = filesInfo
           .filter((x) => x.isDirectory)

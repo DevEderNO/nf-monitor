@@ -73,7 +73,7 @@ export function Configuration() {
             <>
               Agendamento <span className="text-primary">programado</span> para
               ocorrer as{" "}
-              <span className="text-primary">{state?.timeForProcessing}h</span>{" "}
+              <span className="text-primary">{state?.timeForProcessing}</span>{" "}
               diariamente.
             </>
           )}

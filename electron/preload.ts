@@ -71,10 +71,12 @@ function useLoading() {
   .loading-image {
     display: block;
     margin: 0 auto;
-    width: 50px;
+    width: 100px;
+    height: 100px;
     height: auto;
-    transform: rotate(0deg);
-    animation: rotate 5s linear infinite;
+    animation: bounceIn infinite;
+    animation-duration: calc(var(--animate-duration) * 0.75);
+    animation-duration: 1s;
   }
 
   .app-loading-wrap {
@@ -89,12 +91,41 @@ function useLoading() {
     z-index: 9;
   }
 
-  @keyframes rotate {
-    0% {
-      transform: rotate(0deg);
+  @keyframes bounceIn {
+    from,
+    20%,
+    40%,
+    60%,
+    80%,
+    to {
+      animation-timing-function: cubic-bezier(0.215, 0.61, 0.355, 1);
     }
-    100% {
-      transform: rotate(360deg);
+  
+    0% {
+      opacity: 0;
+      transform: scale3d(0.3, 0.3, 0.3);
+    }
+  
+    20% {
+      transform: scale3d(1.1, 1.1, 1.1);
+    }
+  
+    40% {
+      transform: scale3d(0.9, 0.9, 0.9);
+    }
+  
+    60% {
+      opacity: 1;
+      transform: scale3d(1.03, 1.03, 1.03);
+    }
+  
+    80% {
+      transform: scale3d(0.97, 0.97, 0.97);
+    }
+  
+    to {
+      opacity: 1;
+      transform: scale3d(1, 1, 1);
     }
   }
     `;

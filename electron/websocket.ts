@@ -2,24 +2,30 @@ import {
   WSMessage,
   WSMessageType,
   WSMessageTyped,
-} from "../interfaces/ws-message";
+} from "./interfaces/ws-message";
 import * as http from "http";
-import { IUtf8Message, server as WebsocketServer, connection } from "websocket";
+import {
+  IUtf8Message,
+  server as WebsocketServer,
+  connection,
+} from "websocket";
 import {
   pauseProcess,
   resumeProcess,
   startProcess,
   stopProcess,
-} from "./process-service";
+} from "./services/process-service";
 import {
   pauseDiscovery,
   resumeDiscovery,
   startDiscovery,
   stopDiscovery,
-} from "./discovery-service";
-import { IProcessamento } from "electron/interfaces/processamento";
+} from "./services/discovery-service";
+import { IProcessamento } from "./interfaces/processamento";
 
-export function createWebsocket() {
+let wsConnection: connection;
+
+function createWebsocket() {
   const port = 4444;
   const server = http.createServer();
   server.listen(port, () => {
@@ -33,15 +39,15 @@ export function createWebsocket() {
         .toLocaleDateString()
         .concat(" Received a new connection from origin ", request.origin, ".")
     );
-    const connection = request.accept(null, request.origin);
-    console.log("connected");
 
-    connection.on("message", (message) => {
+    wsConnection = request.accept(null, request.origin);
+
+    wsConnection.on("message", (message) => {
       if (message.type === "utf8") {
         const request: WSMessage = JSON.parse(message.utf8Data);
         switch (request.message.type) {
           case WSMessageType.StartDiscovery:
-            startDiscovery(connection);
+            startDiscovery(wsConnection);
             break;
           case WSMessageType.PauseDiscovery:
             pauseDiscovery();
@@ -53,7 +59,7 @@ export function createWebsocket() {
             stopDiscovery();
             break;
           case WSMessageType.StartProcess:
-            wsStartProcess(connection, message);
+            wsStartProcess(wsConnection, message);
             break;
           case WSMessageType.PauseProcess:
             pauseProcess();
@@ -80,3 +86,5 @@ export function createWebsocket() {
     });
   });
 }
+
+export { wsConnection, createWebsocket };

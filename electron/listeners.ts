@@ -9,17 +9,27 @@ import {
 } from "./services/file-operation-service";
 import { IAuth } from "./interfaces/auth";
 import { IDbHistoric } from "./interfaces/db-historic";
+import { initializeJob, updateJob } from "./services/schedules";
+import { encrypt } from "./lib/cryptography";
 
 export async function registerListeners(win: BrowserWindow | null) {
   ipcMain.handle("get-auth", async () => {
     const db: IDb = getDb();
-    return db.auth;
+    return {
+      user: db.auth.user,
+      token: db.auth.token,
+      credentials: { user: "", password: "" },
+    };
   });
 
-  ipcMain.on("set-auth", (_, auth) => {
-    const db: IDb = getDb();
-    db.auth = auth;
-    saveDb(db);
+  ipcMain.on("set-auth", (_, auth: IAuth) => {
+    if (auth.credentials.password.length > 0) {
+      const db: IDb = getDb();
+      const passwordHash = encrypt(auth.credentials.password);
+      auth.credentials.password = passwordHash;
+      db.auth = auth;
+      saveDb(db);
+    }
   });
 
   ipcMain.on("remove-auth", () => {
@@ -59,6 +69,7 @@ export async function registerListeners(win: BrowserWindow | null) {
   ipcMain.on("set-timeForProcessing", async (_, timeForProcessing) => {
     const db: IDb = getDb();
     db.timeForProcessing = timeForProcessing;
+    updateJob(timeForProcessing);
     saveDb(db);
   });
 
@@ -74,5 +85,9 @@ export async function registerListeners(win: BrowserWindow | null) {
       startDate,
       endDate,
     }));
+  });
+
+  ipcMain.on("initialize-job", () => {
+    initializeJob();
   });
 }

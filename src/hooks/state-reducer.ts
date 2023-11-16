@@ -47,19 +47,25 @@ export const StateReducer = (state: IState, action: IAction): IState => {
   switch (action.type) {
     case ActionType.Auth:
       window.ipcRenderer.send("set-auth", action.payload);
-      return { ...state, auth: action.payload };
+      return {
+        ...state,
+        auth: {
+          token: action.payload?.token,
+          user: action.payload?.user,
+          credentials: { user: "", password: "" },
+        },
+      };
     case ActionType.Directories:
       return { ...state, directories: action.payload };
     case ActionType.Loading:
       return { ...state, loading: action.payload };
     case ActionType.Processamento:
+      const messages = state.processamento.messages;
+      messages.push(action.payload.messages);
       return {
         ...state,
         processamento: {
-          messages: [
-            ...state.processamento.messages,
-            ...action.payload.messages,
-          ],
+          messages,
           progress: action.payload.progress,
           status: action.payload.status,
         },

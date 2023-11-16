@@ -68,6 +68,9 @@ const AuthProvider = ({ children }: React.PropsWithChildren) => {
           type: ActionType.Auth,
           payload: {
             token: Token,
+            credentials: {
+              user, password
+            },
             user: {
               Id,
               Nome,
