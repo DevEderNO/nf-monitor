@@ -1,7 +1,6 @@
 {
   "name": "nf-monitor",
   "private": true,
-  "version": "0.0.0",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
