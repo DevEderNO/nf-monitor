@@ -11,6 +11,7 @@ import { IAuth } from "./interfaces/auth";
 import { IDbHistoric } from "./interfaces/db-historic";
 import { initializeJob, updateJob } from "./services/schedules";
 import { encrypt } from "./lib/cryptography";
+import { signIn } from "./lib/axios";
 
 export async function registerListeners(win: BrowserWindow | null) {
   ipcMain.handle("get-auth", async () => {
@@ -22,15 +23,62 @@ export async function registerListeners(win: BrowserWindow | null) {
     };
   });
 
-  ipcMain.on("set-auth", (_, auth: IAuth) => {
-    if (auth.credentials.password.length > 0) {
-      const db: IDb = getDb();
-      const passwordHash = encrypt(auth.credentials.password);
-      auth.credentials.password = passwordHash;
-      db.auth = auth;
+  ipcMain.handle(
+    "signIn",
+    async (_, { user, password }: { user: string; password: string }) => {
+      const db = getDb();
+      const data = await signIn(user, password);
+      const {
+        Token,
+        Escritorio: { Usuarios },
+      } = data;
+
+      const {
+        Id,
+        Nome,
+        Sobrenome,
+        Cpf,
+        Email,
+        PhoneNumber,
+        Ativo,
+        EmailConfirmed,
+        AccessFailedCount,
+        DataDeCriacao,
+        LockoutEnd,
+        EUsuarioEmpresa,
+        Role,
+        EPrimeiroAcesso,
+      } = Usuarios[0];
+
+      const passwordHash = encrypt(password);
+
+      db.auth = {
+        token: Token,
+        credentials: {
+          user,
+          password: passwordHash,
+        },
+        user: {
+          Id,
+          Nome,
+          Sobrenome,
+          Cpf,
+          Email,
+          PhoneNumber,
+          Ativo,
+          EmailConfirmed,
+          AccessFailedCount,
+          DataDeCriacao,
+          LockoutEnd,
+          EUsuarioEmpresa,
+          Role,
+          EPrimeiroAcesso,
+        },
+      };
       saveDb(db);
+      return db.auth;
     }
-  });
+  );
 
   ipcMain.on("remove-auth", () => {
     const db: IDb = getDb();
@@ -48,10 +96,17 @@ export async function registerListeners(win: BrowserWindow | null) {
     const directoriesInDb = db.directories;
     let directories = selectDirectories(win!);
     if (directories.length > 0) {
-      directories = Array.from(new Set([...directoriesInDb, ...directories]));
+      const newDirectories = directories.filter((x) =>
+        !directoriesInDb.find((y) => y.path === x.path)
+      );
+      directories =
+        newDirectories.length > 0
+          ? [...directoriesInDb, ...newDirectories]
+          : directoriesInDb;
+      saveDb({ ...db, directories });
+      return directories;
     }
-    saveDb({ ...db, directories });
-    return directories;
+    return directoriesInDb;
   });
 
   ipcMain.handle("remove-directory", async (_, directory: string) => {

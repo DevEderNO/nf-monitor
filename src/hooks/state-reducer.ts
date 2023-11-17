@@ -46,14 +46,9 @@ export enum ActionType {
 export const StateReducer = (state: IState, action: IAction): IState => {
   switch (action.type) {
     case ActionType.Auth:
-      window.ipcRenderer.send("set-auth", action.payload);
       return {
         ...state,
-        auth: {
-          token: action.payload?.token,
-          user: action.payload?.user,
-          credentials: { user: "", password: "" },
-        },
+        auth: action.payload,
       };
     case ActionType.Directories:
       return { ...state, directories: action.payload };

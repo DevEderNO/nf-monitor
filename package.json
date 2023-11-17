@@ -6,7 +6,10 @@
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:win": "tsc && vite build && electron-builder --win --config",
+    "build:mac": "tsc && vite build && electron-builder --mac --config",
+    "build:linux": "tsc && vite build && electron-builder --linux --config"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.2",
@@ -68,5 +71,6 @@
     "url": "http://www.sittax.com.br"
   },
   "description": "O NFMonitor é um sistema da empresa Sittax que tem como objetivo ler diretórios, encontrar arquivos de notas fiscais nos formatos xml, pdf e zip, e enviá-los para o Sittax",
-  "main": "dist-electron/main.js"
+  "main": "dist-electron/main.js",
+  "proxy": "http://localhost:5173"
 }

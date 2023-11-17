@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu, nativeImage, Tray } from "electron";
 import path from "node:path";
 import { registerListeners } from "./listeners";
 import { createWebsocket } from "./websocket";
+import { autoUpdater } from "electron-updater";
 
 // The built directory structure
 //
@@ -29,8 +30,11 @@ function createWindow() {
     minHeight: 600,
     minWidth: 800,
     icon: path.join(process.env.VITE_PUBLIC, "sittax.ico"),
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
+      nodeIntegration: true,
+      webSecurity: false,
     },
   });
 
@@ -42,15 +46,15 @@ function createWindow() {
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL);
   } else {
-    // win.loadFile('dist/index.html')
     win.loadFile(path.join(process.env.DIST, "index.html"));
-    // const menu = Menu.buildFromTemplate([]);
-    // Menu.setApplicationMenu(menu);
+    const menu = Menu.buildFromTemplate([]);
+    Menu.setApplicationMenu(menu);
   }
 
   const icon = nativeImage.createFromPath(
     path.join(process.env.VITE_PUBLIC, "sittax.png")
   );
+
   tray = new Tray(icon);
   tray.setTitle("NFMonitor");
   tray.setToolTip("NFMonitor");
@@ -107,7 +111,24 @@ app.whenReady().then(() => {
   registerListeners(win);
   createWindow();
   createWebsocket();
+  console.log(import.meta.env.VITE_GITHUB_TOKEN);
+  autoUpdater.setFeedURL({
+    provider: "github",
+    owner: "DevEderNO",
+    repo: "nf-monitor-versions",
+    token: import.meta.env.VITE_GITHUB_TOKEN,
+    releaseType: "release",
+  });
+
+  autoUpdater.checkForUpdates();
 });
+
+if (!VITE_DEV_SERVER_URL) {
+  app.setLoginItemSettings({
+    openAtLogin: true,
+    path: app.getPath("exe"),
+  });
+}
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

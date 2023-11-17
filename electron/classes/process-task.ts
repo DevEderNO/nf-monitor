@@ -15,11 +15,10 @@ import { connection } from "websocket";
 import { IFileInfo } from "../interfaces/file-info";
 import { WSMessageType, WSMessageTyped } from "../interfaces/ws-message";
 import { IDb } from "../interfaces/db";
-import { api, apiAuth } from "../lib/axios";
+import { signIn, upload } from "../lib/axios";
 import FormData from "form-data";
 import { createReadStream } from "fs";
 import { IDbHistoric, IExecution } from "../interfaces/db-historic";
-import { decrypt } from "../lib/cryptography";
 
 export class ProcessTask {
   isPaused: boolean;
@@ -68,17 +67,12 @@ export class ProcessTask {
     ]);
     const progressIncrement = 100 / this.files.length;
     let currentProgress = 0;
-    const password = decrypt(this.db.auth.credentials.password);
-    const resp = await apiAuth.get<{ Token: string }>(
-      `auth/logar-nfe-monitor`,
-      {
-        params: {
-          usuario: this.db.auth.credentials.user,
-          senha: password,
-        },
-      }
+    const resp = await signIn(
+      this.db.auth.credentials.user,
+      this.db.auth.credentials.password,
+      true
     );
-    this.db.auth.token = resp.data.Token;
+    this.db.auth.token = resp.Token;
     saveDb(this.db);
     for (let index = 0; index < this.files.length; index++) {
       if (this.isCancelled) {
@@ -179,12 +173,7 @@ export class ProcessTask {
       const form = new FormData();
       form.append("arquivo", createReadStream(validFile.filepath));
       try {
-        await api.post("upload/importar-arquivo", form, {
-          headers: {
-            ...form.getHeaders,
-            Authorization: `Bearer ${this.db.auth.token}`,
-          },
-        });
+        await upload(this.db.auth.token, validFile.filepath);
         this.files[index].wasSend = true;
         this.files[index].dataSend = new Date();
         await this.sendMessageClient(
@@ -216,15 +205,8 @@ export class ProcessTask {
         [`🚀 Enviando ${this.files[index].filepath}`],
         currentProgress
       );
-      const form = new FormData();
-      form.append("arquivo", createReadStream(this.files[index].filepath));
       try {
-        await api.post("upload/importar-arquivo", form, {
-          headers: {
-            ...form.getHeaders,
-            Authorization: this.db.auth.token,
-          },
-        });
+        await upload(this.db.auth.token, this.files[index].filepath);
         await this.sendMessageClient(
           [`✅ Enviado com sucesso ${this.files[index].filepath}`],
           currentProgress

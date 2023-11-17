@@ -10,7 +10,6 @@ export interface IUser {
   AccessFailedCount: string;
   DataDeCriacao: string;
   LockoutEnd: string;
-  ImagemDoUsuario: string;
   EUsuarioEmpresa: string;
   Role: string;
   EPrimeiroAcesso: string;

@@ -69,26 +69,30 @@ export function validXmlAndPdf(fileInfo: IFileInfo): IFileInfo | null {
   if (fileInfo.extension === ".xml") {
     const data = fs.readFileSync(fileInfo.filepath, "utf-8")?.trim();
     if (!data.startsWith("<")) return null;
-    const chaveAcesso = /\\d{44}/.exec(data);
-    if (
-      chaveAcesso &&
-      isBefore(
-        new Date(
-          2000 + Number(chaveAcesso.slice(2, 4)),
-          Number(chaveAcesso.slice(4, 6)),
-          1
-        ),
-        addMonths(new Date(), -3)
-      )
-    ) {
-      return null;
-    }
+    if (!validNotaFiscal(data)) return null;
     return fileInfo;
   } else if (fileInfo.extension === ".pdf") {
-    const data = fs.readFileSync(fileInfo.filepath, "base64");
-    return /Nº da Declaração:\\s+(\\d+)/.test(data) ? fileInfo : null;
+    return null;
   }
   return null;
+}
+
+function validNotaFiscal(data: string): boolean {
+  const chaveAcesso = /\\d{44}/.exec(data);
+  if (
+    chaveAcesso &&
+    isBefore(
+      new Date(
+        2000 + Number(chaveAcesso.slice(2, 4)),
+        Number(chaveAcesso.slice(4, 6)),
+        1
+      ),
+      addMonths(new Date(), -3)
+    )
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export function validZip(fileInfo: IFileInfo): AdmZip | null {
@@ -97,9 +101,13 @@ export function validZip(fileInfo: IFileInfo): AdmZip | null {
   let valid = false;
   zipEntries.forEach((zipEntry) => {
     if (zipEntry.entryName.endsWith(".xml")) {
-      if (zipEntry.getData().toString("utf-8").startsWith("<")) valid = true;
+      if (
+        zipEntry.getData().toString("utf-8").startsWith("<") &&
+        validNotaFiscal(zipEntry.getData().toString("utf-8"))
+      )
+        valid = true;
     } else if (zipEntry.entryName.endsWith(".pdf")) {
-      if (/Nº da Declaração:\\s+(\\d+)/.test(zipEntry.entryName)) valid = true;
+      valid = false;
     }
     if (valid) return;
   });

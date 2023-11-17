@@ -1,9 +1,7 @@
 import { createContext, useCallback, useContext } from "react";
-import { apiAuth } from "@lib/axios";
 import { useAppState } from "./state";
 import { ActionType } from "./state-reducer";
 import { AxiosError } from "axios";
-import { IUser } from "@/interfaces/user";
 import { useNavigate } from "react-router-dom";
 
 interface SignInCredentials {
@@ -20,73 +18,18 @@ export const AuthContext = createContext<AuthContextData>(
   {} as AuthContextData
 );
 
-interface ILogin {
-  Escritorio: {
-    Id: string;
-    Nome: string;
-    Usuarios: IUser[];
-  };
-  Token: string;
-}
-
 const AuthProvider = ({ children }: React.PropsWithChildren) => {
   const { dispatch } = useAppState();
   const navigate = useNavigate();
 
   const signIn = useCallback(
-    async ({ user, password }: SignInCredentials) => {
+    async (credentials: SignInCredentials) => {
       dispatch({ type: ActionType.Loading, payload: true });
       try {
-        const response = await apiAuth.get<ILogin>(`auth/logar-nfe-monitor`, {
-          params: {
-            usuario: user,
-            senha: password,
-          },
-        });
-
-        const {
-          Token,
-          Escritorio: { Usuarios },
-        } = response.data;
-
-        const {
-          Id,
-          Nome,
-          Sobrenome,
-          Cpf,
-          Email,
-          PhoneNumber,
-          Ativo,
-          EmailConfirmed,
-          AccessFailedCount,
-          DataDeCriacao,
-          LockoutEnd,
-          EUsuarioEmpresa,
-          Role,
-        } = Usuarios[0];
+        const auth = await window.ipcRenderer.invoke("signIn", credentials);
         dispatch({
           type: ActionType.Auth,
-          payload: {
-            token: Token,
-            credentials: {
-              user, password
-            },
-            user: {
-              Id,
-              Nome,
-              Sobrenome,
-              Cpf,
-              Email,
-              PhoneNumber,
-              Ativo,
-              EmailConfirmed,
-              AccessFailedCount,
-              DataDeCriacao,
-              LockoutEnd,
-              EUsuarioEmpresa,
-              Role,
-            },
-          },
+          payload: auth,
         });
       } catch (error) {
         if (typeof error === typeof AxiosError) {
