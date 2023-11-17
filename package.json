@@ -72,5 +72,5 @@
   },
   "description": "O NFMonitor é um sistema da empresa Sittax que tem como objetivo ler diretórios, encontrar arquivos de notas fiscais nos formatos xml, pdf e zip, e enviá-los para o Sittax",
   "main": "dist-electron/main.js",
-  "proxy": "http://localhost:5173"
+  "version": "1.0.0"
 }
