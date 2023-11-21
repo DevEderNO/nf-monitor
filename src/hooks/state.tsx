@@ -23,70 +23,74 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(StateReducer, initialState);
 
-  useEffect(() => {
-    async function loadStoragedData() {
-      dispatch({ type: ActionType.Loading, payload: true });
+  async function loadStoragedData() {
+    dispatch({ type: ActionType.Loading, payload: true });
 
-      const auth: IAuth = await window.ipcRenderer.invoke("get-auth");
-      const directories: IDirectory[] = await window.ipcRenderer.invoke(
-        "get-directories"
-      );
-      const timeForProcessing: IDirectory[] = await window.ipcRenderer.invoke(
-        "get-timeForProcessing"
-      );
+    const auth: IAuth = await window.ipcRenderer.invoke("get-auth");
+    const directories: IDirectory[] = await window.ipcRenderer.invoke(
+      "get-directories"
+    );
+    const timeForProcessing: IDirectory[] = await window.ipcRenderer.invoke(
+      "get-timeForProcessing"
+    );
 
-      if (directories) {
-        dispatch({
-          type: ActionType.Directories,
-          payload: directories,
-        });
-      }
-
-      if (timeForProcessing) {
-        dispatch({
-          type: ActionType.TimeForProcessing,
-          payload: timeForProcessing,
-        });
-        window.ipcRenderer.send("initialize-job");
-      }
-
-      const historic: IExecution[] = await window.ipcRenderer.invoke(
-        "get-historic"
-      );
-      
-      if (historic.length > 0) {
-        dispatch({
-          type: ActionType.Historic,
-          payload: historic.map(
-            (x) =>
-              `${format(
-                parseISO(x.startDate.toString()),
-                "dd/MM/yyyy HH:mm:ss"
-              )}${
-                x.endDate
-                  ? format(
-                      parseISO(x.endDate.toString()),
-                      " - dd/MM/yyyy HH:mm:ss"
-                    )
-                  : ""
-              }`
-          ),
-        });
-      }
-
-      if (auth.token && auth.user) {
-        dispatch({
-          type: ActionType.Auth,
-          payload: auth,
-        });
-        navigate("/dashboard");
-      }
-
-      dispatch({ type: ActionType.Loading, payload: false });
+    if (directories) {
+      dispatch({
+        type: ActionType.Directories,
+        payload: directories,
+      });
     }
 
+    if (timeForProcessing) {
+      dispatch({
+        type: ActionType.TimeForProcessing,
+        payload: timeForProcessing,
+      });
+      window.ipcRenderer.send("initialize-job");
+    }
+
+    const historic: IExecution[] = await window.ipcRenderer.invoke(
+      "get-historic"
+    );
+
+    if (historic.length > 0) {
+      dispatch({
+        type: ActionType.Historic,
+        payload: historic.map(
+          (x) =>
+            `${format(
+              parseISO(x.startDate.toString()),
+              "dd/MM/yyyy HH:mm:ss"
+            )}${
+              x.endDate
+                ? format(
+                    parseISO(x.endDate.toString()),
+                    " - dd/MM/yyyy HH:mm:ss"
+                  )
+                : ""
+            }`
+        ),
+      });
+    }
+
+    if (auth.token && auth.user) {
+      dispatch({
+        type: ActionType.Auth,
+        payload: auth,
+      });
+      navigate("/dashboard");
+    }
+
+    dispatch({ type: ActionType.Loading, payload: false });
+  }
+
+  useEffect(() => {
     loadStoragedData();
   }, []);
+  
+  useEffect(() => {
+    if (state.auth?.token?.length > 0) loadStoragedData();
+  }, [state.auth?.token?.length]);
 
   return (
     <StateContext.Provider value={{ state, dispatch }}>
