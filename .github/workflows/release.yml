@@ -27,14 +27,11 @@ jobs:
 
       - name: build-win
         if: matrix.os == 'windows-latest'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: yarn build:win
 
       - name: release
         uses: softprops/action-gh-release@v1
         with:
-          draft: true
           files: |
             dist/*.exe
             dist/*.zip
