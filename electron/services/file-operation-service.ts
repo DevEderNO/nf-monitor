@@ -10,6 +10,7 @@ import { IDbHistoric, IExecution } from "../interfaces/db-historic";
 import { IUser } from "../interfaces/user";
 import { isBefore, addMonths, parseISO } from "date-fns";
 import * as cheerio from "cheerio";
+import { app } from "electron";
 
 const emissaoSelectors = [
   "data_emissao",
@@ -196,11 +197,12 @@ export function getFilesZip(fileInfo: IFileInfo): IFile[] {
 }
 
 export function getDb(): IDb {
+  const userDataPath = app.getPath("userData");
   try {
     return JSON.parse(
       fs.readFileSync(
         path.join(
-          process.env["VITE_DEV_SERVER_URL"] ? __dirname : process.cwd(),
+          process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
           "db.json"
         ),
         "utf-8"
@@ -226,11 +228,12 @@ export function getDb(): IDb {
 }
 
 export function getDbHistoric(): IDbHistoric {
+  const userDataPath = app.getPath("userData");
   try {
     return JSON.parse(
       fs.readFileSync(
         path.join(
-          process.env["VITE_DEV_SERVER_URL"] ? __dirname : process.cwd(),
+          process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
           "dbHistoric.json"
         ),
         "utf-8"
@@ -242,6 +245,7 @@ export function getDbHistoric(): IDbHistoric {
     };
   }
 }
+
 export function findHistoric(id: string): IExecution {
   try {
     const db: IDbHistoric = getDbHistoric();
@@ -255,10 +259,11 @@ export function findHistoric(id: string): IExecution {
 }
 
 export function saveDb(db: IDb) {
+  const userDataPath = app.getPath("userData");
   try {
     fs.writeFileSync(
       path.join(
-        process.env["VITE_DEV_SERVER_URL"] ? __dirname : process.cwd(),
+        process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
         "db.json"
       ),
       JSON.stringify(db, null, 0)
@@ -269,10 +274,11 @@ export function saveDb(db: IDb) {
 }
 
 export function saveDbHistoric(db: IDbHistoric) {
+  const userDataPath = app.getPath("userData");
   try {
     fs.writeFileSync(
       path.join(
-        process.env["VITE_DEV_SERVER_URL"] ? __dirname : process.cwd(),
+        process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
         "dbHistoric.json"
       ),
       JSON.stringify(db, null, 0)
@@ -283,10 +289,11 @@ export function saveDbHistoric(db: IDbHistoric) {
 }
 
 export function clearHistoric() {
+  const userDataPath = app.getPath("userData");
   try {
     fs.writeFileSync(
       path.join(
-        process.env["VITE_DEV_SERVER_URL"] ? __dirname : process.cwd(),
+        process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
         "dbHistoric.json"
       ),
       JSON.stringify({ executions: [] }, null, 0)

@@ -16,7 +16,7 @@
       owner: "DevEderNO",
       repo: "nf-monitor",
       releaseType: "release",
-    }
+    },
   ],
   mac: {
     target: ["dmg"],
@@ -33,9 +33,9 @@
     artifactName: "${productName}-Windows-${version}-Setup.${ext}",
   },
   nsis: {
-    oneClick: false,
-    perMachine: false,
-    allowToChangeInstallationDirectory: true,
+    oneClick: true,
+    perMachine: true,
+    allowToChangeInstallationDirectory: false,
     installerIcon: "dist/sittax.ico",
     installerHeaderIcon: "dist/sittax.ico",
     deleteAppDataOnUninstall: false,

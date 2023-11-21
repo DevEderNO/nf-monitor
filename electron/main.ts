@@ -131,7 +131,7 @@ autoUpdater.setFeedURL({
 });
 
 setInterval(() => {
-  autoUpdater.checkForUpdates();
+  autoUpdater.checkForUpdatesAndNotify();
 }, 600000);
 
 autoUpdater.on("update-available", () => {
@@ -141,7 +141,7 @@ autoUpdater.on("update-available", () => {
 autoUpdater.on("update-downloaded", () => {
   win?.webContents.send(
     "update-downloaded",
-    "🚀 Atualização começara em 5 segundos"
+    "🚀 Atualização começará em 5 segundos"
   );
   setInterval(() => {}, 5000);
   autoUpdater.quitAndInstall();
