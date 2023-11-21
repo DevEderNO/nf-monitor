@@ -115,7 +115,7 @@ app.whenReady().then(() => {
   autoUpdater.setFeedURL({
     provider: "github",
     owner: "DevEderNO",
-    repo: "nf-monitor-versions",
+    repo: "nf-monitor",
     token: import.meta.env.VITE_GITHUB_TOKEN,
     releaseType: "release",
   });
