@@ -27,8 +27,6 @@ jobs:
 
       - name: build-win
         if: matrix.os == 'windows-latest'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: yarn build:win
 
       - name: release
