@@ -7,6 +7,7 @@ import { useTheme } from "@hooks/theme";
 import { useAuth } from "@hooks/auth";
 import logoMonitor from "@images/logo-monitor.png";
 import grafismo from "@images/grafismo.png";
+import packageJson from "../../../package.json";
 
 const Menu: React.FC = () => {
   const { theme, setTheme } = useTheme();
@@ -63,7 +64,8 @@ const Menu: React.FC = () => {
           {menuItems.map((item, index) => menuItemRender(item, index))}
         </div>
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
+        <span className="text-sm text-muted">v{packageJson.version}</span>
         <Button
           variant="outline"
           size="icon"
