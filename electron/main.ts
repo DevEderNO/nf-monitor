@@ -111,14 +111,6 @@ app.whenReady().then(() => {
   registerListeners(win);
   createWindow();
   createWebsocket();
-  console.log(import.meta.env.VITE_GITHUB_TOKEN);
-  autoUpdater.setFeedURL({
-    provider: "github",
-    owner: "DevEderNO",
-    repo: "nf-monitor",
-    token: import.meta.env.VITE_GITHUB_TOKEN,
-    releaseType: "release",
-  });
 
   autoUpdater.checkForUpdates();
 });
@@ -129,6 +121,31 @@ if (!VITE_DEV_SERVER_URL) {
     path: app.getPath("exe"),
   });
 }
+
+autoUpdater.setFeedURL({
+  provider: "github",
+  owner: "DevEderNO",
+  repo: "nf-monitor",
+  token: import.meta.env.VITE_GITHUB_TOKEN,
+  releaseType: "release",
+});
+
+setInterval(() => {
+  autoUpdater.checkForUpdates();
+}, 600000);
+
+autoUpdater.on("update-available", () => {
+  win?.webContents.send("update-available", "⚙️ Identificada uma nova versão.");
+});
+
+autoUpdater.on("update-downloaded", () => {
+  win?.webContents.send(
+    "update-downloaded",
+    "🚀 Atualização começara em 5 segundos"
+  );
+  setInterval(() => {}, 5000);
+  autoUpdater.quitAndInstall();
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
