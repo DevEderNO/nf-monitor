@@ -79,6 +79,14 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
               ProcessamentoStatus.Stopped,
             ].includes(status)
           ) {
+            dispatch({
+              type: ActionType.Processamento,
+              payload: {
+                messages,
+                progress,
+                status,
+              },
+            });
             setProcessStatus("discovery");
             window.ipcRenderer
               .invoke("get-historic")

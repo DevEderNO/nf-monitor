@@ -32,6 +32,5 @@
       "@interfaces/*": ["./src/interfaces/*"]
     }
   },
-  "include": ["src", "electron"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

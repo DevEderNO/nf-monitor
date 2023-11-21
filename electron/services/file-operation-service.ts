@@ -8,7 +8,24 @@ import { IDb } from "../interfaces/db";
 import { IDirectory } from "../interfaces/directory";
 import { IDbHistoric, IExecution } from "../interfaces/db-historic";
 import { IUser } from "../interfaces/user";
-import { isBefore, addMonths } from "date-fns";
+import { isBefore, addMonths, parseISO } from "date-fns";
+import * as cheerio from "cheerio";
+
+const emissaoSelectors = [
+  "data_emissao",
+  "DataEmissao",
+  "dtEmissao",
+  "Emissao",
+  "data_nfse",
+  "tsDatEms",
+  "prestacao",
+  "dEmi",
+  "DTDATA",
+  "DtEmiNf",
+  "DtHrGerNf",
+  "DT_COMPETENCIA",
+  "data",
+];
 
 export function listDirectory(
   directoryPath: string,
@@ -69,7 +86,9 @@ export function validXmlAndPdf(fileInfo: IFileInfo): IFileInfo | null {
   if (fileInfo.extension === ".xml") {
     const data = fs.readFileSync(fileInfo.filepath, "utf-8")?.trim();
     if (!data.startsWith("<")) return null;
-    if (!validNotaFiscal(data)) return null;
+    const validate = validateNotaFiscal(data);
+    if (validate.isNotaFiscal && !validate.valid) return null;
+    if (!validateNotaServico(data)) return null;
     return fileInfo;
   } else if (fileInfo.extension === ".pdf") {
     return null;
@@ -77,10 +96,13 @@ export function validXmlAndPdf(fileInfo: IFileInfo): IFileInfo | null {
   return null;
 }
 
-function validNotaFiscal(data: string): boolean {
+function validateNotaFiscal(data: string): {
+  valid: boolean;
+  isNotaFiscal: boolean;
+} {
   const chaveAcesso = /\\d{44}/.exec(data);
+  if (!chaveAcesso) return { valid: false, isNotaFiscal: false };
   if (
-    chaveAcesso &&
     isBefore(
       new Date(
         2000 + Number(chaveAcesso.slice(2, 4)),
@@ -90,9 +112,40 @@ function validNotaFiscal(data: string): boolean {
       addMonths(new Date(), -3)
     )
   ) {
+    return { valid: false, isNotaFiscal: true };
+  }
+  return { valid: true, isNotaFiscal: true };
+}
+
+function validateNotaServico(data: string): boolean {
+  try {
+    const html = cheerio.load(data);
+    let date = "";
+    for (let i = 0; i < emissaoSelectors.length; i++) {
+      const element = emissaoSelectors[i];
+      html("*").each((_, elemento) => {
+        if (
+          html(elemento)
+            .prop("name")
+            .toLowerCase()
+            .startsWith(element.toLowerCase())
+        ) {
+          const text = html(elemento).text().trim();
+          console.log(text);
+          if (text.length > 0) {
+            date = text;
+            return false;
+          }
+        }
+      });
+      if (date.length > 0) break;
+    }
+    if (date.length === 0) return false;
+    if (isBefore(parseISO(date), addMonths(new Date(), -3))) return false;
+    return true;
+  } catch (error) {
     return false;
   }
-  return true;
 }
 
 export function validZip(fileInfo: IFileInfo): AdmZip | null {
@@ -103,7 +156,7 @@ export function validZip(fileInfo: IFileInfo): AdmZip | null {
     if (zipEntry.entryName.endsWith(".xml")) {
       if (
         zipEntry.getData().toString("utf-8").startsWith("<") &&
-        validNotaFiscal(zipEntry.getData().toString("utf-8"))
+        validateNotaFiscal(zipEntry.getData().toString("utf-8"))
       )
         valid = true;
     } else if (zipEntry.entryName.endsWith(".pdf")) {
@@ -223,6 +276,20 @@ export function saveDbHistoric(db: IDbHistoric) {
         "dbHistoric.json"
       ),
       JSON.stringify(db, null, 0)
+    );
+  } catch (error) {
+    console.log("saveDbHistoric", error);
+  }
+}
+
+export function clearHistoric() {
+  try {
+    fs.writeFileSync(
+      path.join(
+        process.env["VITE_DEV_SERVER_URL"] ? __dirname : process.cwd(),
+        "dbHistoric.json"
+      ),
+      JSON.stringify({ executions: [] }, null, 0)
     );
   } catch (error) {
     console.log("saveDbHistoric", error);

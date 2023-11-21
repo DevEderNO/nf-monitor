@@ -24,6 +24,7 @@
     "@react-native-community/async-storage": "^1.12.1",
     "adm-zip": "^0.5.10",
     "axios": "^1.6.0",
+    "cheerio": "^1.0.0-rc.12",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "date-fns": "^2.30.0",

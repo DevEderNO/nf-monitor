@@ -58,98 +58,106 @@ export class ProcessTask {
   }
 
   async run(connection: connection, id: string) {
-    this.initializeProperties(connection);
-    this.db = getDb();
-    this.files = this.db.files;
-    this.execution = findHistoric(id);
-    await this.sendMessageClient([
-      "Iniciando o envio dos arquivos para o Sittax",
-    ]);
-    const progressIncrement = 100 / this.files.length;
-    let currentProgress = 0;
-    const resp = await signIn(
-      this.db.auth.credentials.user,
-      this.db.auth.credentials.password,
-      true
-    );
-    this.db.auth.token = resp.Token;
-    saveDb(this.db);
-    for (let index = 0; index < this.files.length; index++) {
-      if (this.isCancelled) {
-        if (this.cancelledMessage === null) {
-          this.cancelledMessage =
-            "Tarefa de envio de arquivo para o Sittax foi cancelada.";
-          await this.sendMessageClient(
-            [this.cancelledMessage],
-            currentProgress,
-            ProcessamentoStatus.Stopped
-          );
-        }
-        this.isCancelled = false;
-        this.isPaused = false;
-        this.hasError = false;
-        this.progress = 0;
-        saveDb({ ...this.db, files: this.files });
-        return;
-      }
-      if (this.isPaused) {
-        if (this.pausedMessage === null) {
-          this.pausedMessage =
-            "Tarefa de envio de arquivo para o Sittax foi pausada.";
-          await this.sendMessageClient(
-            [this.pausedMessage],
-            currentProgress,
-            ProcessamentoStatus.Paused
-          );
-        }
-        await new Promise((resolve) => {
-          setTimeout(resolve, 500);
-        });
-        index--;
-      } else {
-        await new Promise((resolve) => {
-          setTimeout(resolve, 10);
-        });
-        currentProgress = this.progress + progressIncrement * (index + 1);
-        const element = this.files[index];
-        if (element.wasSend) {
-          if (!element.isValid) {
+    try {
+      this.initializeProperties(connection);
+      this.db = getDb();
+      this.files = this.db.files;
+      this.execution = findHistoric(id);
+      await this.sendMessageClient([
+        "Iniciando o envio dos arquivos para o Sittax",
+      ]);
+      const progressIncrement = 100 / this.files.length;
+      let currentProgress = 0;
+      const resp = await signIn(
+        this.db.auth.credentials.user,
+        this.db.auth.credentials.password,
+        true
+      );
+      this.db.auth.token = resp.Token;
+      saveDb(this.db);
+      for (let index = 0; index < this.files.length; index++) {
+        if (this.isCancelled) {
+          if (this.cancelledMessage === null) {
+            this.cancelledMessage =
+              "Tarefa de envio de arquivo para o Sittax foi cancelada.";
             await this.sendMessageClient(
-              [`⚠️ Arquivo não e válido para o envio ${element.filepath}`],
+              [this.cancelledMessage],
               currentProgress,
-              ProcessamentoStatus.Running
+              ProcessamentoStatus.Stopped
             );
-            continue;
           }
-          await this.sendMessageClient(
-            [`☑️ Já foi enviando ${element.filepath}`],
-            currentProgress
-          );
+          this.isCancelled = false;
+          this.isPaused = false;
+          this.hasError = false;
+          this.progress = 0;
+          saveDb({ ...this.db, files: this.files });
+          return;
+        }
+        if (this.isPaused) {
+          if (this.pausedMessage === null) {
+            this.pausedMessage =
+              "Tarefa de envio de arquivo para o Sittax foi pausada.";
+            await this.sendMessageClient(
+              [this.pausedMessage],
+              currentProgress,
+              ProcessamentoStatus.Paused
+            );
+          }
+          await new Promise((resolve) => {
+            setTimeout(resolve, 500);
+          });
+          index--;
         } else {
-          switch (element.extension) {
-            case ".xml":
-            case ".pdf":
-              await this.sendXmlAndPdfSittax(index, currentProgress);
-              break;
-            case ".zip":
-              await this.sendZipSittax(index, currentProgress);
-              break;
-            default:
-              break;
+          await new Promise((resolve) => {
+            setTimeout(resolve, 10);
+          });
+          currentProgress = this.progress + progressIncrement * (index + 1);
+          const element = this.files[index];
+          if (element.wasSend) {
+            if (!element.isValid) {
+              await this.sendMessageClient(
+                [`⚠️ Arquivo não e válido para o envio ${element.filepath}`],
+                currentProgress,
+                ProcessamentoStatus.Running
+              );
+              continue;
+            }
+            await this.sendMessageClient(
+              [`☑️ Já foi enviando ${element.filepath}`],
+              currentProgress
+            );
+          } else {
+            switch (element.extension) {
+              case ".xml":
+              case ".pdf":
+                await this.sendXmlAndPdfSittax(index, currentProgress);
+                break;
+              case ".zip":
+                await this.sendZipSittax(index, currentProgress);
+                break;
+              default:
+                break;
+            }
           }
         }
       }
+      saveDb({ ...this.db, files: this.files });
+      await this.sendMessageClient(
+        [
+          this.hasError
+            ? "😨 Tarefa concluída com erros."
+            : "😁 Tarefa concluída.",
+        ],
+        100,
+        ProcessamentoStatus.Concluded
+      );
+    } catch (error) {
+      await this.sendMessageClient(
+        ["❌ houve um problema ao enviar os arquivos para o Sittax"],
+        0,
+        ProcessamentoStatus.Stopped
+      );
     }
-    saveDb({ ...this.db, files: this.files });
-    await this.sendMessageClient(
-      [
-        this.hasError
-          ? "😨 Tarefa concluída com erros."
-          : "😁 Tarefa concluída.",
-      ],
-      100,
-      ProcessamentoStatus.Concluded
-    );
   }
 
   private initializeProperties(connection: connection) {
@@ -186,6 +194,7 @@ export class ProcessTask {
           [`❌ Erro ao enviar ${this.files[index].filepath}`],
           currentProgress
         );
+        throw error;
       }
     } else {
       await this.sendMessageClient(

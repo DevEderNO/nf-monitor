@@ -53,23 +53,31 @@ export class DiscoveryTask {
   }
 
   async run(connection: connection) {
-    this.initializeProperties(connection);
-    await this.sendMessageClient([
-      "Tarefa de descoberta dos arquivos iniciada.",
-    ]);
-    this.db = { ...getDb() };
-    this.files = this.db.files;
-    await this.discoveryDirectories(this.db.directories);
-    saveDb({
-      ...this.db,
-      directoriesAndSubDirectories: this.directoriesAndSubDirectories,
-      files: this.files,
-    });
-    if (!this.isCancelled) {
+    try {
+      this.initializeProperties(connection);
+      await this.sendMessageClient([
+        "Tarefa de descoberta dos arquivos iniciada.",
+      ]);
+      this.db = { ...getDb() };
+      this.files = this.db.files;
+      await this.discoveryDirectories(this.db.directories);
+      saveDb({
+        ...this.db,
+        directoriesAndSubDirectories: this.directoriesAndSubDirectories,
+        files: this.files,
+      });
+      if (!this.isCancelled) {
+        await this.sendMessageClient(
+          ["Concluído processo de descoberta dos arquivos"],
+          0,
+          ProcessamentoStatus.Concluded
+        );
+      }
+    } catch (error) {
       await this.sendMessageClient(
-        ["Concluído processo de descoberta dos arquivos"],
+        ["❌ houve um problema na descoberta dos arquivos"],
         0,
-        ProcessamentoStatus.Concluded
+        ProcessamentoStatus.Stopped
       );
     }
   }

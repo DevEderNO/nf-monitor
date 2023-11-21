@@ -30,7 +30,7 @@ function createWindow() {
     minHeight: 600,
     minWidth: 800,
     icon: path.join(process.env.VITE_PUBLIC, "sittax.ico"),
-    show: false,
+    show: !VITE_DEV_SERVER_URL ? false : true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: true,
