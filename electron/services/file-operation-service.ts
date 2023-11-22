@@ -101,7 +101,7 @@ function validateNotaFiscal(data: string): {
   valid: boolean;
   isNotaFiscal: boolean;
 } {
-  const chaveAcesso = /\\d{44}/.exec(data);
+  const chaveAcesso = /[0-9]{44}/.exec(data)?.[0];
   if (!chaveAcesso) return { valid: false, isNotaFiscal: false };
   if (
     isBefore(
@@ -132,7 +132,6 @@ function validateNotaServico(data: string): boolean {
             .startsWith(element.toLowerCase())
         ) {
           const text = html(elemento).text().trim();
-          console.log(text);
           if (text.length > 0) {
             date = text;
             return false;
@@ -155,11 +154,11 @@ export function validZip(fileInfo: IFileInfo): AdmZip | null {
   let valid = false;
   zipEntries.forEach((zipEntry) => {
     if (zipEntry.entryName.endsWith(".xml")) {
-      if (
-        zipEntry.getData().toString("utf-8").startsWith("<") &&
-        validateNotaFiscal(zipEntry.getData().toString("utf-8"))
-      )
-        valid = true;
+      const data = zipEntry.getData().toString("utf-8").trim();
+      if (data.startsWith("<")) {
+        const validate = validateNotaFiscal(data);
+        if (validate.valid || validateNotaServico(data)) valid = true;
+      }
     } else if (zipEntry.entryName.endsWith(".pdf")) {
       valid = false;
     }
