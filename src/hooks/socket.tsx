@@ -65,14 +65,6 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
               data: { messages, progress, status },
             },
           }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
-          dispatch({
-            type: ActionType.Processamento,
-            payload: {
-              messages,
-              progress,
-              status,
-            },
-          });
           if (
             [
               ProcessamentoStatus.Concluded,
@@ -111,6 +103,15 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
                   });
                 }
               });
+          } else {
+            dispatch({
+              type: ActionType.Processamento,
+              payload: {
+                messages,
+                progress,
+                status,
+              },
+            });
           }
         }
       }

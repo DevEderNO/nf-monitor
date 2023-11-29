@@ -9,6 +9,7 @@ import {
   listDirectory,
   saveDb,
   saveDbHistoric,
+  saveLog,
 } from "../services/file-operation-service";
 import { connection } from "websocket";
 import { WSMessageType, WSMessageTyped } from "../interfaces/ws-message";
@@ -79,6 +80,7 @@ export class DiscoveryTask {
         0,
         ProcessamentoStatus.Stopped
       );
+      saveLog(JSON.stringify(error));
     }
   }
 

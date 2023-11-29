@@ -55,16 +55,7 @@ export const StateReducer = (state: IState, action: IAction): IState => {
     case ActionType.Loading:
       return { ...state, loading: action.payload };
     case ActionType.Processamento:
-      const messages = state.processamento.messages;
-      messages.push(action.payload.messages);
-      return {
-        ...state,
-        processamento: {
-          messages,
-          progress: action.payload.progress,
-          status: action.payload.status,
-        },
-      };
+      return processamentoReducer();
     case ActionType.TimeForProcessing:
       window.ipcRenderer.send("set-timeForProcessing", action.payload);
       return { ...state, timeForProcessing: action.payload };
@@ -80,5 +71,18 @@ export const StateReducer = (state: IState, action: IAction): IState => {
       };
     default:
       return state;
+  }
+
+  function processamentoReducer() {
+    const messages = state.processamento.messages;
+    messages.push(action.payload.messages);
+    return {
+      ...state,
+      processamento: {
+        messages,
+        progress: action.payload.progress,
+        status: action.payload.status,
+      },
+    };
   }
 };

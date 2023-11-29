@@ -8,6 +8,7 @@ import {
   getDbHistoric,
   saveDb,
   saveDbHistoric,
+  saveLog,
   validXmlAndPdf,
   validZip,
 } from "../services/file-operation-service";
@@ -157,6 +158,7 @@ export class ProcessTask {
         0,
         ProcessamentoStatus.Stopped
       );
+      saveLog(JSON.stringify(error));
     }
   }
 

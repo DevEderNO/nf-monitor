@@ -301,3 +301,18 @@ export function clearHistoric() {
     console.log("saveDbHistoric", error);
   }
 }
+
+export function saveLog(log: string) {
+  const userDataPath = app.getPath("userData");
+  try {
+    fs.appendFileSync(
+      path.join(
+        process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
+        "log.json"
+      ),
+      JSON.stringify("\n" + log, null, 0)
+    );
+  } catch (error) {
+    console.log("saveDbHistoric", error);
+  }
+}
