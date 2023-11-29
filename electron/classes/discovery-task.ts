@@ -75,12 +75,12 @@ export class DiscoveryTask {
         );
       }
     } catch (error) {
+      saveLog(JSON.stringify(error));
       await this.sendMessageClient(
         ["❌ houve um problema na descoberta dos arquivos"],
         0,
         ProcessamentoStatus.Stopped
       );
-      saveLog(JSON.stringify(error));
     }
   }
 

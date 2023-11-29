@@ -89,7 +89,7 @@ export function validXmlAndPdf(fileInfo: IFileInfo): IFileInfo | null {
     if (!data.startsWith("<")) return null;
     const validate = validateNotaFiscal(data);
     if (validate.isNotaFiscal && !validate.valid) return null;
-    if (!validateNotaServico(data)) return null;
+    if (!validate.valid && !validateNotaServico(data)) return null;
     return fileInfo;
   } else if (fileInfo.extension === ".pdf") {
     return null;
@@ -310,7 +310,7 @@ export function saveLog(log: string) {
         process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
         "log.json"
       ),
-      JSON.stringify("\n" + log, null, 0)
+      JSON.stringify(log + "\n", null, 0)
     );
   } catch (error) {
     console.log("saveDbHistoric", error);

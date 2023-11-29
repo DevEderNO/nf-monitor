@@ -62,7 +62,7 @@ export class ProcessTask {
     try {
       this.initializeProperties(connection);
       this.db = getDb();
-      this.files = this.db.files;
+      this.files = this.db.files.filter((x) => x.wasSend === false);
       this.execution = findHistoric(id);
       await this.sendMessageClient([
         "Iniciando o envio dos arquivos para o Sittax",
@@ -153,7 +153,7 @@ export class ProcessTask {
         ProcessamentoStatus.Concluded
       );
     } catch (error) {
-      await this.sendMessageClient(
+      this.sendMessageClient(
         ["❌ houve um problema ao enviar os arquivos para o Sittax"],
         0,
         ProcessamentoStatus.Stopped
@@ -192,7 +192,8 @@ export class ProcessTask {
         );
       } catch (error) {
         this.hasError = true;
-        await this.sendMessageClient(
+        saveLog(JSON.stringify(error));
+        this.sendMessageClient(
           [`❌ Erro ao enviar ${this.files[index].filepath}`],
           currentProgress
         );
