@@ -17,8 +17,6 @@ import { IFileInfo } from "../interfaces/file-info";
 import { WSMessageType, WSMessageTyped } from "../interfaces/ws-message";
 import { IDb } from "../interfaces/db";
 import { signIn, upload } from "../lib/axios";
-import FormData from "form-data";
-import { createReadStream } from "fs";
 import { IDbHistoric, IExecution } from "../interfaces/db-historic";
 
 export class ProcessTask {
@@ -179,9 +177,7 @@ export class ProcessTask {
       await this.sendMessageClient(
         [`🚀 Enviando ${this.files[index].filepath}`],
         currentProgress
-      );
-      const form = new FormData();
-      form.append("arquivo", createReadStream(validFile.filepath));
+      )
       try {
         await upload(this.db.auth.token, validFile.filepath);
         this.files[index].wasSend = true;
