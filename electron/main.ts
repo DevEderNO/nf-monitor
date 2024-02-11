@@ -110,6 +110,7 @@ app.on("ready", () => {
   registerListeners(win);
   createWindow();
   createWebsocket();
+  autoUpdater.checkForUpdatesAndNotify();
 });
 
 autoUpdater.setFeedURL({
@@ -122,7 +123,7 @@ autoUpdater.setFeedURL({
 
 setInterval(() => {
   autoUpdater.checkForUpdatesAndNotify();
-}, 300000);
+}, 60000);
 
 autoUpdater.on("update-available", () => {
   win?.webContents.send("update-available", "⚙️ Identificada uma nova versão.");
