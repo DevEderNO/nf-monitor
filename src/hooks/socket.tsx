@@ -39,15 +39,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
               data: { messages, progress, status, id },
             },
           }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
-          dispatch({
-            type: ActionType.Processamento,
-            payload: {
-              messages,
-              progress,
-              status,
-            },
-          });
-          if ([ProcessamentoStatus.Concluded].includes(status)) {
+          if (ProcessamentoStatus.Concluded === status) {
             const request: WSMessageTyped<IProcessamento> = {
               type: "message",
               message: {
@@ -57,6 +49,14 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
             };
             client?.send(JSON.stringify(request));
           }
+          dispatch({
+            type: ActionType.Processamento,
+            payload: {
+              messages,
+              progress,
+              status,
+            },
+          });
         }
         if (response.message.type === WSMessageType.Process) {
           setProcessStatus("send");
@@ -71,14 +71,6 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
               ProcessamentoStatus.Stopped,
             ].includes(status)
           ) {
-            dispatch({
-              type: ActionType.Processamento,
-              payload: {
-                messages,
-                progress,
-                status,
-              },
-            });
             setProcessStatus("discovery");
             window.ipcRenderer
               .invoke("get-historic")
@@ -103,16 +95,15 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
                   });
                 }
               });
-          } else {
-            dispatch({
-              type: ActionType.Processamento,
-              payload: {
-                messages,
-                progress,
-                status,
-              },
-            });
           }
+          dispatch({
+            type: ActionType.Processamento,
+            payload: {
+              messages,
+              progress,
+              status,
+            },
+          });
         }
       }
     };
