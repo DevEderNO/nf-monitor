@@ -33,7 +33,6 @@ function createWindow() {
     show: !VITE_DEV_SERVER_URL ? false : true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
-      nodeIntegration: true,
       webSecurity: false,
     },
   });
@@ -98,6 +97,14 @@ function createWindow() {
     }
   });
 
+  app.on("second-instance", () => {
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
+      app.quit();
+    }
+  });
+
   if (!VITE_DEV_SERVER_URL) {
     app.setLoginItemSettings({
       openAtLogin: true,
@@ -107,17 +114,21 @@ function createWindow() {
 }
 
 app.on("ready", () => {
-  registerListeners(win);
   createWindow();
-  createWebsocket();
-  autoUpdater.checkForUpdatesAndNotify();
+  const isSecondInstance = app.requestSingleInstanceLock();
+  if (isSecondInstance) {
+    registerListeners(win);
+    createWebsocket();
+    autoUpdater.checkForUpdatesAndNotify();
+  } else {
+    app.quit();
+  }
 });
 
 autoUpdater.setFeedURL({
   provider: "github",
   owner: "DevEderNO",
   repo: "nf-monitor",
-  token: import.meta.env.VITE_GITHUB_TOKEN,
   releaseType: "release",
 });
 
@@ -137,7 +148,3 @@ autoUpdater.on("update-downloaded", () => {
   setInterval(() => {}, 5000);
   autoUpdater.quitAndInstall();
 });
-
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
