@@ -118,14 +118,10 @@ export class DiscoveryTask {
             ProcessamentoStatus.Paused
           );
         }
-        await new Promise((resolve) => {
-          setTimeout(resolve, 500);
-        });
+        await timeout(500);
         index--;
       } else {
-        await new Promise((resolve) => {
-          setTimeout(resolve, 10);
-        });
+        await timeout();
         const filesInfo = listDirectory(directories[index].path);
         await this.sendMessageClient(
           [
@@ -187,6 +183,7 @@ export class DiscoveryTask {
     progress = 0,
     status = ProcessamentoStatus.Running
   ) {
+    await timeout();
     messages.forEach((x) => this.execution.log?.push(x));
     if (
       [ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(
@@ -196,11 +193,7 @@ export class DiscoveryTask {
       const dbHistoric: IDbHistoric = getDbHistoric();
       dbHistoric.executions.push(this.execution);
       saveDbHistoric(dbHistoric);
-      await new Promise((resolve) => {
-        setTimeout(resolve, 500);
-      });
     }
-
     this.connection?.sendUTF(
       JSON.stringify({
         type: "message",
@@ -215,5 +208,12 @@ export class DiscoveryTask {
         },
       } as WSMessageTyped<IProcessamento>)
     );
+    await timeout();
   }
+}
+
+function timeout(time?: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, time ?? 50);
+  });
 }

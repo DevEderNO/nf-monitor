@@ -102,14 +102,9 @@ export class ProcessTask {
               ProcessamentoStatus.Paused
             );
           }
-          await new Promise((resolve) => {
-            setTimeout(resolve, 500);
-          });
+          await timeout(500);
           index--;
         } else {
-          await new Promise((resolve) => {
-            setTimeout(resolve, 10);
-          });
           currentProgress = this.progress + progressIncrement * (index + 1);
           const element = this.files[index];
           if (element.wasSend) {
@@ -151,6 +146,7 @@ export class ProcessTask {
         ProcessamentoStatus.Concluded
       );
     } catch (error) {
+      console.log(error);
       this.sendMessageClient(
         ["❌ houve um problema ao enviar os arquivos para o Sittax"],
         0,
@@ -177,7 +173,7 @@ export class ProcessTask {
       await this.sendMessageClient(
         [`🚀 Enviando ${this.files[index].filepath}`],
         currentProgress
-      )
+      );
       try {
         await upload(this.db.auth.token, validFile.filepath);
         this.files[index].wasSend = true;
@@ -222,6 +218,7 @@ export class ProcessTask {
         this.files[index].wasSend = true;
         this.files[index].dataSend = new Date();
       } catch (error) {
+        console.log(error);
         this.hasError = true;
         await this.sendMessageClient(
           [`❌ Erro ao enviar ${this.files[index].filepath}`],
@@ -243,6 +240,7 @@ export class ProcessTask {
     progress = 0,
     status = ProcessamentoStatus.Running
   ) {
+    await timeout();
     messages.forEach((x) => this.execution.log?.push(x));
     if (
       [ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(
@@ -256,9 +254,6 @@ export class ProcessTask {
         ...dbHistoric.executions.filter((x) => x.id !== this.execution.id),
       ];
       saveDbHistoric(dbHistoric);
-      await new Promise((resolve) => {
-        setTimeout(resolve, 500);
-      });
     }
     this.connection?.sendUTF(
       JSON.stringify({
@@ -274,5 +269,12 @@ export class ProcessTask {
         },
       } as WSMessageTyped<IProcessamento>)
     );
+    await timeout();
   }
+}
+
+function timeout(time?: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, time ?? 50);
+  });
 }
