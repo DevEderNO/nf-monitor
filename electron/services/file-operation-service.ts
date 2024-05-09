@@ -11,6 +11,7 @@ import { IUser } from "../interfaces/user";
 import { isBefore, addMonths, parseISO } from "date-fns";
 import * as cheerio from "cheerio";
 import { app } from "electron";
+import { createDocumentParser } from "@arbs.io/asset-extractor-wasm";
 
 const emissaoSelectors = [
   "data_emissao",
@@ -92,6 +93,7 @@ export function validXmlAndPdf(fileInfo: IFileInfo): IFileInfo | null {
     if (!validate.valid && !validateNotaServico(data)) return null;
     return fileInfo;
   } else if (fileInfo.extension === ".pdf") {
+    if (validatePdf(fileInfo)) return fileInfo;
     return null;
   }
   return null;
@@ -172,7 +174,7 @@ export function getFileXmlAndPdf(fileInfo: IFileInfo): IFile | null {
     const data = fs.readFileSync(fileInfo.filepath, "binary");
     return {
       name: fileInfo.name,
-      type: "xml",
+      type: fileInfo.extension === ".xml" ? "xml" : "pdf",
       data: data,
       path: fileInfo.filepath,
     };
@@ -315,4 +317,22 @@ export function saveLog(log: string) {
   } catch (error) {
     console.log("saveDbHistoric", error);
   }
+}
+
+function validatePdf(fileInfo: IFileInfo): boolean {
+  try {
+    const buf = fs.readFileSync(fileInfo.filepath);
+    const documentParser = createDocumentParser(new Uint8Array(buf));
+    const pdfText = documentParser?.contents?.text;
+    console.log(pdfText);
+    if (!pdfText) return false;
+    const isDeclaracao =
+      (/Nº da Declaração:\s+(\d+)/.exec(pdfText)?.[0].length ?? 0) > 0;
+    const isExtrato =
+      (/Informações da Apuração\s+(\d+)/.exec(pdfText)?.[0]?.length ?? 0) > 0;
+    return isDeclaracao || isExtrato;
+  } catch (error) {
+    console.log("Erro ao ler o PDF: ", fileInfo.filepath);
+  }
+  return false;
 }

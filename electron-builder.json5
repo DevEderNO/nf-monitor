@@ -35,6 +35,7 @@
   nsis: {
     oneClick: true,
     perMachine: true,
+    allowElevation: true,
     allowToChangeInstallationDirectory: false,
     installerIcon: "dist/sittax.ico",
     installerHeaderIcon: "dist/sittax.ico",

@@ -25,6 +25,11 @@
     "@jridgewell/gen-mapping" "^0.3.0"
     "@jridgewell/trace-mapping" "^0.3.9"
 
+"@arbs.io/asset-extractor-wasm@^0.1.2":
+  version "0.1.2"
+  resolved "https://registry.yarnpkg.com/@arbs.io/asset-extractor-wasm/-/asset-extractor-wasm-0.1.2.tgz#2eba9e888f05554ba0757394a6efe5039db72e52"
+  integrity sha512-vZI0d6NtByzFB2+hV1DfsV0Z/mKyfStZt3lsobwWw706AzepP9QYUY9Wza8/orOZ5gz8DBgVYDEUI9Ny7vbe4w==
+
 "@babel/code-frame@^7.22.13":
   version "7.22.13"
   resolved "https://registry.npmjs.org/@babel/code-frame/-/code-frame-7.22.13.tgz"

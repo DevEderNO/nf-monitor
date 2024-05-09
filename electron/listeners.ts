@@ -119,7 +119,6 @@ export async function registerListeners(win: BrowserWindow | null) {
     const files = filesInDb.filter(
       (x) => !x.filepath.includes(directory) || x.wasSend
     );
-    console.log(files);
     saveDb({ ...db, directories, files });
     return directories;
   });
