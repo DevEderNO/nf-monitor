@@ -145,6 +145,7 @@ export class ProcessTask {
         100,
         ProcessamentoStatus.Concluded
       );
+      await this.sendMessageClient([""], 100, ProcessamentoStatus.Concluded);
     } catch (error) {
       console.log(error);
       this.sendMessageClient(
