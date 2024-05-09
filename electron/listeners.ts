@@ -96,8 +96,8 @@ export async function registerListeners(win: BrowserWindow | null) {
     const directoriesInDb = db.directories;
     let directories = selectDirectories(win!);
     if (directories.length > 0) {
-      const newDirectories = directories.filter((x) =>
-        !directoriesInDb.find((y) => y.path === x.path)
+      const newDirectories = directories.filter(
+        (x) => !directoriesInDb.find((y) => y.path === x.path)
       );
       directories =
         newDirectories.length > 0
@@ -112,8 +112,15 @@ export async function registerListeners(win: BrowserWindow | null) {
   ipcMain.handle("remove-directory", async (_, directory: string) => {
     const db: IDb = getDb();
     const directoriesInDb = db.directories;
-    const directories = directoriesInDb.filter((x) => x.path !== directory);
-    saveDb({ ...db, directories });
+    const directories = directoriesInDb.filter(
+      (x) => !x.path.includes(directory)
+    );
+    const filesInDb = db.files;
+    const files = filesInDb.filter(
+      (x) => !x.filepath.includes(directory) || x.wasSend
+    );
+    console.log(files);
+    saveDb({ ...db, directories, files });
     return directories;
   });
 
