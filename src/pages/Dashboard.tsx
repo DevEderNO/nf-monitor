@@ -1,5 +1,5 @@
 import { Button } from "@components/ui/button";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Textarea } from "@components/ui/textarea";
 import { Progress } from "@components/ui/progress";
 import { Play, Pause } from "lucide-react";
@@ -9,6 +9,7 @@ import { WSMessageType } from "../interfaces/ws-message";
 import { ProcessamentoStatus } from "@/interfaces/processamento";
 import { StopIcon } from "@radix-ui/react-icons";
 import { ActionType } from "@/hooks/state-reducer";
+import { useToast } from "@/components/ui/use-toast";
 
 interface IStepProcess {
   [key: string]: {
@@ -25,6 +26,7 @@ export function Dashboard() {
     state: { processamento, directories },
     dispatch,
   } = useAppState();
+  const { toast } = useToast();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -76,6 +78,7 @@ export function Dashboard() {
       label: "Localizar",
       icon: <Play />,
       onClick: () => {
+        if (hasDerectories()) return;
         client?.send(
           JSON.stringify({
             type: "message",
@@ -92,6 +95,7 @@ export function Dashboard() {
       icon: <Play />,
       onClick: () => {
         dispatch({ type: ActionType.ClearMessages });
+        if (hasDerectories()) return;
         client?.send(
           JSON.stringify({
             type: "message",
@@ -104,6 +108,23 @@ export function Dashboard() {
       },
     },
   };
+
+  const hasDerectories = useCallback(() => {
+    if (directories.length <= 0) {
+      const messages = [
+        "😊 Beleza! Só precisa selecionar onde estão os arquivos, tudo certo?",
+        "🤔 Poxa, precisamos que você escolha o diretório onde estão os arquivos que precisamos encontrar.",
+        "😌🔍 Vamos nessa! Escolha o diretório onde estão os arquivos que precisamos achar.",
+      ];
+      toast({
+        title: messages[Math.floor(Math.random() * 3)],
+        description: "",
+        type: "foreground",
+      });
+      return true;
+    }
+    return false;
+  }, [directories.length, toast]);
 
   const send: IStepProcess = {
     Running: {
