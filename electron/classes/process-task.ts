@@ -11,6 +11,7 @@ import {
   saveLog,
   validXmlAndPdf,
   validZip,
+  validateDiretoryFileExists,
 } from "../services/file-operation-service";
 import { connection } from "websocket";
 import { IFileInfo } from "../interfaces/file-info";
@@ -28,6 +29,7 @@ export class ProcessTask {
   progress: number;
   db: IDb;
   files: IFileInfo[];
+  filesSended: IFileInfo[];
   hasError: boolean;
   execution: IExecution;
   constructor() {
@@ -37,6 +39,7 @@ export class ProcessTask {
     this.progress = 0;
     this.db = {} as IDb;
     this.files = [];
+    this.filesSended = [];
     this.hasError = false;
     this.execution = {} as IExecution;
     this.pausedMessage = null;
@@ -60,7 +63,15 @@ export class ProcessTask {
     try {
       this.initializeProperties(connection);
       this.db = getDb();
-      this.files = this.db.files.filter((x) => x.wasSend === false);
+      this.files = [...this.db.files.filter((x) => !x.wasSend)];
+      this.filesSended = [...this.db.files.filter((x) => x.wasSend)];
+      if (
+        this.db.configuration.viewUploadedFiles &&
+        this.filesSended.length > 0
+      ) {
+        this.files.push(...this.filesSended);
+      }
+      this.validateDiretoryFile();
       this.execution = findHistoric(id);
       await this.sendMessageClient([
         "Iniciando o envio dos arquivos para o Sittax",
@@ -135,6 +146,12 @@ export class ProcessTask {
           }
         }
       }
+      if (
+        !this.db.configuration.viewUploadedFiles &&
+        this.filesSended.length > 0
+      ) {
+        this.files.push(...this.filesSended);
+      }
       saveDb({ ...this.db, files: this.files });
       await this.sendMessageClient(
         [
@@ -164,7 +181,18 @@ export class ProcessTask {
     this.pausedMessage = null;
     this.hasError = false;
     this.progress = 0;
+    this.filesSended = [];
     this.connection = connection;
+  }
+
+  private validateDiretoryFile() {
+    const validatedFiles: IFileInfo[] = [];
+    this.files.forEach((file) => {
+      if (validateDiretoryFileExists(file)) {
+        validatedFiles.push(file);
+      }
+    });
+    this.files = validatedFiles;
   }
 
   private async sendXmlAndPdfSittax(index: number, currentProgress: number) {

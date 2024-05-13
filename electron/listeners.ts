@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain } from "electron";
 import { IDb } from "./interfaces/db";
 import {
+  clearHistoric,
   getDb,
   getDbHistoric,
   listDirectory,
@@ -48,6 +49,7 @@ export async function registerListeners(win: BrowserWindow | null) {
         EUsuarioEmpresa,
         Role,
         EPrimeiroAcesso,
+        Nivel,
       } = Usuarios[0];
 
       const passwordHash = encrypt(password);
@@ -73,6 +75,7 @@ export async function registerListeners(win: BrowserWindow | null) {
           EUsuarioEmpresa,
           Role,
           EPrimeiroAcesso,
+          Nivel,
         },
       };
       saveDb(db);
@@ -134,6 +137,12 @@ export async function registerListeners(win: BrowserWindow | null) {
     saveDb(db);
   });
 
+  ipcMain.on("set-viewUploadedFiles", async (_, viewUploadedFiles) => {
+    const db: IDb = getDb();
+    db.configuration.viewUploadedFiles = viewUploadedFiles;
+    saveDb(db);
+  });
+
   ipcMain.handle("get-timeForProcessing", async () => {
     const db: IDb = getDb();
     return db.timeForProcessing;
@@ -150,5 +159,9 @@ export async function registerListeners(win: BrowserWindow | null) {
 
   ipcMain.on("initialize-job", () => {
     initializeJob();
+  });
+
+  ipcMain.on("clear-historic", () => {
+    clearHistoric();
   });
 }

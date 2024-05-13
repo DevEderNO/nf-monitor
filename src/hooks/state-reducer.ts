@@ -4,6 +4,7 @@ import {
   ProcessamentoStatus,
 } from "../interfaces/processamento";
 import { IAuth } from "@/interfaces/auth";
+import { IConfig } from "@/interfaces/config";
 
 export interface IState {
   auth: IAuth;
@@ -12,6 +13,7 @@ export interface IState {
   processamento: IProcessamento;
   timeForProcessing: string;
   historic: string[];
+  config: IConfig;
 }
 
 export interface IAction {
@@ -30,6 +32,9 @@ export const initialState: IState = {
   },
   timeForProcessing: "00:00",
   historic: [],
+  config: {
+    viewUploadedFiles: true,
+  },
 };
 
 export enum ActionType {
@@ -41,6 +46,7 @@ export enum ActionType {
   Clear,
   TimeForProcessing,
   Historic,
+  ViewUploadedFiles,
 }
 
 export const StateReducer = (state: IState, action: IAction): IState => {
@@ -61,6 +67,15 @@ export const StateReducer = (state: IState, action: IAction): IState => {
       return { ...state, timeForProcessing: action.payload };
     case ActionType.Historic:
       return { ...state, historic: action.payload };
+    case ActionType.ViewUploadedFiles:
+      window.ipcRenderer.send("set-viewUploadedFiles", action.payload);
+      return {
+        ...state,
+        config: {
+          ...state.config,
+          viewUploadedFiles: action.payload,
+        },
+      };
     case ActionType.Clear:
       window.ipcRenderer.send("remove-auth");
       return { ...initialState };

@@ -13,4 +13,17 @@ export interface IUser {
   EUsuarioEmpresa: string;
   Role: string;
   EPrimeiroAcesso: string;
+  Nivel: ENivel;
+}
+
+export enum ENivel {
+  Empresa = 1,
+  Usuario = 2,
+  AdministradorEscritorio = 3,
+  Financeiro = 4,
+  Suporte = 5,
+  Revenda = 6,
+
+  Desenvolvedor = 9,
+  Administrador = 10,
 }

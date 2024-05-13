@@ -8,7 +8,7 @@ import { IDb } from "../interfaces/db";
 import { IDirectory } from "../interfaces/directory";
 import { IDbHistoric, IExecution } from "../interfaces/db-historic";
 import { IUser } from "../interfaces/user";
-import { isBefore, addMonths, parseISO } from "date-fns";
+import { isBefore, addMonths, parseISO, format } from "date-fns";
 import * as cheerio from "cheerio";
 import { app } from "electron";
 import { createDocumentParser } from "@arbs.io/asset-extractor-wasm";
@@ -151,22 +151,28 @@ function validateNotaServico(data: string): boolean {
 }
 
 export function validZip(fileInfo: IFileInfo): AdmZip | null {
-  const zip = new AdmZip(fileInfo.filepath);
-  const zipEntries = zip.getEntries();
-  let valid = false;
-  zipEntries.forEach((zipEntry) => {
-    if (zipEntry.entryName.endsWith(".xml")) {
-      const data = zipEntry.getData().toString("utf-8").trim();
-      if (data.startsWith("<")) {
-        const validate = validateNotaFiscal(data);
-        if (validate.valid || validateNotaServico(data)) valid = true;
+  try {
+    console.log("criando amdzip");
+    const zip = new AdmZip(fileInfo.filepath);
+    console.log("pegando os entries");
+    const zipEntries = zip.getEntries();
+    let valid = false;
+    zipEntries.forEach((zipEntry) => {
+      if (zipEntry.entryName.endsWith(".xml")) {
+        const data = zipEntry.getData().toString("utf-8").trim();
+        if (data.startsWith("<")) {
+          const validate = validateNotaFiscal(data);
+          if (validate.valid || validateNotaServico(data)) valid = true;
+        }
+      } else if (zipEntry.entryName.endsWith(".pdf")) {
+        valid = false;
       }
-    } else if (zipEntry.entryName.endsWith(".pdf")) {
-      valid = false;
-    }
-    if (valid) return;
-  });
-  return valid ? zip : null;
+      if (valid) return;
+    });
+    return valid ? zip : null;
+  } catch (error) {
+    return null;
+  }
 }
 
 export function getFileXmlAndPdf(fileInfo: IFileInfo): IFile | null {
@@ -211,7 +217,7 @@ export function getDb(): IDb {
     );
   } catch (error) {
     return {
-      configuration: {},
+      configuration: { viewUploadedFiles: true },
       directories: [],
       directoriesAndSubDirectories: [],
       files: [],
@@ -291,7 +297,16 @@ export function saveDbHistoric(db: IDbHistoric) {
 
 export function clearHistoric() {
   const userDataPath = app.getPath("userData");
+  const dbHistoric = getDbHistoric();
   try {
+    if (dbHistoric.executions.length > 0)
+      fs.writeFileSync(
+        path.join(
+          process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
+          `dbHistoric-${format(new Date(), "yyyy-MM-dd HH-mm-ss")}.json`
+        ),
+        JSON.stringify(dbHistoric, null, 0)
+      );
     fs.writeFileSync(
       path.join(
         process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
@@ -324,7 +339,6 @@ function validatePdf(fileInfo: IFileInfo): boolean {
     const buf = fs.readFileSync(fileInfo.filepath);
     const documentParser = createDocumentParser(new Uint8Array(buf));
     const pdfText = documentParser?.contents?.text;
-    console.log(pdfText);
     if (!pdfText) return false;
     const isDeclaracao =
       (/Nº da Declaração:\s+(\d+)/.exec(pdfText)?.[0].length ?? 0) > 0;
@@ -335,4 +349,15 @@ function validatePdf(fileInfo: IFileInfo): boolean {
     console.log("Erro ao ler o PDF: ", fileInfo.filepath);
   }
   return false;
+}
+
+export function validateDiretoryFileExists(fileInfo: IFileInfo): boolean {
+  try {
+    const fileDirectory = path.dirname(fileInfo.filepath);
+    const directoryExist = fs.existsSync(fileDirectory);
+    fs.accessSync(fileInfo.filepath, fs.constants.F_OK);
+    return directoryExist;
+  } catch (error) {
+    return false;
+  }
 }
