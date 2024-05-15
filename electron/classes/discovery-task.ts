@@ -98,15 +98,12 @@ export class DiscoveryTask {
   private async discoveryDirectories(directories: IDirectory[]) {
     for (let index = 0; index < directories.length; index++) {
       if (this.isCancelled) {
-        if (this.cancelledMessage === null) {
-          this.cancelledMessage =
-            "Tarefa de descoberta dos arquivos cancelada.";
-          await this.sendMessageClient(
-            [this.cancelledMessage],
-            0,
-            ProcessamentoStatus.Stopped
-          );
-        }
+        await this.sendMessageClient(
+          ["Tarefa de descoberta dos arquivos cancelada."],
+          0,
+          ProcessamentoStatus.Stopped
+        );
+        await this.sendMessageClient([], 0, ProcessamentoStatus.Stopped);
         return;
       }
       if (this.isPaused) {
