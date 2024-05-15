@@ -96,6 +96,7 @@ export class ProcessTask {
               ProcessamentoStatus.Stopped
             );
           }
+          await this.sendMessageClient([], 0, ProcessamentoStatus.Stopped);
           this.isCancelled = false;
           this.isPaused = false;
           this.hasError = false;
