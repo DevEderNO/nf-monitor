@@ -27,6 +27,7 @@ const emissaoSelectors = [
   "DtHrGerNf",
   "DT_COMPETENCIA",
   "data",
+  "nfse:DataEmissao"
 ];
 
 export function listDirectory(
@@ -103,7 +104,8 @@ function validateNotaFiscal(data: string): {
   valid: boolean;
   isNotaFiscal: boolean;
 } {
-  const chaveAcesso = /[0-9]{44}/.exec(data)?.[0];
+  const chaveAcesso =
+    /<chNFe>[0-9]{44}/gi.exec(data)?.[0] ?? /NFe[0-9]{44}/gi.exec(data)?.[0];
   if (!chaveAcesso) return { valid: false, isNotaFiscal: false };
   if (
     isBefore(
@@ -152,9 +154,7 @@ function validateNotaServico(data: string): boolean {
 
 export function validZip(fileInfo: IFileInfo): AdmZip | null {
   try {
-    console.log("criando amdzip");
     const zip = new AdmZip(fileInfo.filepath);
-    console.log("pegando os entries");
     const zipEntries = zip.getEntries();
     let valid = false;
     zipEntries.forEach((zipEntry) => {
