@@ -27,7 +27,7 @@ const emissaoSelectors = [
   "DtHrGerNf",
   "DT_COMPETENCIA",
   "data",
-  "nfse:DataEmissao"
+  "nfse:DataEmissao",
 ];
 
 export function listDirectory(
@@ -85,19 +85,23 @@ export function selectDirectories(win: BrowserWindow): IDirectory[] {
   return [];
 }
 
-export function validXmlAndPdf(fileInfo: IFileInfo): IFileInfo | null {
-  if (fileInfo.extension === ".xml") {
-    const data = fs.readFileSync(fileInfo.filepath, "utf-8")?.trim();
-    if (!data.startsWith("<")) return null;
-    const validate = validateNotaFiscal(data);
-    if (validate.isNotaFiscal && !validate.valid) return null;
-    if (!validate.valid && !validateNotaServico(data)) return null;
-    return fileInfo;
-  } else if (fileInfo.extension === ".pdf") {
-    if (validatePdf(fileInfo)) return fileInfo;
-    return null;
+export function validXmlAndPdf(fileInfo: IFileInfo): {
+  valid: boolean;
+  isNotaFiscal: boolean;
+} {
+  let validate = { valid: false, isNotaFiscal: false };
+  switch (fileInfo.extension) {
+    case ".xml":
+      const data = fs.readFileSync(fileInfo.filepath, "utf-8")?.trim();
+      if (!data.startsWith("<")) return validate;
+      validate = validateNotaFiscal(data);
+      if (validate.isNotaFiscal) return validate;
+      return validateNotaServico(data);
+    case ".pdf":
+      if (validatePdf(fileInfo)) return { valid: true, isNotaFiscal: false };
+      return validate;
   }
-  return null;
+  return validate;
 }
 
 function validateNotaFiscal(data: string): {
@@ -122,7 +126,10 @@ function validateNotaFiscal(data: string): {
   return { valid: true, isNotaFiscal: true };
 }
 
-function validateNotaServico(data: string): boolean {
+function validateNotaServico(data: string): {
+  valid: boolean;
+  isNotaFiscal: boolean;
+} {
   try {
     const html = cheerio.load(data);
     let date = "";
@@ -144,34 +151,51 @@ function validateNotaServico(data: string): boolean {
       });
       if (date.length > 0) break;
     }
-    if (date.length === 0) return false;
-    if (isBefore(parseISO(date), addMonths(new Date(), -3))) return false;
-    return true;
+    if (date.length === 0) return { valid: false, isNotaFiscal: false };
+    if (isBefore(parseISO(date), addMonths(new Date(), -3)))
+      return { valid: false, isNotaFiscal: true };
+    return { valid: true, isNotaFiscal: true };
   } catch (error) {
-    return false;
+    return { valid: false, isNotaFiscal: false };
   }
 }
 
-export function validZip(fileInfo: IFileInfo): AdmZip | null {
+export function validZip(fileInfo: IFileInfo): {
+  valid: boolean;
+  isNotaFiscal: boolean;
+} {
+  let validate: {
+    valid: boolean;
+    isNotaFiscal: boolean;
+  } = { valid: false, isNotaFiscal: false };
   try {
     const zip = new AdmZip(fileInfo.filepath);
     const zipEntries = zip.getEntries();
-    let valid = false;
     zipEntries.forEach((zipEntry) => {
-      if (zipEntry.entryName.endsWith(".xml")) {
-        const data = zipEntry.getData().toString("utf-8").trim();
-        if (data.startsWith("<")) {
-          const validate = validateNotaFiscal(data);
-          if (validate.valid || validateNotaServico(data)) valid = true;
-        }
-      } else if (zipEntry.entryName.endsWith(".pdf")) {
-        valid = false;
+      switch (path.extname(zipEntry.entryName)) {
+        case ".xml":
+          const data = zipEntry.getData().toString("utf-8").trim();
+          if (data.startsWith("<")) {
+            validate = validateNotaFiscal(data);
+            if (validate.valid) return;
+            validate = validateNotaServico(data);
+            if (validate.valid) return;
+          }
+          break;
+        case ".pdf":
+          if (validatePdf(fileInfo)) {
+            validate = {
+              valid: true,
+              isNotaFiscal: false,
+            };
+            return;
+          }
+          break;
       }
-      if (valid) return;
     });
-    return valid ? zip : null;
+    return validate;
   } catch (error) {
-    return null;
+    return validate;
   }
 }
 

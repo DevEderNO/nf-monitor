@@ -198,14 +198,14 @@ export class ProcessTask {
 
   private async sendXmlAndPdfSittax(index: number, currentProgress: number) {
     const validFile = validXmlAndPdf(this.files[index]);
-    if (validFile) {
+    if (validFile.valid) {
       this.files[index].isValid = true;
       await this.sendMessageClient(
         [`🚀 Enviando ${this.files[index].filepath}`],
         currentProgress
       );
       try {
-        await upload(this.db.auth.token, validFile.filepath);
+        await upload(this.db.auth.token, this.files[index].filepath);
         this.files[index].wasSend = true;
         this.files[index].dataSend = new Date();
         await this.sendMessageClient(
@@ -223,7 +223,11 @@ export class ProcessTask {
       }
     } else {
       await this.sendMessageClient(
-        [`⚠️ Arquivo não e válido para o envio ${this.files[index].filepath}`],
+        [
+          validFile.isNotaFiscal
+            ? `⚠️ Arquivo não é válido por que a data de emissão e anterior 3️⃣ messes ${this.files[index].filepath}`
+            : `⚠️ Arquivo não e válido para o envio ${this.files[index].filepath}`,
+        ],
         currentProgress,
         ProcessamentoStatus.Running
       );
@@ -233,7 +237,7 @@ export class ProcessTask {
 
   private async sendZipSittax(index: number, currentProgress: number) {
     const validFile = validZip(this.files[index]);
-    if (validFile) {
+    if (validFile.valid) {
       this.files[index].isValid = true;
       await this.sendMessageClient(
         [`🚀 Enviando ${this.files[index].filepath}`],
@@ -257,7 +261,11 @@ export class ProcessTask {
       }
     } else {
       await this.sendMessageClient(
-        [`⚠️ Arquivo não e válido para o envio ${this.files[index].filepath}`],
+        [
+          validFile.isNotaFiscal
+            ? `⚠️ Arquivo não é válido por que a data de emissão e anterior 3️⃣ messes ${this.files[index].filepath}`
+            : `⚠️ Arquivo não é válido para o envio ${this.files[index].filepath}`,
+        ],
         currentProgress,
         ProcessamentoStatus.Running
       );
