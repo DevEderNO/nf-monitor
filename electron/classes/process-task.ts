@@ -165,7 +165,6 @@ export class ProcessTask {
       );
       await this.sendMessageClient([""], 100, ProcessamentoStatus.Concluded);
     } catch (error) {
-      console.log(error);
       this.sendMessageClient(
         ["❌ houve um problema ao enviar os arquivos para o Sittax"],
         0,
@@ -219,7 +218,7 @@ export class ProcessTask {
           [`❌ Erro ao enviar ${this.files[index].filepath}`],
           currentProgress
         );
-        throw error;
+        //throw error;
       }
     } else {
       await this.sendMessageClient(
@@ -252,7 +251,6 @@ export class ProcessTask {
         this.files[index].wasSend = true;
         this.files[index].dataSend = new Date();
       } catch (error) {
-        console.log(error);
         this.hasError = true;
         await this.sendMessageClient(
           [`❌ Erro ao enviar ${this.files[index].filepath}`],

@@ -10,6 +10,7 @@ import {
   saveDb,
   saveDbHistoric,
   saveLog,
+  validadeUnlockedFile,
 } from "../services/file-operation-service";
 import { connection } from "websocket";
 import { WSMessageType, WSMessageTyped } from "../interfaces/ws-message";
@@ -158,6 +159,9 @@ export class DiscoveryTask {
             ...newDirectoriesAndSubDirectories,
           ];
         }
+        filesInfo.forEach(x => {
+          validadeUnlockedFile(x.filepath);
+        })
         let filesFiltered = filesInfo.filter(
           (x) =>
             x.isFile &&

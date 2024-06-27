@@ -118,7 +118,10 @@ function validateNotaFiscal(data: string): {
         Number(chaveAcesso.slice(4, 6)),
         1
       ),
-      addMonths(new Date(), -3)
+      addMonths(
+        new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+        -3
+      )
     )
   ) {
     return { valid: false, isNotaFiscal: true };
@@ -152,7 +155,13 @@ function validateNotaServico(data: string): {
       if (date.length > 0) break;
     }
     if (date.length === 0) return { valid: false, isNotaFiscal: false };
-    if (isBefore(parseISO(date), addMonths(new Date(), -3)))
+    const newDate = new Date();
+    if (
+      isBefore(
+        parseISO(date),
+        addMonths(new Date(newDate.getFullYear(), newDate.getMonth(), 1), -3)
+      )
+    )
       return { valid: false, isNotaFiscal: true };
     return { valid: true, isNotaFiscal: true };
   } catch (error) {
@@ -383,5 +392,15 @@ export function validateDiretoryFileExists(fileInfo: IFileInfo): boolean {
     return directoryExist;
   } catch (error) {
     return false;
+  }
+}
+
+export function validadeUnlockedFile(filepth: string): boolean {
+  try {
+    fs.unlinkSync(filepth + ":Zone.Identifier");
+    console.log("O ADS foi deletado com sucesso. O arquivo está desbloqueado.");
+    return true;
+  } catch (error) {
+    return true;
   }
 }
