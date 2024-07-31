@@ -9,6 +9,7 @@ import {
   saveDb,
   saveDbHistoric,
   saveLog,
+  unblockFile,
   validXmlAndPdf,
   validZip,
   validateDiretoryFileExists,
@@ -133,6 +134,13 @@ export class ProcessTask {
               currentProgress
             );
           } else {
+            if (element.bloqued) {
+              await this.sendMessageClient(
+                [`🔓 desbloqueando o arquivo ${element.filepath}`],
+                currentProgress
+              );
+              unblockFile(element.filepath);
+            }
             switch (element.extension) {
               case ".xml":
               case ".pdf":

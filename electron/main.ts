@@ -3,6 +3,7 @@ import path from "node:path";
 import { registerListeners } from "./listeners";
 import { createWebsocket } from "./websocket";
 import { autoUpdater } from "electron-updater";
+import { acceptStreamsEula } from "./services/file-operation-service";
 
 // The built directory structure
 //
@@ -39,7 +40,16 @@ function createWindow() {
 
   // Test active push message to Renderer-process.
   win.webContents.on("did-finish-load", () => {
-    win?.webContents.send("main-process-message", new Date().toLocaleString());
+    // win?.webContents.send("main-process-message", new Date().toLocaleString());
+    // win?.webContents.send(
+    //   "main-process-message",
+    //   path.join(
+    //     process.env["VITE_DEV_SERVER_URL"]
+    //       ? __dirname
+    //       : path.dirname(app.getPath("exe")),
+    //     "streams.exe"
+    //   )
+    // );
   });
 
   if (VITE_DEV_SERVER_URL) {
@@ -115,6 +125,7 @@ function createWindow() {
 
 app.on("ready", () => {
   createWindow();
+  acceptStreamsEula();
   const isSecondInstance = app.requestSingleInstanceLock();
   if (isSecondInstance) {
     registerListeners(win);

@@ -9,4 +9,5 @@ export interface IFileInfo {
   dataSend?: Date;
   wasSend: boolean;
   isValid: boolean;
+  bloqued: boolean;
 }

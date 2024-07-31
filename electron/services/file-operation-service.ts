@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { execSync } from "node:child_process";
 import { BrowserWindow, dialog } from "electron";
 import AdmZip from "adm-zip";
 import { IFileInfo } from "../interfaces/file-info";
@@ -53,6 +54,7 @@ export function listDirectory(
           size: fs.statSync(itemPath).size,
           wasSend: false,
           isValid: false,
+          bloqued: isFile && isFileBlocked(itemPath),
         });
       } catch (_) {
         if (callback) {
@@ -90,9 +92,10 @@ export function validXmlAndPdf(fileInfo: IFileInfo): {
   isNotaFiscal: boolean;
 } {
   let validate = { valid: false, isNotaFiscal: false };
+  let data = "";
   switch (fileInfo.extension) {
     case ".xml":
-      const data = fs.readFileSync(fileInfo.filepath, "utf-8")?.trim();
+      data = fs.readFileSync(fileInfo.filepath, "utf-8")?.trim();
       if (!data.startsWith("<")) return validate;
       validate = validateNotaFiscal(data);
       if (validate.isNotaFiscal) return validate;
@@ -180,10 +183,11 @@ export function validZip(fileInfo: IFileInfo): {
   try {
     const zip = new AdmZip(fileInfo.filepath);
     const zipEntries = zip.getEntries();
+    let data = "";
     zipEntries.forEach((zipEntry) => {
       switch (path.extname(zipEntry.entryName)) {
         case ".xml":
-          const data = zipEntry.getData().toString("utf-8").trim();
+          data = zipEntry.getData().toString("utf-8").trim();
           if (data.startsWith("<")) {
             validate = validateNotaFiscal(data);
             if (validate.valid) return;
@@ -388,19 +392,54 @@ export function validateDiretoryFileExists(fileInfo: IFileInfo): boolean {
   try {
     const fileDirectory = path.dirname(fileInfo.filepath);
     const directoryExist = fs.existsSync(fileDirectory);
-    fs.accessSync(fileInfo.filepath, fs.constants.F_OK);
     return directoryExist;
   } catch (error) {
+    console.log("Erro ao desbloquear arquivos:", error);
     return false;
   }
 }
 
-export function validadeUnlockedFile(filepth: string): boolean {
+export function acceptStreamsEula() {
   try {
-    fs.unlinkSync(filepth + ":Zone.Identifier");
-    console.log("O ADS foi deletado com sucesso. O arquivo está desbloqueado.");
-    return true;
+    // Comando para adicionar a entrada no registro
+    const regCommand =
+      'reg add "HKCU\\Software\\Sysinternals\\Streams" /v EulaAccepted /t REG_DWORD /d 1 /f';
+    execSync(regCommand, { stdio: "ignore" });
+    console.log("Termos do streams.exe aceitos automaticamente.");
   } catch (error) {
-    return true;
+    console.error("Erro ao aceitar os termos do streams.exe:", error);
+  }
+}
+
+export function isFileBlocked(filePath: string): boolean {
+  const streamsPath = path.join(
+    process.env["VITE_DEV_SERVER_URL"]
+      ? __dirname
+      : path.dirname(app.getPath("exe")),
+    "streams.exe"
+  );
+  try {
+    const output = execSync(`"${streamsPath}" "${filePath}"`, {
+      stdio: "pipe",
+    }).toString();
+    return output.includes("Zone.Identifier");
+  } catch (error) {
+    console.error("Erro ao verificar o arquivo:", error);
+    return false;
+  }
+}
+
+export function unblockFile(filePath: string) {
+  const streamsPath = path.join(
+    process.env["VITE_DEV_SERVER_URL"]
+      ? __dirname
+      : path.dirname(app.getPath("exe")),
+    "streams.exe"
+  );
+  try {
+    execSync(`"${streamsPath}" -d "${filePath}"`, { stdio: "ignore" });
+    console.log(`Arquivo ${path.basename(filePath)} desbloqueado com sucesso.`);
+  } catch (error) {
+    console.error("Erro ao desbloquear o arquivo:", error);
   }
 }

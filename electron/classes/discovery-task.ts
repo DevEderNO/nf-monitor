@@ -10,7 +10,6 @@ import {
   saveDb,
   saveDbHistoric,
   saveLog,
-  validadeUnlockedFile,
 } from "../services/file-operation-service";
 import { connection } from "websocket";
 import { WSMessageType, WSMessageTyped } from "../interfaces/ws-message";
@@ -159,18 +158,21 @@ export class DiscoveryTask {
             ...newDirectoriesAndSubDirectories,
           ];
         }
-        filesInfo.forEach(x => {
-          validadeUnlockedFile(x.filepath);
-        })
         let filesFiltered = filesInfo.filter(
           (x) =>
             x.isFile &&
             [".xml", ".pdf", ".zip"].includes(x.extension.toLowerCase())
         );
 
+        this.files = this.files.map((f) => {
+          const file = filesFiltered.find((ff) => ff.filepath == f.filepath);
+          return file ? { ...f, bloqued: file.bloqued } : f;
+        });
+
         filesFiltered = filesFiltered.filter(
           (x) => !this.files.map((d) => d.filepath).includes(x.filepath)
         );
+
         if (filesFiltered.length > 0) {
           this.files = [...this.files, ...filesFiltered];
         }
