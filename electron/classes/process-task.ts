@@ -14,7 +14,6 @@ import { WSMessageType, WSMessageTyped } from "../interfaces/ws-message";
 import { signIn, upload } from "../lib/axios";
 import { IDbHistoric } from "../interfaces/db-historic";
 import {
-  addError,
   addHistoric,
   getAuth,
   getConfiguration,
@@ -22,7 +21,6 @@ import {
   updateAuth,
   updateFile,
 } from "../services/database";
-import { ErrorType } from "@prisma/client";
 import { IAuth } from "../interfaces/auth";
 
 export class ProcessTask {
@@ -93,11 +91,6 @@ export class ProcessTask {
       );
       if (!resp.Token) {
         this.hasError = true;
-        await addError({
-          message: "Não foi possível autenticar no Sittax",
-          stack: JSON.stringify(resp),
-          type: ErrorType.Proccess,
-        });
         await this.sendMessageClient(
           ["❌ Não foi possível autenticar no Sittax"],
           0,
@@ -200,11 +193,6 @@ export class ProcessTask {
         0,
         ProcessamentoStatus.Stopped
       );
-      await addError({
-        message: JSON.stringify(error),
-        stack: JSON.stringify(error),
-        type: ErrorType.Proccess,
-      });
     }
   }
 
@@ -249,11 +237,6 @@ export class ProcessTask {
         );
       } catch (error) {
         this.hasError = true;
-        await addError({
-          message: JSON.stringify(error),
-          stack: JSON.stringify(error),
-          type: ErrorType.Proccess,
-        });
         this.sendMessageClient(
           [`❌ Erro ao enviar ${this.files[index].filepath}`],
           currentProgress
@@ -294,11 +277,6 @@ export class ProcessTask {
         });
       } catch (error) {
         this.hasError = true;
-        await addError({
-          message: JSON.stringify(error),
-          stack: JSON.stringify(error),
-          type: ErrorType.Proccess,
-        });
         await this.sendMessageClient(
           [`❌ Erro ao enviar ${this.files[index].filepath}`],
           currentProgress

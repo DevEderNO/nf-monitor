@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import path from "node:path";
 import electron from "vite-plugin-electron";
 import renderer from "vite-plugin-electron-renderer";
+import fs from 'fs-extra';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -10,6 +11,8 @@ export default defineConfig({
       {
         entry: "electron/main.ts",
         onstart(options) {
+          // Copia os arquivos da pasta resources para dist-electron no início
+          fs.copySync('resources', 'dist-electron');
           options.startup();
         },
         vite: {

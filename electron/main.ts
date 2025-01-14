@@ -4,7 +4,9 @@ import { registerListeners } from "./listeners";
 import { createWebsocket } from "./websocket";
 import { autoUpdater } from "electron-updater";
 import { acceptStreamsEula } from "./services/file-operation-service";
-import { initializeDatabase } from './services/database';
+import { initializeDatabase } from "./services/database";
+import { logError } from "./services/error-service";
+import { ErrorType } from "@prisma/client";
 
 // The built directory structure
 //
@@ -37,20 +39,6 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       webSecurity: false,
     },
-  });
-
-  // Test active push message to Renderer-process.
-  win.webContents.on("did-finish-load", () => {
-    // win?.webContents.send("main-process-message", new Date().toLocaleString());
-    // win?.webContents.send(
-    //   "main-process-message",
-    //   path.join(
-    //     process.env["VITE_DEV_SERVER_URL"]
-    //       ? __dirname
-    //       : path.dirname(app.getPath("exe")),
-    //     "streams.exe"
-    //   )
-    // );
   });
 
   if (VITE_DEV_SERVER_URL) {
@@ -116,6 +104,36 @@ function createWindow() {
     }
   });
 
+  // Intercepta erros não tratados
+  process.on("uncaughtException", async (error) => {
+    await logError(error, ErrorType.UncaughtException);
+  });
+
+  // Intercepta promessas rejeitadas não tratadas
+  process.on("unhandledRejection", async (reason) => {
+    if (reason instanceof Error) {
+      await logError(reason, ErrorType.UnhandledRejection);
+    } else {
+      await logError(new Error(String(reason)), ErrorType.UnhandledRejection);
+    }
+  });
+
+  // Intercepta erros de renderização
+  app.on("render-process-gone", async (_event, _webContents, details) => {
+    await logError(
+      new Error(`Render process gone: ${details.reason}`),
+      ErrorType.RenderProcessGone
+    );
+  });
+
+  // Intercepta erros de GPU
+  app.on("child-process-gone", async (_event, details) => {
+    await logError(
+      new Error(`GPU process gone: ${details.type}`),
+      ErrorType.GPUProcessGone
+    );
+  });
+
   if (!VITE_DEV_SERVER_URL) {
     app.setLoginItemSettings({
       openAtLogin: true,
@@ -125,7 +143,7 @@ function createWindow() {
 }
 
 app.on("ready", async () => {
-  await initializeDatabase(); 
+  await initializeDatabase();
   createWindow();
   acceptStreamsEula();
   const isSecondInstance = app.requestSingleInstanceLock();

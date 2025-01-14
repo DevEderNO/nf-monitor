@@ -10,13 +10,11 @@ import { IFileInfo } from "../interfaces/file-info";
 import { IDbHistoric } from "../interfaces/db-historic";
 import {
   addDirectoryDiscovery,
-  addError,
   addFiles,
   addHistoric,
   getDirectories,
   getFiles,
 } from "../services/database";
-import { ErrorType } from "@prisma/client";
 
 export class DiscoveryTask {
   isPaused: boolean;
@@ -74,11 +72,6 @@ export class DiscoveryTask {
         );
       }
     } catch (error) {
-      await addError({
-        message: JSON.stringify(error),
-        stack: JSON.stringify(error),
-        type: ErrorType.Discovery,
-      });
       await this.sendMessageClient(
         ["❌ houve um problema na descoberta dos arquivos"],
         0,

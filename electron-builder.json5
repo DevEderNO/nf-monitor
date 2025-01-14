@@ -9,12 +9,31 @@
   directories: {
     output: "release/${version}",
   },
-  files: ["dist", "dist-electron"],
-  extraFiles: [
+  files: [
+    "dist",
+    "dist-electron",
     {
-      from: "resources/",
+      from: "resources",
+      to: "dist-electron",
+    },
+  ],
+  extraResources: [
+    {
+      from: "prisma/",
+      to: "prisma/",
+      filter: ["schema.prisma", "nfmonitor.db", "schema.sql"],
+    },
+    {
+      from: "node_modules/@prisma/client",
+      to: "node_modules/@prisma/client",
+    },
+    {
+      from: "node_modules/.prisma",
+      to: "node_modules/.prisma",
+    },
+    {
+      from: "resources",
       to: ".",
-      filter: ["**/*"],
     },
   ],
   publish: [
@@ -52,21 +71,4 @@
     target: ["AppImage"],
     artifactName: "${productName}-Linux-${version}.${ext}",
   },
-  extraResources: [
-    {
-      from: "prisma/",
-      to: "prisma/",
-      filter: ["schema.prisma", "schema.sql"],
-    },
-    {
-      from: "node_modules/.bin/",
-      to: "node_modules/.bin/",
-      filter: ["prisma", "prisma.cmd"],
-    },
-    {
-      from: "resources/*",
-      to: ".",
-      filter: ["**/*"],
-    },
-  ],
 }

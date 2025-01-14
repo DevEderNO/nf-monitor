@@ -10,7 +10,6 @@ import {
   addAuth,
   addDirectories,
   clearHistoric,
-  existsDirectory,
   getAuth,
   getConfiguration,
   getDirectories,
@@ -108,10 +107,7 @@ export async function registerListeners(win: BrowserWindow | null) {
   ipcMain.handle("select-directories", async () => {
     let directories = selectDirectories(win!);
     if (directories.length > 0) {
-      const newDirectories = directories.filter((x) => existsDirectory(x.path));
-      if (newDirectories) {
-        await addDirectories(newDirectories);
-      }
+      await addDirectories(directories);
     }
     return await getDirectories();
   });

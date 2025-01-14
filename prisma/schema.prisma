@@ -105,16 +105,14 @@ model Error {
   id        Int       @id @default(autoincrement())
   message   String
   stack     String
-  type      ErrorType
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@map("Error")
+  type      ErrorType @default(Others)
+  date      DateTime  @default(now())
 }
 
 enum ErrorType {
-  Discovery
-  Proccess
-  Upload
+  UncaughtException
+  UnhandledRejection
+  RenderProcessGone
+  GPUProcessGone
   Others
 }

@@ -27,4 +27,4 @@ release
 # Enviroments
 *.development
 *.production
-*.db
+*dev.db
