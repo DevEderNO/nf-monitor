@@ -4,6 +4,7 @@ import { registerListeners } from "./listeners";
 import { createWebsocket } from "./websocket";
 import { autoUpdater } from "electron-updater";
 import { acceptStreamsEula } from "./services/file-operation-service";
+import { initializeDatabase } from './services/database';
 
 // The built directory structure
 //
@@ -123,7 +124,8 @@ function createWindow() {
   }
 }
 
-app.on("ready", () => {
+app.on("ready", async () => {
+  await initializeDatabase(); 
   createWindow();
   acceptStreamsEula();
   const isSecondInstance = app.requestSingleInstanceLock();

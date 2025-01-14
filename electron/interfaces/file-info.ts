@@ -1,13 +1,16 @@
 export interface IFileInfo {
-  name: string;
-  isDirectory: boolean;
-  isFile: boolean;
+  id?: number;
   filepath: string;
+  filename: string;
   extension: string;
-  modifiedtime: Date;
-  size: number;
-  dataSend?: Date;
   wasSend: boolean;
+  dataSend: Date | null;
   isValid: boolean;
+  isDirectory: boolean;
   bloqued: boolean;
+  isFile: boolean;
+  modifiedtime: Date | null;
+  size: number;
+  createdAt?: Date;
+  updatedAt?: Date;
 }

@@ -14,18 +14,18 @@ const api = axios.create({
 });
 
 export async function signIn(
-  user: string,
+  username: string,
   password: string,
   useCryptography?: boolean
 ): Promise<ISignIn> {
   const currentPassword = useCryptography ? decrypt(password) : password;
   const resp = await apiAuth.get<ISignIn>(`auth/logar-nfe-monitor`, {
     params: {
-      usuario: user,
+      usuario: username,
       senha: currentPassword,
     },
     headers: {
-      Origin: "http://app.sittax.com.br",
+      Origin: "https://app.sittax.com.br",
     },
   });
   return resp.data;

@@ -1,25 +1,35 @@
 import { BrowserWindow, ipcMain } from "electron";
-import { IDb } from "./interfaces/db";
 import {
-  clearHistoric,
-  getDb,
-  getDbHistoric,
   listDirectory,
-  saveDb,
   selectDirectories,
 } from "./services/file-operation-service";
-import { IAuth } from "./interfaces/auth";
-import { IDbHistoric } from "./interfaces/db-historic";
 import { initializeJob, updateJob } from "./services/schedules";
 import { encrypt } from "./lib/cryptography";
 import { signIn } from "./lib/axios";
+import {
+  addAuth,
+  addDirectories,
+  clearHistoric,
+  existsDirectory,
+  getAuth,
+  getConfiguration,
+  getDirectories,
+  getHistoric,
+  removeAuth,
+  removeDirectory,
+  removeFiles,
+  updateConfiguration,
+} from "./services/database";
+import { IConfig } from "./interfaces/config";
+import { IDirectory } from "./interfaces/directory";
+import { IUser } from "./interfaces/user";
 
 export async function registerListeners(win: BrowserWindow | null) {
   ipcMain.handle("get-auth", async () => {
-    const db: IDb = getDb();
+    const auth = await getAuth();
     return {
-      user: db.auth.user,
-      token: db.auth.token,
+      user: auth?.username,
+      token: auth?.token,
       credentials: { user: "", password: "" },
     };
   });
@@ -27,11 +37,10 @@ export async function registerListeners(win: BrowserWindow | null) {
   ipcMain.handle(
     "signIn",
     async (_, { user, password }: { user: string; password: string }) => {
-      const db = getDb();
       const data = await signIn(user, password);
       const {
         Token,
-        Escritorio: { Usuarios },
+        Escritorio: { Usuarios, Empresas },
       } = data;
 
       const {
@@ -54,14 +63,13 @@ export async function registerListeners(win: BrowserWindow | null) {
 
       const passwordHash = encrypt(password);
 
-      db.auth = {
+      const auth = {
         token: Token,
-        credentials: {
-          user,
-          password: passwordHash,
-        },
+        username: user,
+        name: Nome,
+        password: passwordHash,
         user: {
-          Id,
+          userId: Id,
           Nome,
           Sobrenome,
           Cpf,
@@ -76,54 +84,42 @@ export async function registerListeners(win: BrowserWindow | null) {
           Role,
           EPrimeiroAcesso,
           Nivel,
-        },
+        } as IUser,
+        empresas: Empresas.map((x) => ({
+          empresaId: x.Id,
+          nome: x.Nome,
+          cnpj: x.Cnpj,
+        })),
       };
-      saveDb(db);
-      return db.auth;
+      addAuth(auth);
+      return auth;
     }
   );
 
-  ipcMain.on("remove-auth", () => {
-    const db: IDb = getDb();
-    db.auth = {} as IAuth;
-    saveDb(db);
+  ipcMain.on("remove-auth", async () => {
+    await removeAuth();
   });
 
   ipcMain.handle("get-directories", async () => {
-    const db: IDb = getDb();
-    return db.directories;
+    const directories: Partial<IDirectory>[] = (await getDirectories()) ?? [];
+    return directories;
   });
 
   ipcMain.handle("select-directories", async () => {
-    const db: IDb = getDb();
-    const directoriesInDb = db.directories;
     let directories = selectDirectories(win!);
     if (directories.length > 0) {
-      const newDirectories = directories.filter(
-        (x) => !directoriesInDb.find((y) => y.path === x.path)
-      );
-      directories =
-        newDirectories.length > 0
-          ? [...directoriesInDb, ...newDirectories]
-          : directoriesInDb;
-      saveDb({ ...db, directories });
-      return directories;
+      const newDirectories = directories.filter((x) => existsDirectory(x.path));
+      if (newDirectories) {
+        await addDirectories(newDirectories);
+      }
     }
-    return directoriesInDb;
+    return await getDirectories();
   });
 
   ipcMain.handle("remove-directory", async (_, directory: string) => {
-    const db: IDb = getDb();
-    const directoriesInDb = db.directories;
-    const directories = directoriesInDb.filter(
-      (x) => !x.path.includes(directory)
-    );
-    const filesInDb = db.files;
-    const files = filesInDb.filter(
-      (x) => !x.filepath.includes(directory) || x.wasSend
-    );
-    saveDb({ ...db, directories, files });
-    return directories;
+    await removeDirectory(directory);
+    await removeFiles(directory);
+    return await getDirectories();
   });
 
   ipcMain.handle("list-directory", async (_, directoryPath) => {
@@ -131,37 +127,41 @@ export async function registerListeners(win: BrowserWindow | null) {
   });
 
   ipcMain.on("set-timeForProcessing", async (_, timeForProcessing) => {
-    const db: IDb = getDb();
-    db.timeForProcessing = timeForProcessing;
+    const configuration: IConfig | null = await getConfiguration();
     updateJob(timeForProcessing);
-    saveDb(db);
+    if (configuration) {
+      configuration.timeForProcessing = timeForProcessing;
+      await updateConfiguration(configuration);
+    }
   });
 
   ipcMain.on("set-viewUploadedFiles", async (_, viewUploadedFiles) => {
-    const db: IDb = getDb();
-    db.configuration.viewUploadedFiles = viewUploadedFiles;
-    saveDb(db);
+    const configuration: IConfig | null = await getConfiguration();
+    if (configuration) {
+      configuration.viewUploadedFiles = viewUploadedFiles;
+      await updateConfiguration(configuration);
+    }
   });
 
   ipcMain.handle("get-timeForProcessing", async () => {
-    const db: IDb = getDb();
-    return db.timeForProcessing;
+    const configuration: IConfig | null = await getConfiguration();
+    return configuration?.timeForProcessing ?? "00:00";
+  });
+
+  ipcMain.handle("get-viewUploadedFiles", async () => {
+    const configuration: IConfig | null = await getConfiguration();
+    return configuration?.viewUploadedFiles ?? false;
   });
 
   ipcMain.handle("get-historic", async () => {
-    const dbHistoric: IDbHistoric = getDbHistoric();
-    return dbHistoric.executions.map(({ id, startDate, endDate }) => ({
-      id,
-      startDate,
-      endDate,
-    }));
+    return await getHistoric();
   });
 
   ipcMain.on("initialize-job", () => {
     initializeJob();
   });
 
-  ipcMain.on("clear-historic", () => {
-    clearHistoric();
+  ipcMain.on("clear-historic", async () => {
+    await clearHistoric();
   });
 }

@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Auth {
+  id          Int      @id @default(autoincrement())
+  token       String?
+  userId      Int?
+  name        String
+  username    String
+  password    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model User {
+  id                Int      @id @default(autoincrement())
+  userId            String
+  nome              String
+  sobrenome         String?
+  cpf               String?
+  email             String?
+  phoneNumber       String?
+  ativo             Boolean @default(false)
+  emailConfirmed    Boolean @default(false)
+  accessFailedCount String
+  dataDeCriacao     String
+  lockoutEnd        String
+  eUsuarioEmpresa   Boolean @default(false)
+  role              String
+  ePrimeiroAcesso   Boolean @default(false)
+  nivel             Int
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Empresa {
+  id                Int      @id @default(autoincrement())
+  empresaId         String
+  nome              String
+  cnpj              String
+  userId            Int
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt 
+}
+
+model Directory {
+  id           Int      @id @default(autoincrement())
+  path         String
+  modifiedtime DateTime
+  size         Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model DirectoryDiscovery {
+  id           Int      @id @default(autoincrement())
+  path         String
+  modifiedtime DateTime
+  size         Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model File {
+  id                Int       @id @default(autoincrement())
+  filepath          String
+  filename          String
+  extension         String
+  wasSend           Boolean   @default(false)
+  dataSend          DateTime?
+  isValid           Boolean   @default(false)
+  bloqued           Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  isDirectory       Boolean   @default(false)
+  isFile            Boolean   @default(false)
+  modifiedtime      DateTime?
+  size              Int
+}
+
+model Configuration {
+  id                Int      @id @default(autoincrement())
+  timeForProcessing String   @default("00:00")
+  viewUploadedFiles Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Historic {
+  id        Int       @id @default(autoincrement())
+  startDate DateTime
+  endDate   DateTime?
+  log       String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+} 
+
+model Error {
+  id        Int       @id @default(autoincrement())
+  message   String
+  stack     String
+  type      ErrorType
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("Error")
+}
+
+enum ErrorType {
+  Discovery
+  Proccess
+  Upload
+  Others
+}

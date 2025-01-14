@@ -1,38 +1,29 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const diretorioExiste = fs.existsSync(path.join(__dirname, "dist-electron"));
-if (diretorioExiste) {
-  copiarArquivoAssetExtractorWasm();
-  copiarArquivoStreamsExe();
-} else {
-  fs.mkdirSync(path.join(__dirname, "dist-electron"));
-  copiarArquivoAssetExtractorWasm();
-  copiarArquivoStreamsExe();
+// Função para criar diretório se não existir
+function ensureDirectoryExistence(filePath) {
+  const dirname = path.dirname(filePath);
+  if (fs.existsSync(dirname)) {
+    return true;
+  }
+  ensureDirectoryExistence(dirname);
+  fs.mkdirSync(dirname);
 }
 
-function copiarArquivoAssetExtractorWasm() {
-  fs.copyFile(
-    path.join(__dirname, "resources", "asset-extractor-wasm_bg.wasm"),
-    path.join(__dirname, "dist-electron", "asset-extractor-wasm_bg.wasm"),
-    (err) => {
-      if (err) throw err;
-      console.log(
-        "Arquivos asset-extractor-wasm_bg.wasm copiados com sucesso!"
-      );
-    }
-  );
+// Função para copiar arquivo
+function copyFile(source, target) {
+  ensureDirectoryExistence(target);
+  fs.copyFileSync(source, target);
+  console.log(`Copiado: ${source} -> ${target}`);
 }
 
-function copiarArquivoStreamsExe() {
-  fs.copyFile(
-    path.join(__dirname, "resources", "streams.exe"),
-    path.join(__dirname, "dist-electron", "streams.exe"),
-    (err) => {
-      if (err) throw err;
-      console.log(
-        "Arquivos streams.exe copiados com sucesso!"
-      );
-    }
-  );
-}
+// Copia os arquivos da pasta resources
+const resourcesDir = path.join(__dirname, "resources");
+const files = fs.readdirSync(resourcesDir);
+
+files.forEach(file => {
+  const sourcePath = path.join(resourcesDir, file);
+  const targetPath = path.join(__dirname, "dist-electron", file);
+  copyFile(sourcePath, targetPath);
+});

@@ -33,7 +33,8 @@ export const initialState: IState = {
   timeForProcessing: "00:00",
   historic: [],
   config: {
-    viewUploadedFiles: true,
+    viewUploadedFiles: false,
+    timeForProcessing: "00:00",
   },
 };
 

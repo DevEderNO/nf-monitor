@@ -52,4 +52,21 @@
     target: ["AppImage"],
     artifactName: "${productName}-Linux-${version}.${ext}",
   },
+  extraResources: [
+    {
+      from: "prisma/",
+      to: "prisma/",
+      filter: ["schema.prisma", "schema.sql"],
+    },
+    {
+      from: "node_modules/.bin/",
+      to: "node_modules/.bin/",
+      filter: ["prisma", "prisma.cmd"],
+    },
+    {
+      from: "resources/*",
+      to: ".",
+      filter: ["**/*"],
+    },
+  ],
 }

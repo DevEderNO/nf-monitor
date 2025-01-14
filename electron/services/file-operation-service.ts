@@ -5,11 +5,8 @@ import { BrowserWindow, dialog } from "electron";
 import AdmZip from "adm-zip";
 import { IFileInfo } from "../interfaces/file-info";
 import { IFile } from "../interfaces/file";
-import { IDb } from "../interfaces/db";
 import { IDirectory } from "../interfaces/directory";
-import { IDbHistoric, IExecution } from "../interfaces/db-historic";
-import { IUser } from "../interfaces/user";
-import { isBefore, addMonths, parseISO, format } from "date-fns";
+import { isBefore, addMonths, parseISO } from "date-fns";
 import * as cheerio from "cheerio";
 import { app } from "electron";
 import { createDocumentParser } from "@arbs.io/asset-extractor-wasm";
@@ -45,7 +42,7 @@ export function listDirectory(
         const isDirectory = fs.statSync(itemPath).isDirectory();
         const isFile = fs.statSync(itemPath).isFile();
         filesAndFolders.push({
-          name: element,
+          filename: element,
           isDirectory,
           isFile,
           filepath: itemPath.split("\\").join("/").toString(),
@@ -55,6 +52,7 @@ export function listDirectory(
           wasSend: false,
           isValid: false,
           bloqued: isFile && isFileBlocked(itemPath),
+          dataSend: null,
         });
       } catch (_) {
         if (callback) {
@@ -216,7 +214,7 @@ export function getFileXmlAndPdf(fileInfo: IFileInfo): IFile | null {
   if ([".xml", ".pdf"].includes(fileInfo.extension)) {
     const data = fs.readFileSync(fileInfo.filepath, "binary");
     return {
-      name: fileInfo.name,
+      name: fileInfo.filename,
       type: fileInfo.extension === ".xml" ? "xml" : "pdf",
       data: data,
       path: fileInfo.filepath,
@@ -238,137 +236,6 @@ export function getFilesZip(fileInfo: IFileInfo): IFile[] {
     }));
   }
   return [];
-}
-
-export function getDb(): IDb {
-  const userDataPath = app.getPath("userData");
-  try {
-    return JSON.parse(
-      fs.readFileSync(
-        path.join(
-          process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
-          "db.json"
-        ),
-        "utf-8"
-      )
-    );
-  } catch (error) {
-    return {
-      configuration: { viewUploadedFiles: true },
-      directories: [],
-      directoriesAndSubDirectories: [],
-      files: [],
-      auth: {
-        token: "",
-        user: {} as IUser,
-        credentials: {
-          user: "",
-          password: "",
-        },
-      },
-      timeForProcessing: "",
-    };
-  }
-}
-
-export function getDbHistoric(): IDbHistoric {
-  const userDataPath = app.getPath("userData");
-  try {
-    return JSON.parse(
-      fs.readFileSync(
-        path.join(
-          process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
-          "dbHistoric.json"
-        ),
-        "utf-8"
-      )
-    );
-  } catch (error) {
-    return {
-      executions: [],
-    };
-  }
-}
-
-export function findHistoric(id: string): IExecution {
-  try {
-    const db: IDbHistoric = getDbHistoric();
-    const execution = db.executions.find((x) => x?.id === id);
-    if (!execution) throw new Error("Registro de execução não localizado");
-    return execution;
-  } catch (error) {
-    console.log("findHistoric", error);
-    throw error;
-  }
-}
-
-export function saveDb(db: IDb) {
-  const userDataPath = app.getPath("userData");
-  try {
-    fs.writeFileSync(
-      path.join(
-        process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
-        "db.json"
-      ),
-      JSON.stringify(db, null, 0)
-    );
-  } catch (error) {
-    console.log("saveDb", error);
-  }
-}
-
-export function saveDbHistoric(db: IDbHistoric) {
-  const userDataPath = app.getPath("userData");
-  try {
-    fs.writeFileSync(
-      path.join(
-        process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
-        "dbHistoric.json"
-      ),
-      JSON.stringify(db, null, 0)
-    );
-  } catch (error) {
-    console.log("saveDbHistoric", error);
-  }
-}
-
-export function clearHistoric() {
-  const userDataPath = app.getPath("userData");
-  const dbHistoric = getDbHistoric();
-  try {
-    if (dbHistoric.executions.length > 0)
-      fs.writeFileSync(
-        path.join(
-          process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
-          `dbHistoric-${format(new Date(), "yyyy-MM-dd HH-mm-ss")}.json`
-        ),
-        JSON.stringify(dbHistoric, null, 0)
-      );
-    fs.writeFileSync(
-      path.join(
-        process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
-        "dbHistoric.json"
-      ),
-      JSON.stringify({ executions: [] }, null, 0)
-    );
-  } catch (error) {
-    console.log("saveDbHistoric", error);
-  }
-}
-
-export function saveLog(log: string) {
-  const userDataPath = app.getPath("userData");
-  try {
-    fs.appendFileSync(
-      path.join(
-        process.env["VITE_DEV_SERVER_URL"] ? __dirname : userDataPath,
-        "log.json"
-      ),
-      JSON.stringify(log + "\n", null, 0)
-    );
-  } catch (error) {
-    console.log("saveDbHistoric", error);
-  }
 }
 
 function validatePdf(fileInfo: IFileInfo): boolean {

@@ -1,3 +1,4 @@
+import { IEmpresa } from "./empresa";
 import { IUser } from "./user";
 
 export interface ISignIn {
@@ -5,6 +6,7 @@ export interface ISignIn {
     Id: string;
     Nome: string;
     Usuarios: IUser[];
+    Empresas: IEmpresa[];
   };
   Token: string;
 }

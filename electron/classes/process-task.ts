@@ -3,12 +3,6 @@ import {
   ProcessamentoStatus,
 } from "../interfaces/processamento";
 import {
-  findHistoric,
-  getDb,
-  getDbHistoric,
-  saveDb,
-  saveDbHistoric,
-  saveLog,
   unblockFile,
   validXmlAndPdf,
   validZip,
@@ -17,9 +11,19 @@ import {
 import { connection } from "websocket";
 import { IFileInfo } from "../interfaces/file-info";
 import { WSMessageType, WSMessageTyped } from "../interfaces/ws-message";
-import { IDb } from "../interfaces/db";
 import { signIn, upload } from "../lib/axios";
-import { IDbHistoric, IExecution } from "../interfaces/db-historic";
+import { IDbHistoric } from "../interfaces/db-historic";
+import {
+  addError,
+  addHistoric,
+  getAuth,
+  getConfiguration,
+  getFiles,
+  updateAuth,
+  updateFile,
+} from "../services/database";
+import { ErrorType } from "@prisma/client";
+import { IAuth } from "../interfaces/auth";
 
 export class ProcessTask {
   isPaused: boolean;
@@ -28,21 +32,25 @@ export class ProcessTask {
   cancelledMessage: string | null;
   connection: connection | null;
   progress: number;
-  db: IDb;
   files: IFileInfo[];
   filesSended: IFileInfo[];
   hasError: boolean;
-  execution: IExecution;
+  historic: IDbHistoric;
+  viewUploadedFiles: boolean = false;
+  auth: IAuth | null = null;
   constructor() {
     this.isPaused = false;
     this.isCancelled = false;
     this.connection = null;
     this.progress = 0;
-    this.db = {} as IDb;
     this.files = [];
     this.filesSended = [];
     this.hasError = false;
-    this.execution = {} as IExecution;
+    this.historic = {
+      startDate: new Date(),
+      endDate: null,
+      log: [],
+    } as IDbHistoric;
     this.pausedMessage = null;
     this.cancelledMessage = null;
   }
@@ -60,32 +68,51 @@ export class ProcessTask {
     this.isCancelled = true;
   }
 
-  async run(connection: connection, id: string) {
+  async run(connection: connection) {
     try {
       this.initializeProperties(connection);
-      this.db = getDb();
-      this.files = [...this.db.files.filter((x) => !x.wasSend)];
-      this.filesSended = [...this.db.files.filter((x) => x.wasSend)];
-      if (
-        this.db.configuration.viewUploadedFiles &&
-        this.filesSended.length > 0
-      ) {
+      this.files = (await getFiles()).filter((x) => !x.wasSend);
+      this.filesSended = (await getFiles()).filter((x) => x.wasSend);
+      this.viewUploadedFiles =
+        (await getConfiguration())?.viewUploadedFiles ?? false;
+      if (this.viewUploadedFiles && this.filesSended.length > 0) {
         this.files.push(...this.filesSended);
       }
       this.validateDiretoryFile();
-      this.execution = findHistoric(id);
       await this.sendMessageClient([
         "Iniciando o envio dos arquivos para o Sittax",
       ]);
       const progressIncrement = 100 / this.files.length;
       let currentProgress = 0;
+      this.auth = await getAuth();
+      if (!this.auth?.id) return;
       const resp = await signIn(
-        this.db.auth.credentials.user,
-        this.db.auth.credentials.password,
+        this.auth.username ?? "",
+        this.auth.password ?? "",
         true
       );
-      this.db.auth.token = resp.Token;
-      saveDb(this.db);
+      if (!resp.Token) {
+        this.hasError = true;
+        await addError({
+          message: "Não foi possível autenticar no Sittax",
+          stack: JSON.stringify(resp),
+          type: ErrorType.Proccess,
+        });
+        await this.sendMessageClient(
+          ["❌ Não foi possível autenticar no Sittax"],
+          0,
+          ProcessamentoStatus.Stopped
+        );
+        await timeout(500);
+        return;
+      }
+      this.auth.token = resp.Token;
+      await updateAuth({
+        id: this.auth.id,
+        token: this.auth.token ?? "",
+        username: this.auth.username ?? "",
+        password: this.auth.password ?? "",
+      });
       for (let index = 0; index < this.files.length; index++) {
         if (this.isCancelled) {
           if (this.cancelledMessage === null) {
@@ -102,7 +129,6 @@ export class ProcessTask {
           this.isPaused = false;
           this.hasError = false;
           this.progress = 0;
-          saveDb({ ...this.db, files: this.files });
           return;
         }
         if (this.isPaused) {
@@ -155,13 +181,9 @@ export class ProcessTask {
           }
         }
       }
-      if (
-        !this.db.configuration.viewUploadedFiles &&
-        this.filesSended.length > 0
-      ) {
+      if (!this.viewUploadedFiles && this.filesSended.length > 0) {
         this.files.push(...this.filesSended);
       }
-      saveDb({ ...this.db, files: this.files });
       await this.sendMessageClient(
         [
           this.hasError
@@ -178,7 +200,11 @@ export class ProcessTask {
         0,
         ProcessamentoStatus.Stopped
       );
-      saveLog(JSON.stringify(error));
+      await addError({
+        message: JSON.stringify(error),
+        stack: JSON.stringify(error),
+        type: ErrorType.Proccess,
+      });
     }
   }
 
@@ -212,16 +238,22 @@ export class ProcessTask {
         currentProgress
       );
       try {
-        await upload(this.db.auth.token, this.files[index].filepath);
-        this.files[index].wasSend = true;
-        this.files[index].dataSend = new Date();
+        await upload(this.auth?.token ?? "", this.files[index].filepath);
+        updateFile(this.files[index].filepath, {
+          wasSend: true,
+          dataSend: new Date(),
+        });
         await this.sendMessageClient(
           [`✅ Enviado com sucesso ${this.files[index].filepath}`],
           currentProgress
         );
       } catch (error) {
         this.hasError = true;
-        saveLog(JSON.stringify(error));
+        await addError({
+          message: JSON.stringify(error),
+          stack: JSON.stringify(error),
+          type: ErrorType.Proccess,
+        });
         this.sendMessageClient(
           [`❌ Erro ao enviar ${this.files[index].filepath}`],
           currentProgress
@@ -251,15 +283,22 @@ export class ProcessTask {
         currentProgress
       );
       try {
-        await upload(this.db.auth.token, this.files[index].filepath);
+        await upload(this.auth?.token ?? "", this.files[index].filepath);
         await this.sendMessageClient(
           [`✅ Enviado com sucesso ${this.files[index].filepath}`],
           currentProgress
         );
-        this.files[index].wasSend = true;
-        this.files[index].dataSend = new Date();
+        updateFile(this.files[index].filepath, {
+          wasSend: true,
+          dataSend: new Date(),
+        });
       } catch (error) {
         this.hasError = true;
+        await addError({
+          message: JSON.stringify(error),
+          stack: JSON.stringify(error),
+          type: ErrorType.Proccess,
+        });
         await this.sendMessageClient(
           [`❌ Erro ao enviar ${this.files[index].filepath}`],
           currentProgress
@@ -285,19 +324,13 @@ export class ProcessTask {
     status = ProcessamentoStatus.Running
   ) {
     await timeout();
-    messages.forEach((x) => this.execution.log?.push(x));
+    messages.forEach((x) => this.historic.log?.push(x));
     if (
       [ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(
         status
       )
     ) {
-      const dbHistoric: IDbHistoric = getDbHistoric();
-      this.execution.endDate = new Date();
-      dbHistoric.executions = [
-        this.execution,
-        ...dbHistoric.executions.filter((x) => x.id !== this.execution.id),
-      ];
-      saveDbHistoric(dbHistoric);
+      await addHistoric(this.historic);
     }
     this.connection?.sendUTF(
       JSON.stringify({
@@ -308,7 +341,7 @@ export class ProcessTask {
             messages,
             progress,
             status,
-            id: this.execution?.id,
+            id: this.historic?.id,
           },
         },
       } as WSMessageTyped<IProcessamento>)

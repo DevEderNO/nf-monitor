@@ -9,8 +9,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import { IDirectory } from "@/interfaces/directory";
 import { IAuth } from "@/interfaces/auth";
-import { IExecution } from "@/interfaces/db-historic";
-import { format, parseISO } from "date-fns";
+import { IDbHistoric } from "@/interfaces/db-historic";
+import { format } from "date-fns";
 
 interface StateContextData {
   state: IState;
@@ -27,11 +27,15 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
     dispatch({ type: ActionType.Loading, payload: true });
 
     const auth: IAuth = await window.ipcRenderer.invoke("get-auth");
+    console.log("auth", auth);
     const directories: IDirectory[] = await window.ipcRenderer.invoke(
       "get-directories"
     );
     const timeForProcessing: IDirectory[] = await window.ipcRenderer.invoke(
       "get-timeForProcessing"
+    );
+    const viewUploadedFiles: boolean = await window.ipcRenderer.invoke(
+      "get-viewUploadedFiles"
     );
 
     if (directories) {
@@ -49,31 +53,40 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
       window.ipcRenderer.send("initialize-job");
     }
 
-    const historic: IExecution[] = await window.ipcRenderer.invoke(
+    dispatch({
+      type: ActionType.ViewUploadedFiles,
+      payload: viewUploadedFiles,
+    });
+
+    const historic: IDbHistoric[] = await window.ipcRenderer.invoke(
       "get-historic"
     );
 
     if (historic.length > 0) {
+      console.log("historic", historic);
+      console.log(
+        historic.map(
+          (x) =>
+            `${format(x.startDate, "dd/MM/yyyy HH:mm:ss")}${
+              x.endDate ? format(x.endDate, " - dd/MM/yyyy HH:mm:ss") : ""
+            }`
+        )
+      );
       dispatch({
         type: ActionType.Historic,
         payload: historic.map(
           (x) =>
-            `${format(
-              parseISO(x.startDate.toString()),
-              "dd/MM/yyyy HH:mm:ss"
-            )}${
+            `${format(x.startDate, "dd/MM/yyyy HH:mm:ss")} | ${
               x.endDate
-                ? format(
-                    parseISO(x.endDate.toString()),
-                    " - dd/MM/yyyy HH:mm:ss"
-                  )
-                : ""
+                ? format(x.endDate, " - dd/MM/yyyy HH:mm:ss")
+                : "Não finalizado ou interrompido"
             }`
         ),
       });
     }
 
     if (auth.token && auth.user) {
+      console.log("auth", auth);
       dispatch({
         type: ActionType.Auth,
         payload: auth,
@@ -87,7 +100,7 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
   useEffect(() => {
     loadStoragedData();
   }, []);
-  
+
   useEffect(() => {
     if (state.auth?.token?.length > 0) loadStoragedData();
   }, [state.auth?.token?.length]);

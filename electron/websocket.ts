@@ -4,11 +4,7 @@ import {
   WSMessageTyped,
 } from "./interfaces/ws-message";
 import * as http from "http";
-import {
-  IUtf8Message,
-  server as WebsocketServer,
-  connection,
-} from "websocket";
+import { IUtf8Message, server as WebsocketServer, connection } from "websocket";
 import {
   pauseProcess,
   resumeProcess,
@@ -77,11 +73,9 @@ function createWebsocket() {
 
       function wsStartProcess(connection: connection, message: IUtf8Message) {
         const {
-          message: {
-            data: { id },
-          },
+          message: {},
         }: WSMessageTyped<IProcessamento> = JSON.parse(message.utf8Data);
-        startProcess(connection, id!);
+        startProcess(connection);
       }
     });
   });

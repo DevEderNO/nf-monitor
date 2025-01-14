@@ -38,11 +38,11 @@ const formSchema = z.object({
 export function Configuration() {
   const { state, dispatch } = useAppState();
   const [historic, setHistoric] = useState([] as string[]);
-  const [viewUploadedFiles, setViewUploadedFiles] = useState(true);
+  const [viewUploadedFiles, setViewUploadedFiles] = useState(false);
 
   useEffect(() => {
     setHistoric(state?.historic ?? []);
-    setViewUploadedFiles(state?.config?.viewUploadedFiles ?? true);
+    setViewUploadedFiles(state?.config?.viewUploadedFiles ?? false);
   }, [state?.config?.viewUploadedFiles, state?.historic]);
 
   const form = useForm<z.infer<typeof formSchema>>({

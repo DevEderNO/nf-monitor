@@ -3,38 +3,40 @@ import {
   ProcessamentoStatus,
 } from "../interfaces/processamento";
 import { IDirectory } from "../interfaces/directory";
-import {
-  getDb,
-  getDbHistoric,
-  listDirectory,
-  saveDb,
-  saveDbHistoric,
-  saveLog,
-} from "../services/file-operation-service";
+import { listDirectory } from "../services/file-operation-service";
 import { connection } from "websocket";
 import { WSMessageType, WSMessageTyped } from "../interfaces/ws-message";
 import { IFileInfo } from "../interfaces/file-info";
-import { IDb } from "../interfaces/db";
-import { IDbHistoric, IExecution } from "../interfaces/db-historic";
-import { randomUUID } from "crypto";
+import { IDbHistoric } from "../interfaces/db-historic";
+import {
+  addDirectoryDiscovery,
+  addError,
+  addFiles,
+  addHistoric,
+  getDirectories,
+  getFiles,
+} from "../services/database";
+import { ErrorType } from "@prisma/client";
 
 export class DiscoveryTask {
   isPaused: boolean;
   pausedMessage: string | null;
   isCancelled: boolean;
   cancelledMessage: string | null;
-  db: IDb;
   directoriesAndSubDirectories: IDirectory[];
   files: IFileInfo[];
-  execution: IExecution;
+  historic: IDbHistoric;
   connection: connection | null;
   constructor() {
     this.isPaused = false;
     this.isCancelled = false;
-    this.db = {} as IDb;
     this.directoriesAndSubDirectories = [];
     this.files = [];
-    this.execution = {} as IExecution;
+    this.historic = {
+      startDate: new Date(),
+      endDate: null,
+      log: [],
+    } as IDbHistoric;
     this.connection = null;
     this.pausedMessage = null;
     this.cancelledMessage = null;
@@ -59,14 +61,11 @@ export class DiscoveryTask {
       await this.sendMessageClient([
         "Tarefa de descoberta dos arquivos iniciada.",
       ]);
-      this.db = { ...getDb() };
-      this.files = this.db.files;
-      await this.discoveryDirectories(this.db.directories);
-      saveDb({
-        ...this.db,
-        directoriesAndSubDirectories: this.directoriesAndSubDirectories,
-        files: this.files,
-      });
+      this.files = await getFiles();
+      const directories = await getDirectories();
+      await this.discoveryDirectories(directories);
+      await addDirectoryDiscovery(this.directoriesAndSubDirectories);
+      await addFiles(this.files);
       if (!this.isCancelled) {
         await this.sendMessageClient(
           ["Concluído processo de descoberta dos arquivos"],
@@ -75,7 +74,11 @@ export class DiscoveryTask {
         );
       }
     } catch (error) {
-      saveLog(JSON.stringify(error));
+      await addError({
+        message: JSON.stringify(error),
+        stack: JSON.stringify(error),
+        type: ErrorType.Discovery,
+      });
       await this.sendMessageClient(
         ["❌ houve um problema na descoberta dos arquivos"],
         0,
@@ -89,9 +92,6 @@ export class DiscoveryTask {
     this.cancelledMessage = null;
     this.isPaused = false;
     this.pausedMessage = null;
-    this.execution.startDate = new Date();
-    this.execution.id = randomUUID();
-    this.execution.log = [];
     this.connection = connection;
   }
 
@@ -187,15 +187,13 @@ export class DiscoveryTask {
     status = ProcessamentoStatus.Running
   ) {
     await timeout();
-    messages.forEach((x) => this.execution.log?.push(x));
+    messages.forEach((x) => this.historic.log?.push(x));
     if (
       [ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(
         status
       )
     ) {
-      const dbHistoric: IDbHistoric = getDbHistoric();
-      dbHistoric.executions.push(this.execution);
-      saveDbHistoric(dbHistoric);
+      await addHistoric(this.historic);
     }
     this.connection?.sendUTF(
       JSON.stringify({
@@ -206,7 +204,7 @@ export class DiscoveryTask {
             messages,
             progress,
             status,
-            id: this.execution?.id,
+            id: this.historic?.id,
           },
         },
       } as WSMessageTyped<IProcessamento>)

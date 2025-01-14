@@ -1,10 +1,8 @@
 export interface IDbHistoric {
-  executions: IExecution[];
-}
-
-export interface IExecution {
-  id: string;
+  id?: number;
   startDate: Date;
-  endDate?: Date;
-  log?: string[];
+  endDate: Date | null;
+  log: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
 }

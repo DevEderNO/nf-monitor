@@ -1,18 +1,19 @@
 export interface IUser {
   Id: string;
+  userId: string;
   Nome: string;
   Sobrenome: string;
   Cpf: string;
   Email: string;
   PhoneNumber: string;
-  Ativo: string;
-  EmailConfirmed: string;
+  Ativo: boolean;
+  EmailConfirmed: boolean;
   AccessFailedCount: string;
   DataDeCriacao: string;
   LockoutEnd: string;
-  EUsuarioEmpresa: string;
+  EUsuarioEmpresa: boolean;
   Role: string;
-  EPrimeiroAcesso: string;
+  EPrimeiroAcesso: boolean;
   Nivel: ENivel;
 }
 

@@ -9,7 +9,7 @@ import {
 import { ActionType } from "./state-reducer";
 import { IProcessamento, ProcessamentoStatus } from "@interfaces/processamento";
 import { format, parseISO } from "date-fns";
-import { IExecution } from "@/interfaces/db-historic";
+import { IDbHistoric } from "@/interfaces/db-historic";
 
 interface SocketContextData {
   client: w3cwebsocket | undefined;
@@ -74,7 +74,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
             setProcessStatus("discovery");
             window.ipcRenderer
               .invoke("get-historic")
-              .then((historic: IExecution[]) => {
+              .then((historic: IDbHistoric[]) => {
                 if (historic.length > 0) {
                   dispatch({
                     type: ActionType.Historic,
