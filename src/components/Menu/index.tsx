@@ -8,12 +8,14 @@ import { useAuth } from "@hooks/auth";
 import logoMonitor from "@images/logo-monitor.png";
 import grafismo from "@images/grafismo.png";
 import packageJson from "../../../package.json";
+import { useAppState } from "@/hooks/state";
 
 const Menu: React.FC = () => {
   const { theme, setTheme } = useTheme();
   const { signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { state } = useAppState();
 
   const menuItems = useMemo(
     () => [
@@ -26,6 +28,7 @@ const Menu: React.FC = () => {
             state: { from: location },
           });
         },
+        visible: true,
       },
       {
         label: "Diretórios",
@@ -36,6 +39,7 @@ const Menu: React.FC = () => {
             state: { from: location },
           });
         },
+        visible: true,
       },
       {
         label: "Configuração",
@@ -46,6 +50,18 @@ const Menu: React.FC = () => {
             state: { from: location },
           });
         },
+        visible: true,
+      },
+      {
+        label: "Sieg",
+        selected: location.pathname === "/sieg",
+        onClick: () => {
+          navigate("/sieg", {
+            replace: true,
+            state: { from: location },
+          });
+        },
+        visible: state.config.apiKeySieg && state.config.apiKeySieg.length > 0,
       },
     ],
     [location, navigate]
@@ -61,7 +77,9 @@ const Menu: React.FC = () => {
         />
         <Separator orientation="vertical" className="h-7" />
         <div className="flex items-center h-7">
-          {menuItems.map((item, index) => menuItemRender(item, index))}
+          {menuItems
+            .filter((x) => x.visible)
+            .map((item, index) => menuItemRender(item, index))}
         </div>
       </div>
       <div className="flex gap-2 items-center">

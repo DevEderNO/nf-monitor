@@ -8,7 +8,7 @@ import {
 } from "@interfaces/ws-message";
 import { ActionType } from "./state-reducer";
 import { IProcessamento, ProcessamentoStatus } from "@interfaces/processamento";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { IDbHistoric } from "@/interfaces/db-historic";
 
 interface SocketContextData {
@@ -80,16 +80,10 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
                     type: ActionType.Historic,
                     payload: historic.map(
                       (x) =>
-                        `${format(
-                          parseISO(x.startDate.toString()),
-                          "dd/MM/yyyy HH:mm:ss"
-                        )}${
+                        `${format(x.startDate, "dd/MM/yyyy HH:mm:ss")}${
                           x.endDate
-                            ? format(
-                                parseISO(x.endDate.toString()),
-                                " - dd/MM/yyyy HH:mm:ss"
-                              )
-                            : ""
+                            ? format(x.endDate, " - dd/MM/yyyy HH:mm:ss")
+                            : " - Não finalizado ou interrompido"
                         }`
                     ),
                   });

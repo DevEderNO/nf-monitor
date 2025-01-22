@@ -13,7 +13,9 @@ import {
   addFiles,
   addHistoric,
   getDirectories,
+  getDirectoriesDownloadSieg,
   getFiles,
+  updateHistoric,
 } from "../services/database";
 
 export class DiscoveryTask {
@@ -60,6 +62,7 @@ export class DiscoveryTask {
         "Tarefa de descoberta dos arquivos iniciada.",
       ]);
       this.files = await getFiles();
+      this.historic = await addHistoric(this.historic);
       const directories = await getDirectories();
       await this.discoveryDirectories(directories);
       await addDirectoryDiscovery(this.directoriesAndSubDirectories);
@@ -77,6 +80,7 @@ export class DiscoveryTask {
         0,
         ProcessamentoStatus.Stopped
       );
+      throw error;
     }
   }
 
@@ -85,6 +89,11 @@ export class DiscoveryTask {
     this.cancelledMessage = null;
     this.isPaused = false;
     this.pausedMessage = null;
+    this.historic = {
+      startDate: new Date(),
+      endDate: null,
+      log: [],
+    } as IDbHistoric;
     this.connection = connection;
   }
 
@@ -112,7 +121,7 @@ export class DiscoveryTask {
         index--;
       } else {
         await timeout();
-        const filesInfo = listDirectory(directories[index].path);
+        const filesInfo = await listDirectory(directories[index].path);
         await this.sendMessageClient(
           [
             `🔍 Foram encontrados ${
@@ -186,7 +195,8 @@ export class DiscoveryTask {
         status
       )
     ) {
-      await addHistoric(this.historic);
+      this.historic.endDate = new Date();
+      await updateHistoric(this.historic);
     }
     this.connection?.sendUTF(
       JSON.stringify({

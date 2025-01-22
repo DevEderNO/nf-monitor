@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { execSync } from "node:child_process";
-import { BrowserWindow, dialog } from "electron";
+import { BrowserWindow, dialog, OpenDialogOptions } from "electron";
 import AdmZip from "adm-zip";
 import { IFileInfo } from "../interfaces/file-info";
 import { IFile } from "../interfaces/file";
@@ -10,6 +10,7 @@ import { isBefore, addMonths, parseISO } from "date-fns";
 import * as cheerio from "cheerio";
 import { app } from "electron";
 import { createDocumentParser } from "@arbs.io/asset-extractor-wasm";
+import { timeout } from "../lib/time-utils";
 
 const emissaoSelectors = [
   "data_emissao",
@@ -28,10 +29,10 @@ const emissaoSelectors = [
   "nfse:DataEmissao",
 ];
 
-export function listDirectory(
+export async function listDirectory(
   directoryPath: string,
   callback?: (message: string) => void
-): IFileInfo[] {
+): Promise<IFileInfo[]> {
   const filesAndFolders: IFileInfo[] = [];
   try {
     const directoryContents = fs.readdirSync(directoryPath);
@@ -59,6 +60,7 @@ export function listDirectory(
           callback(`A pasta/arquivo não pode ser lido ${itemPath}`);
         }
       }
+      await timeout();
     }
   } catch (_) {
     if (callback) {
@@ -68,21 +70,32 @@ export function listDirectory(
   return filesAndFolders;
 }
 
-export function selectDirectories(win: BrowserWindow): IDirectory[] {
+export function selectDirectories(
+  win: BrowserWindow,
+  properties: OpenDialogOptions["properties"] = [
+    "openDirectory",
+    "multiSelections",
+  ]
+): IDirectory[] {
   const result = dialog.showOpenDialogSync(win, {
-    properties: ["openDirectory", "multiSelections"],
+    properties,
   });
   if (result) {
     const dados: IDirectory[] = result.map((x) => {
-      return {
-        path: x.split("\\").join("/").toString(),
-        modifiedtime: fs.statSync(x).mtime,
-        size: fs.statSync(x).size,
-      };
+      return getDirectoryData(x);
     });
     return dados;
   }
   return [];
+}
+
+export function getDirectoryData(path: string): IDirectory {
+  const directory = fs.statSync(path);
+  return {
+    path: path.includes("\\") ? path.split("\\").join("/").toString() : path,
+    modifiedtime: directory.mtime,
+    size: directory.size,
+  };
 }
 
 export function validXmlAndPdf(fileInfo: IFileInfo): {
@@ -110,7 +123,11 @@ function validateNotaFiscal(data: string): {
   isNotaFiscal: boolean;
 } {
   const chaveAcesso =
-    /<chNFe>[0-9]{44}/gi.exec(data)?.[0] ?? /NFe[0-9]{44}/gi.exec(data)?.[0];
+    /<chNFe>[0-9]{44}/gi.exec(data)?.[0] ??
+    /NFe[0-9]{44}/gi.exec(data)?.[0] ??
+    /NFCe[0-9]{44}/gi.exec(data)?.[0] ??
+    /CFe[0-9]{44}/gi.exec(data)?.[0] ??
+    /CTe[0-9]{44}/gi.exec(data)?.[0];
   if (!chaveAcesso) return { valid: false, isNotaFiscal: false };
   if (
     isBefore(
@@ -309,4 +326,8 @@ export function unblockFile(filePath: string) {
   } catch (error) {
     console.error("Erro ao desbloquear o arquivo:", error);
   }
+}
+
+export function existsDirectory(path: string): boolean {
+  return fs.existsSync(path);
 }

@@ -11,7 +11,6 @@ export interface IState {
   directories: IDirectory[];
   loading: boolean;
   processamento: IProcessamento;
-  timeForProcessing: string;
   historic: string[];
   config: IConfig;
 }
@@ -30,11 +29,16 @@ export const initialState: IState = {
     progress: 0,
     status: ProcessamentoStatus.Stopped,
   },
-  timeForProcessing: "00:00",
   historic: [],
   config: {
     viewUploadedFiles: false,
     timeForProcessing: "00:00",
+    timeForConsultingSieg: "00:00",
+    directoryDownloadSieg: null,
+    apiKeySieg: null,
+    emailSieg: null,
+    senhaSieg: null,
+    directorySieg: null,
   },
 };
 
@@ -45,9 +49,8 @@ export enum ActionType {
   Processamento,
   ClearMessages,
   Clear,
-  TimeForProcessing,
   Historic,
-  ViewUploadedFiles,
+  Config,
 }
 
 export const StateReducer = (state: IState, action: IAction): IState => {
@@ -63,20 +66,11 @@ export const StateReducer = (state: IState, action: IAction): IState => {
       return { ...state, loading: action.payload };
     case ActionType.Processamento:
       return processamentoReducer();
-    case ActionType.TimeForProcessing:
-      window.ipcRenderer.send("set-timeForProcessing", action.payload);
-      return { ...state, timeForProcessing: action.payload };
     case ActionType.Historic:
       return { ...state, historic: action.payload };
-    case ActionType.ViewUploadedFiles:
-      window.ipcRenderer.send("set-viewUploadedFiles", action.payload);
-      return {
-        ...state,
-        config: {
-          ...state.config,
-          viewUploadedFiles: action.payload,
-        },
-      };
+    case ActionType.Config:
+      window.ipcRenderer.send("set-config", action.payload);
+      return { ...state, config: action.payload };
     case ActionType.Clear:
       window.ipcRenderer.send("remove-auth");
       return { ...initialState };

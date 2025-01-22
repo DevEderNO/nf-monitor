@@ -3,6 +3,11 @@ import { decrypt } from "./cryptography";
 import { createReadStream } from "fs";
 import FormData from "form-data";
 import { ISignIn } from "../interfaces/signin";
+import {
+  ISiegCountNotesRequest,
+  ISiegDownloadNotesRequest,
+  ISiegDownloadNotesResponse,
+} from "../interfaces/sieg";
 
 const apiAuth = axios.create({
   baseURL: import.meta.env.VITE_API_AUTH_URL,
@@ -11,6 +16,11 @@ const apiAuth = axios.create({
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_UPLOAD_URL,
   timeout: 20000,
+});
+
+const apiSieg = axios.create({
+  baseURL: import.meta.env.VITE_API_SIEG_URL,
+  timeout: 50000,
 });
 
 export async function signIn(
@@ -45,7 +55,6 @@ export async function retry(
     await sleep(delay);
     const form = new FormData();
     form.append("arquivo", createReadStream(filepath));
-    console.log("Enviando o arquivo ", filepath, " para o Sittax pelo retry");
     const { data } = await api.post(url, form, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -55,14 +64,70 @@ export async function retry(
 
     return data;
   } catch (e) {
-    console.log("Erro ao enviar o arquivo no retry: ", e);
     if (attempt >= maximumRetry) throw e;
-    return retry(url, filepath, token, attempt + 1, (delay || 1000) * 2);
+    return retry(
+      url,
+      filepath,
+      token,
+      maximumRetry,
+      attempt + 1,
+      (delay || 1000) * 2
+    );
   }
 }
 
 export async function upload(token: string, filepath: string) {
   const form = new FormData();
   form.append("arquivo", createReadStream(filepath));
-  await retry("upload/importar-arquivo", filepath, token, 5, 0, 0);
+  await retry("upload/importar-arquivo", filepath, token, 5);
+}
+
+export async function retrySieg(
+  url: string,
+  apiKey: string,
+  data: ISiegCountNotesRequest,
+  maximumRetry = 0,
+  attempt = 0,
+  delay = 0
+) {
+  try {
+    await sleep(delay);
+    const resp = await apiSieg.post(url, data, {
+      params: {
+        api_key: apiKey,
+      },
+      headers: {
+        Origin: "http://app.sittax.com.br",
+      },
+    });
+
+    return resp.data;
+  } catch (e) {
+    if (attempt >= maximumRetry) throw e;
+    console.log("Erro ao baixar notas numero de tentativas: ", attempt);
+    return retrySieg(
+      url,
+      apiKey,
+      data,
+      maximumRetry,
+      attempt + 1,
+      (delay || 1000) * 2
+    );
+  }
+}
+
+export async function getCountNotes(
+  apiKey: string,
+  data: ISiegCountNotesRequest
+) {
+  const response = await retrySieg(`/ContarXmls`, apiKey, data, 5);
+  return response;
+}
+
+export async function downloadNotes(
+  apiKey: string,
+  data: ISiegDownloadNotesRequest
+): Promise<ISiegDownloadNotesResponse> {
+  const response = await retrySieg(`/BaixarXmlsV2`, apiKey, data, 5);
+  return response;
 }

@@ -43,7 +43,7 @@ export function Directories() {
   );
 
   return (
-    <div className="p-4 m-4 flex flex-col gap-4 border rounded-md h-full basis-full overflow-y-auto">
+    <div className="p-4 m-4 flex flex-1 flex-col gap-4 border rounded-md h-full basis-full overflow-y-auto">
       <div className="flex">
         <Button onClick={handleSelectDirectories}>Selecionar Diretórios</Button>
       </div>

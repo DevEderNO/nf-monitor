@@ -6,6 +6,8 @@ interface ImportMetaEnv {
   readonly VITE_API_UPLOAD_URL: string;
   readonly VITE_PASSWORD_SECRET: string;
   readonly VITE_GITHUB_TOKEN: string;
+  readonly DATABASE_URL: string;
+  readonly VITE_API_SIEG_URL: string;
   // more env variables...
 }
 

@@ -7,6 +7,9 @@ import { IUser } from "../interfaces/user";
 import { IDbHistoric } from "../interfaces/db-historic";
 import { IFileInfo } from "../interfaces/file-info";
 import { IDirectory } from "../interfaces/directory";
+import { IConfig } from "../interfaces/config";
+import { getDirectoryData } from "./file-operation-service";
+import { ICountedNotes } from "../interfaces/count-notes";
 
 // Configura o caminho do banco de dados
 const dbPath = app.isPackaged
@@ -41,6 +44,7 @@ export async function initializeDatabase() {
         await prisma.configuration.create({
           data: {
             timeForProcessing: "00:00",
+            timeForConsultingSieg: "00:00",
             viewUploadedFiles: false,
           },
         });
@@ -52,19 +56,19 @@ export async function initializeDatabase() {
   }
 }
 
-export async function getConfiguration() {
+export async function getConfiguration(): Promise<IConfig | null> {
   return prisma.configuration.findFirst();
 }
 
-export async function updateConfiguration(data: {
-  timeForProcessing?: string;
-  viewUploadedFiles?: boolean;
-}) {
+export async function updateConfiguration(data: IConfig) {
   const config = await prisma.configuration.findFirst();
   if (config) {
-    return prisma.configuration.update({
+    return await prisma.configuration.update({
       where: { id: config.id },
-      data,
+      data: {
+        ...data,
+        id: undefined,
+      },
     });
   }
 }
@@ -79,6 +83,11 @@ export async function addAuth(data: {
   username: string;
   password: string;
   empresas: any[];
+  configuration: {
+    apiKeySieg: string;
+    emailSieg: string;
+    senhaSieg: string;
+  };
 }) {
   const result = await prisma.$transaction(async (tx) => {
     // Create user record first
@@ -123,6 +132,31 @@ export async function addAuth(data: {
       },
     });
 
+    const config = await tx.configuration.findFirst();
+    if (config) {
+      await tx.configuration.update({
+        where: { id: config?.id },
+        data: {
+          ...config,
+          apiKeySieg: data.configuration.apiKeySieg,
+          emailSieg: data.configuration.emailSieg,
+          senhaSieg: data.configuration.senhaSieg,
+          id: undefined,
+        },
+      });
+    } else {
+      await tx.configuration.create({
+        data: {
+          timeForProcessing: "00:00",
+          timeForConsultingSieg: "00:00",
+          viewUploadedFiles: false,
+          apiKeySieg: data.configuration.apiKeySieg,
+          emailSieg: data.configuration.emailSieg,
+          senhaSieg: data.configuration.senhaSieg,
+        },
+      });
+    }
+
     return auth;
   });
   return result;
@@ -146,14 +180,28 @@ export async function updateAuth(data: {
 
 export async function removeAuth() {
   return await prisma.$transaction(async (tx) => {
+    await tx.countedNotes.deleteMany();
     await tx.empresa.deleteMany();
     await tx.auth.deleteMany();
     await tx.user.deleteMany();
   });
 }
 
-export async function getDirectories() {
-  return prisma.directory.findMany();
+export async function getDirectories(): Promise<IDirectory[]> {
+  const directorySieg = await getDirectoriesDownloadSieg();
+  if (directorySieg) {
+    return [directorySieg, ...(await prisma.directory.findMany())];
+  }
+  return await prisma.directory.findMany();
+}
+
+export async function getDirectoriesDownloadSieg(): Promise<IDirectory | null> {
+  const config = await getConfiguration();
+  if (config && config.directoryDownloadSieg) {
+    const directory = getDirectoryData(config.directoryDownloadSieg);
+    return directory;
+  }
+  return null;
 }
 
 export async function addDirectory(data: {
@@ -161,6 +209,16 @@ export async function addDirectory(data: {
   modifiedtime: Date;
   size: number;
 }) {
+  const existingPath = await prisma.directory.findFirst({
+    where: {
+      path: {
+        equals: data.path,
+      },
+    },
+  });
+  if (existingPath) {
+    return existingPath;
+  }
   return prisma.directory.create({ data });
 }
 
@@ -171,7 +229,12 @@ export async function addDirectories(
     size: number;
   }[]
 ) {
-  return prisma.directory.createMany({ data });
+  const existingPaths = await prisma.directory.findMany({
+    select: { path: true },
+  });
+  const existingPathSet = new Set(existingPaths.map((d) => d.path));
+  const newDirectories = data.filter((d) => !existingPathSet.has(d.path));
+  return prisma.directory.createMany({ data: newDirectories });
 }
 
 export async function existsDirectory(path: string): Promise<boolean> {
@@ -187,7 +250,7 @@ export async function existsDirectory(path: string): Promise<boolean> {
 }
 
 export async function removeDirectory(path: string) {
-  return prisma.directory.deleteMany({
+  return await prisma.directory.deleteMany({
     where: {
       path: {
         equals: path,
@@ -273,12 +336,24 @@ export async function addHistoric(data: {
   startDate: Date;
   endDate: Date | null;
   log: string[];
-}) {
-  return prisma.historic.create({
+}): Promise<IDbHistoric> {
+  const historic = await prisma.historic.create({
     data: {
       ...data,
+      id: undefined,
       log: JSON.stringify(data.log),
     },
+  });
+  return {
+    ...historic,
+    log: JSON.parse(historic.log),
+  };
+}
+
+export async function updateHistoric(data: IDbHistoric) {
+  return prisma.historic.update({
+    where: { id: data.id },
+    data: { ...data, log: JSON.stringify(data.log) },
   });
 }
 
@@ -304,4 +379,33 @@ export async function addError(data: {
   type: ErrorType;
 }) {
   return prisma.error.create({ data });
+}
+
+export async function getEmpresas() {
+  return prisma.empresa.findMany({ orderBy: { cnpj: "asc" } });
+}
+
+export async function addCountedNotes(data: ICountedNotes) {
+  return prisma.countedNotes.create({
+    data,
+  });
+}
+
+export async function getCountedNotes(
+  dataInicio: Date,
+  dataFim: Date
+): Promise<ICountedNotes | null> {
+  return prisma.countedNotes.findFirst({
+    where: {
+      dataInicio,
+      dataFim,
+    },
+  });
+}
+
+export async function updateCountedNotes(data: ICountedNotes) {
+  return prisma.countedNotes.update({
+    where: { id: data.id },
+    data,
+  });
 }

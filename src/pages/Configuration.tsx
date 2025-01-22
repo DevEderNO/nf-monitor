@@ -10,30 +10,16 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppState } from "@/hooks/state";
 import { ActionType } from "@/hooks/state-reducer";
+import { IDirectory } from "@/interfaces/directory";
 import { ENivel } from "@/interfaces/user";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { TrashIcon } from "lucide-react";
+import { FolderIcon, TrashIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-
-const formSchema = z.object({
-  hora: z.string().min(5, { message: "A hora e obrigatória" }),
-});
 
 export function Configuration() {
   const { state, dispatch } = useAppState();
@@ -45,19 +31,40 @@ export function Configuration() {
     setViewUploadedFiles(state?.config?.viewUploadedFiles ?? false);
   }, [state?.config?.viewUploadedFiles, state?.historic]);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      hora: state?.timeForProcessing,
-    },
-  });
+  const handleSelectDirectoryDownloadSieg = useCallback(async () => {
+    const filepaths: IDirectory | null = await window.ipcRenderer.invoke(
+      "select-directory-download-sieg"
+    );
+    if (filepaths) {
+      dispatch({
+        type: ActionType.Config,
+        payload: {
+          ...state.config,
+          directoryDownloadSieg: filepaths.path,
+        },
+      });
+    }
+  }, [dispatch]);
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    dispatch({
-      type: ActionType.TimeForProcessing,
-      payload: values.hora,
-    });
-  }
+  const handleTimeForProcessing = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      dispatch({
+        type: ActionType.Config,
+        payload: { ...state.config, timeForProcessing: e.target.value },
+      });
+    },
+    [dispatch]
+  );
+
+  const handleTimeForConsultingSieg = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      dispatch({
+        type: ActionType.Config,
+        payload: { ...state.config, timeForConsultingSieg: e.target.value },
+      });
+    },
+    [dispatch]
+  );
 
   const handleCleanHistoric = useCallback(() => {
     window.ipcRenderer.send("clear-historic");
@@ -66,13 +73,13 @@ export function Configuration() {
 
   const changeViewUploadedFiles = useCallback(() => {
     dispatch({
-      type: ActionType.ViewUploadedFiles,
-      payload: !viewUploadedFiles,
+      type: ActionType.Config,
+      payload: { ...state.config, viewUploadedFiles: !viewUploadedFiles },
     });
   }, [dispatch, viewUploadedFiles]);
 
   return (
-    <div className="p-4 m-4 flex flex-col gap-4 flex-1 border rounded-md">
+    <div className="p-4 m-4 flex flex-1 flex-col gap-4 border rounded-md">
       <div className="flex items-center space-x-2">
         <Switch
           id="airplane-mode"
@@ -83,47 +90,31 @@ export function Configuration() {
           Visualizar arquivos já enviados. (☑️)
         </Label>
       </div>
-      <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-4 w-full"
-        >
-          <div className="flex gap-4">
-            <FormField
-              control={form.control}
-              name="hora"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>
-                    Hora para localizar e enviar os arquivos
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder=""
-                      type="time"
-                      className="w-fit"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-          <Button type="submit">Salvar</Button>
-        </form>
-      </Form>
-      <h2 className="scroll-m-20 text-2xl font-semibold tracking-tight transition-colors first:mt-0">
-        {state?.timeForProcessing?.length > 0 &&
-          state?.timeForProcessing !== "00:00" && (
+      <div className="flex gap-4">
+        <div className="flex flex-col gap-2">
+          <Label>Hora para localizar e enviar os arquivos</Label>
+          <Input
+            placeholder=""
+            type="time"
+            className="w-fit"
+            onChange={handleTimeForProcessing}
+            value={state.config.timeForProcessing}
+          />
+        </div>
+      </div>
+      <h3 className="scroll-m-20 text-xl font-semibold tracking-tight transition-colors first:mt-0">
+        {state?.config?.timeForProcessing?.length > 0 &&
+          state?.config?.timeForProcessing !== "00:00" && (
             <>
               Agendamento <span className="text-primary">programado</span> para
               ocorrer as{" "}
-              <span className="text-primary">{state?.timeForProcessing}</span>{" "}
+              <span className="text-primary">
+                {state?.config?.timeForProcessing}
+              </span>{" "}
               diariamente.
             </>
           )}
-      </h2>
+      </h3>
       <div className="flex flex-col flex-1 gap-2">
         <div className="flex items-center justify-between">
           <Label>Histórico de execuções</Label>
@@ -169,6 +160,52 @@ export function Configuration() {
           defaultValue={historic?.join("\n")}
         />
       </div>
+      {state.config.apiKeySieg && state.config.apiKeySieg.length > 0 ? (
+        <div className="flex flex-col flex-1 gap-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label>Hora para consultar notas no SIEG</Label>
+              <Input
+                placeholder=""
+                type="time"
+                className="w-fit"
+                onChange={handleTimeForConsultingSieg}
+                value={state?.config?.timeForConsultingSieg}
+              />
+            </div>
+            <div className="flex flex-col w-full gap-2">
+              <Label>Diretório para download das notas do SIEG</Label>
+              <div className="flex w-full items-center">
+                <Button onClick={handleSelectDirectoryDownloadSieg}>
+                  <FolderIcon className="w-5 h-4" />
+                </Button>
+                <Input
+                  placeholder=""
+                  type="text"
+                  className="w-full"
+                  value={state?.config?.directoryDownloadSieg ?? ""}
+                  disabled
+                />
+              </div>
+            </div>
+          </div>
+          <h3 className="scroll-m-20 text-xl font-semibold tracking-tight transition-colors first:mt-0">
+            {state?.config?.timeForConsultingSieg?.length > 0 &&
+              state?.config?.timeForConsultingSieg !== "00:00" && (
+                <>
+                  Agendamento para consultar notas no SIEG programado para
+                  ocorrer as{" "}
+                  <span className="text-primary">
+                    {state?.config?.timeForConsultingSieg}
+                  </span>{" "}
+                  diariamente.
+                </>
+              )}
+          </h3>
+        </div>
+      ) : (
+        <></>
+      )}
     </div>
   );
 }

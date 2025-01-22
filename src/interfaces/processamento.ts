@@ -2,7 +2,7 @@ export interface IProcessamento {
   messages: string[];
   progress: number;
   status: ProcessamentoStatus;
-  id?: string;
+  id?: number;
 }
 
 export enum ProcessamentoStatus {

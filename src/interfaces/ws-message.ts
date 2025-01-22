@@ -20,6 +20,11 @@ export enum WSMessageType {
   PauseProcess,
   ResumeProcess,
   StopProcess,
+  StartSieg,
+  PauseSieg,
+  ResumeSieg,
+  StopSieg,
   Discovery,
   Process,
+  Sieg,
 }

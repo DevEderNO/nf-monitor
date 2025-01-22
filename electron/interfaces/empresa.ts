@@ -1,5 +1,9 @@
 export interface IEmpresa {
-  Id: string;
-  Nome: string;
-  Cnpj: string;
+  id?: number;
+  empresaId: string;
+  nome: string;
+  cnpj: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
+

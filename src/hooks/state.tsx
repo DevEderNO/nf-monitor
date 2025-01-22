@@ -11,6 +11,7 @@ import { IDirectory } from "@/interfaces/directory";
 import { IAuth } from "@/interfaces/auth";
 import { IDbHistoric } from "@/interfaces/db-historic";
 import { format } from "date-fns";
+import { IConfig } from "@/interfaces/config";
 
 interface StateContextData {
   state: IState;
@@ -27,17 +28,9 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
     dispatch({ type: ActionType.Loading, payload: true });
 
     const auth: IAuth = await window.ipcRenderer.invoke("get-auth");
-    console.log("auth", auth);
     const directories: IDirectory[] = await window.ipcRenderer.invoke(
       "get-directories"
     );
-    const timeForProcessing: IDirectory[] = await window.ipcRenderer.invoke(
-      "get-timeForProcessing"
-    );
-    const viewUploadedFiles: boolean = await window.ipcRenderer.invoke(
-      "get-viewUploadedFiles"
-    );
-
     if (directories) {
       dispatch({
         type: ActionType.Directories,
@@ -45,48 +38,32 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
       });
     }
 
-    if (timeForProcessing) {
-      dispatch({
-        type: ActionType.TimeForProcessing,
-        payload: timeForProcessing,
-      });
-      window.ipcRenderer.send("initialize-job");
-    }
-
+    const config: IConfig = await window.ipcRenderer.invoke("get-config");
     dispatch({
-      type: ActionType.ViewUploadedFiles,
-      payload: viewUploadedFiles,
+      type: ActionType.Config,
+      payload: config,
     });
 
+    window.ipcRenderer.send("initialize-job");
     const historic: IDbHistoric[] = await window.ipcRenderer.invoke(
       "get-historic"
     );
 
     if (historic.length > 0) {
-      console.log("historic", historic);
-      console.log(
-        historic.map(
-          (x) =>
-            `${format(x.startDate, "dd/MM/yyyy HH:mm:ss")}${
-              x.endDate ? format(x.endDate, " - dd/MM/yyyy HH:mm:ss") : ""
-            }`
-        )
-      );
       dispatch({
         type: ActionType.Historic,
         payload: historic.map(
           (x) =>
-            `${format(x.startDate, "dd/MM/yyyy HH:mm:ss")} | ${
+            `${format(x.startDate, "dd/MM/yyyy HH:mm:ss")}${
               x.endDate
                 ? format(x.endDate, " - dd/MM/yyyy HH:mm:ss")
-                : "Não finalizado ou interrompido"
+                : " - Não finalizado ou interrompido"
             }`
         ),
       });
     }
 
     if (auth.token && auth.user) {
-      console.log("auth", auth);
       dispatch({
         type: ActionType.Auth,
         payload: auth,

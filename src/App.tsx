@@ -6,6 +6,7 @@ import { AppProvider } from "@hooks/index";
 import { Directories } from "@pages/Directories";
 import { RequireAuth } from "@components/auth/RequireAuth";
 import { Configuration } from "./pages/Configuration";
+import { Sieg } from "@pages/Sieg";
 
 export default function App() {
   return (
@@ -34,6 +35,14 @@ export default function App() {
             element={
               <RequireAuth>
                 <Configuration />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/sieg"
+            element={
+              <RequireAuth>
+                <Sieg />
               </RequireAuth>
             }
           />

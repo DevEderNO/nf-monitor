@@ -18,6 +18,13 @@ import {
   stopDiscovery,
 } from "./services/discovery-service";
 import { IProcessamento } from "./interfaces/processamento";
+import {
+  pauseSieg,
+  resumeSieg,
+  startSieg,
+  stopSieg,
+} from "./services/sieg-service";
+import { parseISO } from "date-fns";
 
 let wsConnection: connection;
 
@@ -66,6 +73,18 @@ function createWebsocket() {
           case WSMessageType.StopProcess:
             stopProcess();
             break;
+          case WSMessageType.StartSieg:
+            wsStartSieg(wsConnection, message);
+            break;
+          case WSMessageType.PauseSieg:
+            pauseSieg();
+            break;
+          case WSMessageType.ResumeSieg:
+            resumeSieg();
+            break;
+          case WSMessageType.StopSieg:
+            stopSieg();
+            break;
           default:
             break;
         }
@@ -73,9 +92,21 @@ function createWebsocket() {
 
       function wsStartProcess(connection: connection, message: IUtf8Message) {
         const {
-          message: {},
+          message: {
+            data: { id },
+          },
         }: WSMessageTyped<IProcessamento> = JSON.parse(message.utf8Data);
-        startProcess(connection);
+        startProcess(connection, id);
+      }
+
+      function wsStartSieg(connection: connection, message: IUtf8Message) {
+        const {
+          message: {
+            data: { dateInitial, dateEnd },
+          },
+        }: WSMessageTyped<{ dateInitial: string; dateEnd: string }> =
+          JSON.parse(message.utf8Data);
+        startSieg(connection, parseISO(dateInitial), parseISO(dateEnd));
       }
     });
   });

@@ -14,14 +14,15 @@ import { WSMessageType, WSMessageTyped } from "../interfaces/ws-message";
 import { signIn, upload } from "../lib/axios";
 import { IDbHistoric } from "../interfaces/db-historic";
 import {
-  addHistoric,
   getAuth,
   getConfiguration,
   getFiles,
   updateAuth,
   updateFile,
+  updateHistoric,
 } from "../services/database";
 import { IAuth } from "../interfaces/auth";
+import { timeout } from "../lib/time-utils";
 
 export class ProcessTask {
   isPaused: boolean;
@@ -66,11 +67,14 @@ export class ProcessTask {
     this.isCancelled = true;
   }
 
-  async run(connection: connection) {
+  async run(connection: connection, id?: number) {
     try {
       this.initializeProperties(connection);
       this.files = (await getFiles()).filter((x) => !x.wasSend);
       this.filesSended = (await getFiles()).filter((x) => x.wasSend);
+      if (id) {
+        this.historic.id = id;
+      }
       this.viewUploadedFiles =
         (await getConfiguration())?.viewUploadedFiles ?? false;
       if (this.viewUploadedFiles && this.filesSended.length > 0) {
@@ -308,7 +312,10 @@ export class ProcessTask {
         status
       )
     ) {
-      await addHistoric(this.historic);
+      this.historic.endDate = new Date();
+      if (this.historic.id) {
+        await updateHistoric(this.historic);
+      }
     }
     this.connection?.sendUTF(
       JSON.stringify({
@@ -326,10 +333,4 @@ export class ProcessTask {
     );
     await timeout();
   }
-}
-
-function timeout(time?: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, time ?? 50);
-  });
 }

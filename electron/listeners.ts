@@ -39,7 +39,7 @@ export async function registerListeners(win: BrowserWindow | null) {
       const data = await signIn(user, password);
       const {
         Token,
-        Escritorio: { Usuarios, Empresas },
+        Escritorio: { Usuarios, Empresas, ApiKeySieg, EmailSieg, SenhaSieg },
       } = data;
 
       const {
@@ -89,6 +89,11 @@ export async function registerListeners(win: BrowserWindow | null) {
           nome: x.Nome,
           cnpj: x.Cnpj,
         })),
+        configuration: {
+          apiKeySieg: ApiKeySieg,
+          emailSieg: EmailSieg,
+          senhaSieg: SenhaSieg,
+        },
       };
       addAuth(auth);
       return auth;
@@ -110,6 +115,14 @@ export async function registerListeners(win: BrowserWindow | null) {
       await addDirectories(directories);
     }
     return await getDirectories();
+  });
+
+  ipcMain.handle("select-directory-download-sieg", async () => {
+    let directory = selectDirectories(win!, ["openDirectory"]);
+    if (directory.length > 0) {
+      return directory.at(0);
+    }
+    return null;
   });
 
   ipcMain.handle("remove-directory", async (_, directory: string) => {
@@ -139,18 +152,18 @@ export async function registerListeners(win: BrowserWindow | null) {
     }
   });
 
-  ipcMain.handle("get-timeForProcessing", async () => {
+  ipcMain.handle("get-config", async () => {
     const configuration: IConfig | null = await getConfiguration();
-    return configuration?.timeForProcessing ?? "00:00";
+    return configuration;
   });
 
-  ipcMain.handle("get-viewUploadedFiles", async () => {
-    const configuration: IConfig | null = await getConfiguration();
-    return configuration?.viewUploadedFiles ?? false;
+  ipcMain.on("set-config", async (_, config) => {
+    await updateConfiguration(config);
   });
 
   ipcMain.handle("get-historic", async () => {
-    return await getHistoric();
+    const historic = await getHistoric();
+    return historic;
   });
 
   ipcMain.on("initialize-job", () => {
