@@ -1,7 +1,7 @@
 import { isValid, parseISO, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-export function toDate(text: string): Date {
+export function toDate(text: string): Date | null {
   const textReplaced = text
     .trim()
     .replace(/\//g, "")
@@ -9,7 +9,6 @@ export function toDate(text: string): Date {
     .replace(/-/g, "")
     .replace(/ GMT$/, "")
     .replace(/ UTC$/, "");
-
   let date = parseISO(text);
   if (isValid(date)) return date;
   date = parseISO(textReplaced);
@@ -44,7 +43,7 @@ export function toDate(text: string): Date {
   if (isValid(date)) return date;
   date = parse(textReplaced, "yyyyM", new Date());
   if (isValid(date)) return date;
-  return date;
+  return null;
 }
 
 export function testToDate() {

@@ -3,7 +3,7 @@ import {
   listDirectory,
   selectDirectories,
 } from "./services/file-operation-service";
-import { initializeJob, updateJob } from "./services/schedules";
+import { updateJobs } from "./services/schedules";
 import { encrypt } from "./lib/cryptography";
 import { signIn } from "./lib/axios";
 import {
@@ -26,11 +26,7 @@ import { IUser } from "./interfaces/user";
 export async function registerListeners(win: BrowserWindow | null) {
   ipcMain.handle("get-auth", async () => {
     const auth = await getAuth();
-    return {
-      user: auth?.username,
-      token: auth?.token,
-      credentials: { user: "", password: "" },
-    };
+    return auth;
   });
 
   ipcMain.handle(
@@ -68,21 +64,21 @@ export async function registerListeners(win: BrowserWindow | null) {
         name: Nome,
         password: passwordHash,
         user: {
-          userId: Id,
-          Nome,
-          Sobrenome,
-          Cpf,
-          Email,
-          PhoneNumber,
-          Ativo,
-          EmailConfirmed,
-          AccessFailedCount,
-          DataDeCriacao,
-          LockoutEnd,
-          EUsuarioEmpresa,
-          Role,
-          EPrimeiroAcesso,
-          Nivel,
+          userId: Id.toString(),
+          nome: Nome,
+          sobrenome: Sobrenome,
+          cpf: Cpf,
+          email: Email,
+          phoneNumber: PhoneNumber,
+          ativo: Ativo,
+          emailConfirmed: EmailConfirmed,
+          accessFailedCount: AccessFailedCount,
+          dataDeCriacao: DataDeCriacao,
+          lockoutEnd: LockoutEnd,
+          eUsuarioEmpresa: EUsuarioEmpresa,
+          role: Role,
+          ePrimeiroAcesso: EPrimeiroAcesso,
+          nivel: Nivel,
         } as IUser,
         empresas: Empresas.map((x) => ({
           empresaId: x.Id,
@@ -90,12 +86,12 @@ export async function registerListeners(win: BrowserWindow | null) {
           cnpj: x.Cnpj,
         })),
         configuration: {
-          apiKeySieg: ApiKeySieg,
-          emailSieg: EmailSieg,
-          senhaSieg: SenhaSieg,
+          apiKeySieg: ApiKeySieg ?? "",
+          emailSieg: EmailSieg ?? "",
+          senhaSieg: SenhaSieg ?? "",
         },
       };
-      addAuth(auth);
+      await addAuth(auth);
       return auth;
     }
   );
@@ -135,23 +131,6 @@ export async function registerListeners(win: BrowserWindow | null) {
     return listDirectory(directoryPath);
   });
 
-  ipcMain.on("set-timeForProcessing", async (_, timeForProcessing) => {
-    const configuration: IConfig | null = await getConfiguration();
-    updateJob(timeForProcessing);
-    if (configuration) {
-      configuration.timeForProcessing = timeForProcessing;
-      await updateConfiguration(configuration);
-    }
-  });
-
-  ipcMain.on("set-viewUploadedFiles", async (_, viewUploadedFiles) => {
-    const configuration: IConfig | null = await getConfiguration();
-    if (configuration) {
-      configuration.viewUploadedFiles = viewUploadedFiles;
-      await updateConfiguration(configuration);
-    }
-  });
-
   ipcMain.handle("get-config", async () => {
     const configuration: IConfig | null = await getConfiguration();
     return configuration;
@@ -159,15 +138,16 @@ export async function registerListeners(win: BrowserWindow | null) {
 
   ipcMain.on("set-config", async (_, config) => {
     await updateConfiguration(config);
+    updateJobs();
   });
 
   ipcMain.handle("get-historic", async () => {
-    const historic = await getHistoric();
+    const historic = (await getHistoric()) ?? [];
     return historic;
   });
 
   ipcMain.on("initialize-job", () => {
-    initializeJob();
+    updateJobs();
   });
 
   ipcMain.on("clear-historic", async () => {

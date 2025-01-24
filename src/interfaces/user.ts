@@ -1,19 +1,20 @@
 export interface IUser {
-  Id: string;
-  Nome: string;
-  Sobrenome: string;
-  Cpf: string;
-  Email: string;
-  PhoneNumber: string;
-  Ativo: string;
-  EmailConfirmed: string;
-  AccessFailedCount: string;
-  DataDeCriacao: string;
-  LockoutEnd: string;
-  EUsuarioEmpresa: string;
-  Role: string;
-  EPrimeiroAcesso: string;
-  Nivel: ENivel;
+  id?: Number;
+  userId: string;
+  nome: string;
+  sobrenome: string | null;
+  cpf: string | null;
+  email: string | null;
+  phoneNumber: string | null;
+  ativo: boolean;
+  emailConfirmed: boolean;
+  accessFailedCount: number;
+  dataDeCriacao: string;
+  lockoutEnd: string;
+  eUsuarioEmpresa: boolean;
+  role: string;
+  ePrimeiroAcesso: boolean;
+  nivel: ENivel;
 }
 
 export enum ENivel {

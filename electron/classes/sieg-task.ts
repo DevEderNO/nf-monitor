@@ -21,7 +21,7 @@ import fs from "fs";
 import { ensureDirSync } from "fs-extra";
 import { RoleTypeSieg } from "@prisma/client";
 import { IConfig } from "../interfaces/config";
-import { xml } from "cheerio";
+import { getDataEmissao } from "../lib/nfse-utils";
 
 export class SiegTask {
   isPaused: boolean;
@@ -124,7 +124,7 @@ export class SiegTask {
       await this.sendMessageClient(
         [`Finalizado o processo de download das notas fiscais`],
         0,
-        ProcessamentoStatus.Running
+        ProcessamentoStatus.Concluded
       );
       console.log(`Finalizado o processo de download das notas fiscais`);
     } catch (error) {
@@ -133,6 +133,7 @@ export class SiegTask {
   }
 
   async downloadNotes(xmlType: SiegXmlType) {
+    if (await this.checkIfCancelled()) return;
     const countNotes = await getCountedNotes(this.dateInitial!, this.dateEnd!);
     if (!countNotes) return;
 
@@ -176,51 +177,66 @@ export class SiegTask {
           },
         });
         for (let i = 0; i < downloadNFe.xmls.length; i++) {
-          let emitente = "";
-          let ano = "";
-          let mes = "";
-          let destinatario: string | null = null;
-          const xml = downloadNFe.xmls[i];
-          const xmlString = Buffer.from(xml, "base64").toString("utf-8");
-          if (xmlType !== SiegXmlType.NFSe) {
-            const regex = this.getChaveRegex(xmlType);
-            const chave = regex
-              ? xmlString.match(regex)?.[1]
-              : xmlString.substring(0, 10) + new Date().getTime().toString();
-            if (chave?.length === 44) {
-              ano = chave.substring(2, 4);
-              mes = chave.substring(4, 6);
-              emitente = chave.substring(6, 20);
-              destinatario = await this.getDestination(
-                xmlType,
-                xmlString.toString()
-              );
-              if (
-                destinatario &&
-                destinatario.length > 0 &&
-                !this.empresas.map((x) => x.cnpj).includes(destinatario)
-              ) {
-                this.saveStandardizedFile(
-                  Number(ano),
-                  Number(mes),
-                  emitente,
-                  xmlType,
-                  chave,
-                  xmlString
-                );
-              } else {
-                this.saveStandardizedFile(
-                  Number(ano),
-                  Number(mes),
-                  emitente,
-                  xmlType,
-                  chave,
-                  xmlString
-                );
-              }
-            }
+          if (await this.checkIfCancelled()) return;
+          if (await this.checkIfPaused()) {
+            await timeout(250);
+            i--;
+            continue;
           } else {
-            this.saveNfseFile(Number(ano), Number(mes), xmlString);
+            let emitente = "";
+            let ano = "";
+            let mes = "";
+            let destinatario: string | null = null;
+            const xml = downloadNFe.xmls[i];
+            const xmlString = Buffer.from(xml, "base64").toString("utf-8");
+            if (xmlType !== SiegXmlType.NFSe) {
+              const regex = this.getChaveRegex(xmlType);
+              const chave = regex
+                ? xmlString.match(regex)?.[1]
+                : xmlString.substring(0, 10) + new Date().getTime().toString();
+              if (chave?.length === 44) {
+                ano = chave.substring(2, 4);
+                mes = chave.substring(4, 6);
+                emitente = chave.substring(6, 20);
+                destinatario = await this.getDestination(
+                  xmlType,
+                  xmlString.toString()
+                );
+                if (
+                  destinatario &&
+                  destinatario.length > 0 &&
+                  !this.empresas.map((x) => x.cnpj).includes(destinatario)
+                ) {
+                  this.saveStandardizedFile(
+                    Number(ano),
+                    Number(mes),
+                    emitente,
+                    xmlType,
+                    chave,
+                    xmlString
+                  );
+                } else {
+                  this.saveStandardizedFile(
+                    Number(ano),
+                    Number(mes),
+                    emitente,
+                    xmlType,
+                    chave,
+                    xmlString
+                  );
+                }
+              }
+            } else {
+              const dataEmissao = getDataEmissao(xmlString);
+              if (dataEmissao) {
+                ano = format(dataEmissao, "yy");
+                mes = format(dataEmissao, "MM");
+              } else {
+                ano = format(this.dateInitial!, "'9000'yy");
+                mes = format(this.dateInitial!, "'9000'MM");
+              }
+              this.saveNfseFile(Number(ano), Number(mes), xmlString);
+            }
           }
         }
       }
@@ -352,8 +368,6 @@ export class SiegTask {
         );
         console.log(this.cancelledMessage);
       }
-      this.isCancelled = false;
-      this.isPaused = false;
       return true;
     }
     return false;
@@ -396,6 +410,16 @@ export class SiegTask {
         countedNotesDb.cfe === this.countNotes.CFe &&
         countedNotesDb.nfse === this.countNotes.NFSe
       ) {
+        await this.sendMessageClient(
+          [
+            `Foram encontradas ${this.countNotes.NFe} NFe | ${this.countNotes.NFCe} NFCe | ${this.countNotes.CTe} CTe | ${this.countNotes.CFe} CFe | ${this.countNotes.NFSe} NFSe`,
+          ],
+          0,
+          ProcessamentoStatus.Running
+        );
+        console.log(
+          `Foram encontradas ${this.countNotes.NFe} NFe | ${this.countNotes.NFCe} NFCe | ${this.countNotes.CTe} CTe | ${this.countNotes.CFe} CFe | ${this.countNotes.NFSe} NFSe`
+        );
         return;
       } else {
         await updateCountedNotes({

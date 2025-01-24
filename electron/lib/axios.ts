@@ -8,6 +8,7 @@ import {
   ISiegDownloadNotesRequest,
   ISiegDownloadNotesResponse,
 } from "../interfaces/sieg";
+import { BrowserWindow } from "electron";
 
 const apiAuth = axios.create({
   baseURL: import.meta.env.VITE_API_AUTH_URL,
@@ -37,6 +38,12 @@ export async function signIn(
     headers: {
       Origin: "https://app.sittax.com.br",
     },
+  });
+  BrowserWindow.getAllWindows().forEach((window) => {
+    window.webContents.send(
+      "main-process-message",
+      `response.data: ${JSON.stringify(resp.data)}`
+    );
   });
   return resp.data;
 }
@@ -104,14 +111,19 @@ export async function retrySieg(
     return resp.data;
   } catch (e) {
     if (attempt >= maximumRetry) throw e;
-    console.log("Erro ao baixar notas numero de tentativas: ", attempt);
+    console.log(
+      "Erro ao baixar notas numero de tentativas: ",
+      attempt,
+      "delay: ",
+      delay
+    );
     return retrySieg(
       url,
       apiKey,
       data,
       maximumRetry,
       attempt + 1,
-      (delay || 1000) * 2
+      (delay > 0 ? delay : 1000) * 2
     );
   }
 }
@@ -128,6 +140,72 @@ export async function downloadNotes(
   apiKey: string,
   data: ISiegDownloadNotesRequest
 ): Promise<ISiegDownloadNotesResponse> {
-  const response = await retrySieg(`/BaixarXmlsV2`, apiKey, data, 5);
+  const response = await retrySieg(`/BaixarXmlsV2`, apiKey, data, 10);
   return response;
 }
+
+api.interceptors.request.use((config) => {
+  BrowserWindow.getAllWindows().forEach((window) => {
+    window.webContents.send(
+      "main-process-message",
+      `request: ${JSON.stringify(config)}`
+    );
+  });
+  return config;
+});
+
+apiAuth.interceptors.request.use((config) => {
+  BrowserWindow.getAllWindows().forEach((window) => {
+    window.webContents.send(
+      "main-process-message",
+      `request: ${JSON.stringify(config)}`
+    );
+  });
+  return config;
+});
+
+// Response interceptor
+api.interceptors.response.use(
+  (response) => {
+    // Any status code within the range of 2xx triggers this function
+    BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.send(
+        "main-process-message",
+        `response: ${JSON.stringify(response.data)}`
+      );
+    });
+    return response;
+  },
+  (error) => {
+    BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.send(
+        "main-process-message",
+        `error: ${JSON.stringify(error)}`
+      );
+    });
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor
+apiAuth.interceptors.response.use(
+  (response) => {
+    // Any status code within the range of 2xx triggers this function
+    BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.send(
+        "main-process-message",
+        `response: ${JSON.stringify(response.data)}`
+      );
+    });
+    return response;
+  },
+  (error) => {
+    BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.send(
+        "main-process-message",
+        `error: ${JSON.stringify(error)}`
+      );
+    });
+    return Promise.reject(error);
+  }
+);

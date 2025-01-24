@@ -13,7 +13,6 @@ import {
   addFiles,
   addHistoric,
   getDirectories,
-  getDirectoriesDownloadSieg,
   getFiles,
   updateHistoric,
 } from "../services/database";

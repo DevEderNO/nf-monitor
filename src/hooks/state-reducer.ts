@@ -11,6 +11,7 @@ export interface IState {
   directories: IDirectory[];
   loading: boolean;
   processamento: IProcessamento;
+  processamentoSieg: IProcessamento;
   historic: string[];
   config: IConfig;
 }
@@ -29,16 +30,20 @@ export const initialState: IState = {
     progress: 0,
     status: ProcessamentoStatus.Stopped,
   },
+  processamentoSieg: {
+    messages: [],
+    progress: 0,
+    status: ProcessamentoStatus.Stopped,
+  },
   historic: [],
   config: {
     viewUploadedFiles: false,
     timeForProcessing: "00:00",
     timeForConsultingSieg: "00:00",
     directoryDownloadSieg: null,
-    apiKeySieg: null,
+    apiKeySieg: "",
     emailSieg: null,
     senhaSieg: null,
-    directorySieg: null,
   },
 };
 
@@ -47,13 +52,22 @@ export enum ActionType {
   Directories,
   Loading,
   Processamento,
+  ProcessamentoSieg,
   ClearMessages,
   Clear,
   Historic,
   Config,
 }
 
-export const StateReducer = (state: IState, action: IAction): IState => {
+export const StateReducer = (
+  state: IState,
+  action: IAction | IAction[]
+): IState => {
+  if (Array.isArray(action)) {
+    return action.reduce((acc, curr) => {
+      return StateReducer(acc, curr);
+    }, state);
+  }
   switch (action.type) {
     case ActionType.Auth:
       return {
@@ -65,12 +79,17 @@ export const StateReducer = (state: IState, action: IAction): IState => {
     case ActionType.Loading:
       return { ...state, loading: action.payload };
     case ActionType.Processamento:
-      return processamentoReducer();
+      return processamentoReducer(action);
+    case ActionType.ProcessamentoSieg:
+      return processamentoSiegReducer(action);
     case ActionType.Historic:
       return { ...state, historic: action.payload };
     case ActionType.Config:
-      window.ipcRenderer.send("set-config", action.payload);
-      return { ...state, config: action.payload };
+      window.ipcRenderer.send("set-config", {
+        ...state.config,
+        ...action.payload,
+      });
+      return { ...state, config: { ...state.config, ...action.payload } };
     case ActionType.Clear:
       window.ipcRenderer.send("remove-auth");
       return { ...initialState };
@@ -83,12 +102,25 @@ export const StateReducer = (state: IState, action: IAction): IState => {
       return state;
   }
 
-  function processamentoReducer() {
+  function processamentoReducer(action: IAction) {
     const messages = state.processamento.messages;
     messages.push(action.payload.messages);
     return {
       ...state,
       processamento: {
+        messages,
+        progress: action.payload.progress,
+        status: action.payload.status,
+      },
+    };
+  }
+
+  function processamentoSiegReducer(action: IAction) {
+    const messages = state.processamentoSieg.messages;
+    messages.push(action.payload.messages);
+    return {
+      ...state,
+      processamentoSieg: {
         messages,
         progress: action.payload.progress,
         status: action.payload.status,

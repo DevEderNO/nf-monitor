@@ -27,10 +27,16 @@ const AuthProvider = ({ children }: React.PropsWithChildren) => {
       dispatch({ type: ActionType.Loading, payload: true });
       try {
         const auth = await window.ipcRenderer.invoke("signIn", credentials);
-        dispatch({
-          type: ActionType.Auth,
-          payload: auth,
-        });
+        dispatch([
+          {
+            type: ActionType.Auth,
+            payload: auth,
+          },
+          {
+            type: ActionType.Config,
+            payload: auth.configuration,
+          },
+        ]);
       } catch (error) {
         if (typeof error === typeof AxiosError) {
           console.log("signIn", error);
@@ -44,8 +50,10 @@ const AuthProvider = ({ children }: React.PropsWithChildren) => {
   );
 
   const signOut = async () => {
-    dispatch({ type: ActionType.Clear });
-    dispatch({ type: ActionType.Loading, payload: false });
+    dispatch([
+      { type: ActionType.Clear },
+      { type: ActionType.Loading, payload: false },
+    ]);
     navigate("/", { replace: true });
   };
 

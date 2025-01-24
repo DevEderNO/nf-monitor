@@ -1,9 +1,9 @@
 import { IUser } from "./user";
 
 export interface IAuth {
-  id: number;
+  id?: number;
   token: string | null;
-  user?: IUser;
+  user: IUser | null;
   name: string | null;
   username: string | null;
   password: string | null;

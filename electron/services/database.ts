@@ -1,8 +1,6 @@
 import { ErrorType, PrismaClient } from "@prisma/client";
 import { app } from "electron";
 import path from "path";
-import fs from "fs";
-import { execSync } from "child_process";
 import { IUser } from "../interfaces/user";
 import { IDbHistoric } from "../interfaces/db-historic";
 import { IFileInfo } from "../interfaces/file-info";
@@ -10,51 +8,23 @@ import { IDirectory } from "../interfaces/directory";
 import { IConfig } from "../interfaces/config";
 import { getDirectoryData } from "./file-operation-service";
 import { ICountedNotes } from "../interfaces/count-notes";
+import { IAuth } from "../interfaces/auth";
 
 // Configura o caminho do banco de dados
 const dbPath = app.isPackaged
-  ? path.join(process.resourcesPath, "prisma/dev.db")
-  : path.join(__dirname, "../prisma/dev.db");
+  ? path.join(process.resourcesPath, "prisma", "nfmonitor.db")
+  : path.join(__dirname, "..", "prisma", "dev.db");
 
 process.env.DATABASE_URL = `file:${dbPath}`;
 
-const prisma = new PrismaClient();
-
-export async function initializeDatabase() {
-  try {
-    // Verifica se o banco existe
-    const dbExists = fs.existsSync(dbPath);
-
-    if (!dbExists) {
-      // Executa o comando prisma db push
-      const prismaBinPath = app.isPackaged
-        ? path.join(process.resourcesPath, "node_modules/.bin/prisma")
-        : "npx prisma";
-
-      execSync(`${prismaBinPath} db push --skip-generate`, {
-        env: {
-          ...process.env,
-          DATABASE_URL: `file:${dbPath}`,
-        },
-      });
-
-      // Cria configuração inicial
-      const config = await prisma.configuration.findFirst();
-      if (!config) {
-        await prisma.configuration.create({
-          data: {
-            timeForProcessing: "00:00",
-            timeForConsultingSieg: "00:00",
-            viewUploadedFiles: false,
-          },
-        });
-      }
-    }
-  } catch (error) {
-    console.error("Erro ao inicializar banco:", error);
-    throw error;
-  }
-}
+// Inicializa o PrismaClient com o banco de dados no caminho especificado
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: `file:${dbPath}`,
+    },
+  },
+});
 
 export async function getConfiguration(): Promise<IConfig | null> {
   return prisma.configuration.findFirst();
@@ -73,8 +43,11 @@ export async function updateConfiguration(data: IConfig) {
   }
 }
 
-export async function getAuth() {
-  return prisma.auth.findFirst();
+export async function getAuth(): Promise<IAuth | null> {
+  const user = await prisma.user.findFirst();
+  const auth = await prisma.auth.findFirst();
+  if (!auth) return null;
+  return { ...auth, user };
 }
 
 export async function addAuth(data: {
@@ -93,21 +66,22 @@ export async function addAuth(data: {
     // Create user record first
     const savedUser = await tx.user.create({
       data: {
+        id: undefined,
         userId: data.user.userId,
-        nome: data.user.Nome,
-        sobrenome: data.user.Sobrenome,
-        cpf: data.user.Cpf,
-        email: data.user.Email,
-        phoneNumber: data.user.PhoneNumber,
-        ativo: data.user.Ativo,
-        emailConfirmed: data.user.EmailConfirmed,
-        accessFailedCount: data.user.AccessFailedCount.toString(),
-        dataDeCriacao: data.user.DataDeCriacao.toString(),
-        lockoutEnd: data.user.LockoutEnd?.toString() || "",
-        eUsuarioEmpresa: data.user.EUsuarioEmpresa,
-        role: JSON.stringify(data.user.Role),
-        ePrimeiroAcesso: data.user.EPrimeiroAcesso,
-        nivel: data.user.Nivel,
+        nome: data.user.nome,
+        sobrenome: data.user.sobrenome,
+        cpf: data.user.cpf,
+        email: data.user.email,
+        phoneNumber: data.user.phoneNumber,
+        ativo: data.user.ativo,
+        emailConfirmed: data.user.emailConfirmed,
+        accessFailedCount: data.user.accessFailedCount,
+        dataDeCriacao: data.user.dataDeCriacao,
+        lockoutEnd: data.user.lockoutEnd,
+        eUsuarioEmpresa: data.user.eUsuarioEmpresa,
+        role: JSON.stringify(data.user.role),
+        ePrimeiroAcesso: data.user.ePrimeiroAcesso,
+        nivel: data.user.nivel,
       },
     });
 
@@ -126,12 +100,11 @@ export async function addAuth(data: {
       data: {
         token: data.token,
         userId: savedUser.id,
-        name: data.user.Nome,
+        name: data.user.nome,
         username: data.username,
         password: data.password,
       },
     });
-
     const config = await tx.configuration.findFirst();
     if (config) {
       await tx.configuration.update({
@@ -141,7 +114,6 @@ export async function addAuth(data: {
           apiKeySieg: data.configuration.apiKeySieg,
           emailSieg: data.configuration.emailSieg,
           senhaSieg: data.configuration.senhaSieg,
-          id: undefined,
         },
       });
     } else {
@@ -157,7 +129,7 @@ export async function addAuth(data: {
       });
     }
 
-    return auth;
+    return { ...auth, config, token: data.token };
   });
   return result;
 }
@@ -176,6 +148,29 @@ export async function updateAuth(data: {
       password: data.password ?? "",
     },
   });
+}
+
+export async function getUser(): Promise<IUser | null> {
+  const user = await prisma.user.findFirst();
+  if (!user) return null;
+  return {
+    id: user.id,
+    userId: user.userId,
+    nome: user.nome,
+    sobrenome: user.sobrenome,
+    cpf: user.cpf,
+    email: user.email,
+    phoneNumber: user.phoneNumber,
+    ativo: user.ativo,
+    emailConfirmed: user.emailConfirmed,
+    accessFailedCount: user.accessFailedCount,
+    dataDeCriacao: user.dataDeCriacao,
+    lockoutEnd: user.lockoutEnd,
+    eUsuarioEmpresa: user.eUsuarioEmpresa,
+    role: user.role,
+    ePrimeiroAcesso: user.ePrimeiroAcesso,
+    nivel: user.nivel,
+  };
 }
 
 export async function removeAuth() {

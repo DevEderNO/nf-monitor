@@ -4,10 +4,9 @@ export interface IConfig {
   timeForConsultingSieg: string;
   directoryDownloadSieg: string | null;
   viewUploadedFiles: boolean;
-  apiKeySieg: string | null;
+  apiKeySieg: string;
   emailSieg: string | null;
   senhaSieg: string | null;
-  directorySieg: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }

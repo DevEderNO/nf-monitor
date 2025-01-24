@@ -6,28 +6,11 @@ import AdmZip from "adm-zip";
 import { IFileInfo } from "../interfaces/file-info";
 import { IFile } from "../interfaces/file";
 import { IDirectory } from "../interfaces/directory";
-import { isBefore, addMonths, parseISO } from "date-fns";
-import * as cheerio from "cheerio";
+import { isBefore, addMonths } from "date-fns";
 import { app } from "electron";
 import { createDocumentParser } from "@arbs.io/asset-extractor-wasm";
 import { timeout } from "../lib/time-utils";
-
-const emissaoSelectors = [
-  "data_emissao",
-  "DataEmissao",
-  "dtEmissao",
-  "Emissao",
-  "data_nfse",
-  "tsDatEms",
-  "prestacao",
-  "dEmi",
-  "DTDATA",
-  "DtEmiNf",
-  "DtHrGerNf",
-  "DT_COMPETENCIA",
-  "data",
-  "nfse:DataEmissao",
-];
+import { getDataEmissao } from "../lib/nfse-utils";
 
 export async function listDirectory(
   directoryPath: string,
@@ -152,31 +135,12 @@ function validateNotaServico(data: string): {
   isNotaFiscal: boolean;
 } {
   try {
-    const html = cheerio.load(data);
-    let date = "";
-    for (let i = 0; i < emissaoSelectors.length; i++) {
-      const element = emissaoSelectors[i];
-      html("*").each((_, elemento) => {
-        if (
-          html(elemento)
-            .prop("name")
-            .toLowerCase()
-            .startsWith(element.toLowerCase())
-        ) {
-          const text = html(elemento).text().trim();
-          if (text.length > 0) {
-            date = text;
-            return false;
-          }
-        }
-      });
-      if (date.length > 0) break;
-    }
-    if (date.length === 0) return { valid: false, isNotaFiscal: false };
     const newDate = new Date();
+    let date = getDataEmissao(data);
+    if (!date) return { valid: false, isNotaFiscal: false };
     if (
       isBefore(
-        parseISO(date),
+        date,
         addMonths(new Date(newDate.getFullYear(), newDate.getMonth(), 1), -3)
       )
     )

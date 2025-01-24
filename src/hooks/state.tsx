@@ -15,7 +15,7 @@ import { IConfig } from "@/interfaces/config";
 
 interface StateContextData {
   state: IState;
-  dispatch: (action: IAction) => void;
+  dispatch: (action: IAction | IAction[]) => void;
 }
 
 const StateContext = createContext<StateContextData>({} as StateContextData);
@@ -28,29 +28,33 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
     dispatch({ type: ActionType.Loading, payload: true });
 
     const auth: IAuth = await window.ipcRenderer.invoke("get-auth");
+    const config: IConfig = await window.ipcRenderer.invoke("get-config");
     const directories: IDirectory[] = await window.ipcRenderer.invoke(
       "get-directories"
     );
-    if (directories) {
-      dispatch({
-        type: ActionType.Directories,
-        payload: directories,
-      });
-    }
-
-    const config: IConfig = await window.ipcRenderer.invoke("get-config");
-    dispatch({
-      type: ActionType.Config,
-      payload: config,
-    });
-
     window.ipcRenderer.send("initialize-job");
     const historic: IDbHistoric[] = await window.ipcRenderer.invoke(
       "get-historic"
     );
 
-    if (historic.length > 0) {
-      dispatch({
+    dispatch([
+      {
+        type: ActionType.Auth,
+        payload: auth,
+      },
+      {
+        type: ActionType.Config,
+        payload: config,
+      },
+      {
+        type: ActionType.Directories,
+        payload: directories,
+      },
+      {
+        type: ActionType.Loading,
+        payload: false,
+      },
+      {
         type: ActionType.Historic,
         payload: historic.map(
           (x) =>
@@ -60,18 +64,11 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
                 : " - Não finalizado ou interrompido"
             }`
         ),
-      });
-    }
-
+      },
+    ]);
     if (auth.token && auth.user) {
-      dispatch({
-        type: ActionType.Auth,
-        payload: auth,
-      });
       navigate("/dashboard");
     }
-
-    dispatch({ type: ActionType.Loading, payload: false });
   }
 
   useEffect(() => {

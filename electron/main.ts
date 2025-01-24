@@ -4,7 +4,6 @@ import { registerListeners } from "./listeners";
 import { createWebsocket } from "./websocket";
 import { autoUpdater } from "electron-updater";
 import { acceptStreamsEula } from "./services/file-operation-service";
-import { initializeDatabase } from "./services/database";
 import { logError } from "./services/error-service";
 import { ErrorType } from "@prisma/client";
 
@@ -45,8 +44,8 @@ function createWindow() {
     win.loadURL(VITE_DEV_SERVER_URL);
   } else {
     win.loadFile(path.join(process.env.DIST, "index.html"));
-    const menu = Menu.buildFromTemplate([]);
-    Menu.setApplicationMenu(menu);
+    // const menu = Menu.buildFromTemplate([]);
+    // Menu.setApplicationMenu(menu);
   }
 
   const icon = nativeImage.createFromPath(
@@ -107,14 +106,23 @@ function createWindow() {
   // Intercepta erros não tratados
   process.on("uncaughtException", async (error) => {
     await logError(error, ErrorType.UncaughtException);
+    BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.send("main-process-message", error);
+    });
   });
 
   // Intercepta promessas rejeitadas não tratadas
   process.on("unhandledRejection", async (reason) => {
     if (reason instanceof Error) {
       await logError(reason, ErrorType.UnhandledRejection);
+      BrowserWindow.getAllWindows().forEach((window) => {
+        window.webContents.send("main-process-message", reason);
+      });
     } else {
       await logError(new Error(String(reason)), ErrorType.UnhandledRejection);
+      BrowserWindow.getAllWindows().forEach((window) => {
+        window.webContents.send("main-process-message", reason);
+      });
     }
   });
 
@@ -124,6 +132,9 @@ function createWindow() {
       new Error(`Render process gone: ${details.reason}`),
       ErrorType.RenderProcessGone
     );
+    BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.send("main-process-message", details.reason);
+    });
   });
 
   // Intercepta erros de GPU
@@ -132,6 +143,9 @@ function createWindow() {
       new Error(`GPU process gone: ${details.type}`),
       ErrorType.GPUProcessGone
     );
+    BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.send("main-process-message", details.type);
+    });
   });
 
   if (!VITE_DEV_SERVER_URL) {
@@ -143,7 +157,6 @@ function createWindow() {
 }
 
 app.on("ready", async () => {
-  await initializeDatabase();
   createWindow();
   acceptStreamsEula();
   const isSecondInstance = app.requestSingleInstanceLock();

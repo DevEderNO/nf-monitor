@@ -16,9 +16,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 postMessage({ payload: "removeLoading" }, "*");
 
 // Use contextBridge
+// Recebe mensagens do processo principal
 window.ipcRenderer.on("main-process-message", (_event, message) => {
   console.log(message);
 });
+
+// Para enviar uma mensagem do processo principal (electron) para o renderer:
+// No arquivo electron/main.ts ou outro arquivo do processo principal, use:
+// win?.webContents.send("main-process-message", "Sua mensagem aqui");
 
 window.ipcRenderer.on("update-available", (_event, message) => {
   toast({

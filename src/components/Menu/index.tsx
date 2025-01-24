@@ -42,6 +42,17 @@ const Menu: React.FC = () => {
         visible: true,
       },
       {
+        label: "SIEG",
+        selected: location.pathname === "/sieg",
+        onClick: () => {
+          navigate("/sieg", {
+            replace: true,
+            state: { from: location },
+          });
+        },
+        visible: state.config.apiKeySieg && state.config.apiKeySieg.length > 0,
+      },
+      {
         label: "Configuração",
         selected: location.pathname === "/configuration",
         onClick: () => {
@@ -52,19 +63,8 @@ const Menu: React.FC = () => {
         },
         visible: true,
       },
-      {
-        label: "Sieg",
-        selected: location.pathname === "/sieg",
-        onClick: () => {
-          navigate("/sieg", {
-            replace: true,
-            state: { from: location },
-          });
-        },
-        visible: state.config.apiKeySieg && state.config.apiKeySieg.length > 0,
-      },
     ],
-    [location, navigate]
+    [location, navigate, state.config.apiKeySieg]
   );
 
   return (

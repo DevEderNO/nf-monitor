@@ -118,7 +118,7 @@ export function Configuration() {
       <div className="flex flex-col flex-1 gap-2">
         <div className="flex items-center justify-between">
           <Label>Histórico de execuções</Label>
-          {state.auth.user?.Nivel?.valueOf() <= ENivel.Suporte.valueOf() ? (
+          {state.auth.user?.nivel?.valueOf() <= ENivel.Suporte.valueOf() ? (
             <Button
               variant={"destructive"}
               size={"sm"}
