@@ -304,7 +304,8 @@ export class ProcessTask {
   private async sendMessageClient(
     messages: string[],
     progress = 0,
-    status = ProcessamentoStatus.Running
+    status = ProcessamentoStatus.Running,
+    replace = false
   ) {
     await timeout();
     messages.forEach((x) => this.historic.log?.push(x));
@@ -327,6 +328,7 @@ export class ProcessTask {
             messages,
             progress,
             status,
+            replace,
             id: this.historic?.id,
           },
         },

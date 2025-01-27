@@ -9,49 +9,7 @@ import { IDirectory } from "../interfaces/directory";
 import { isBefore, addMonths } from "date-fns";
 import { app } from "electron";
 import { createDocumentParser } from "@arbs.io/asset-extractor-wasm";
-import { timeout } from "../lib/time-utils";
 import { getDataEmissao } from "../lib/nfse-utils";
-
-export async function listDirectory(
-  directoryPath: string,
-  callback?: (message: string) => void
-): Promise<IFileInfo[]> {
-  const filesAndFolders: IFileInfo[] = [];
-  try {
-    const directoryContents = fs.readdirSync(directoryPath);
-    for (let index = 0; index < directoryContents.length; index++) {
-      const element = directoryContents[index];
-      const itemPath = path.join(directoryPath, element);
-      try {
-        const isDirectory = fs.statSync(itemPath).isDirectory();
-        const isFile = fs.statSync(itemPath).isFile();
-        filesAndFolders.push({
-          filename: element,
-          isDirectory,
-          isFile,
-          filepath: itemPath.split("\\").join("/").toString(),
-          extension: !isDirectory ? path.extname(element) : "",
-          modifiedtime: fs.statSync(itemPath).mtime,
-          size: fs.statSync(itemPath).size,
-          wasSend: false,
-          isValid: false,
-          bloqued: isFile && isFileBlocked(itemPath),
-          dataSend: null,
-        });
-      } catch (_) {
-        if (callback) {
-          callback(`A pasta/arquivo não pode ser lido ${itemPath}`);
-        }
-      }
-      await timeout();
-    }
-  } catch (_) {
-    if (callback) {
-      callback(`A pasta não pode ser lida ${directoryPath}`);
-    }
-  }
-  return filesAndFolders;
-}
 
 export function selectDirectories(
   win: BrowserWindow,

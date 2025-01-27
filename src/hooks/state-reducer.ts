@@ -28,11 +28,13 @@ export const initialState: IState = {
   processamento: {
     messages: [],
     progress: 0,
+    replace: false,
     status: ProcessamentoStatus.Stopped,
   },
   processamentoSieg: {
     messages: [],
     progress: 0,
+    replace: false,
     status: ProcessamentoStatus.Stopped,
   },
   historic: [],
@@ -104,19 +106,29 @@ export const StateReducer = (
 
   function processamentoReducer(action: IAction) {
     const messages = state.processamento.messages;
-    messages.push(action.payload.messages);
+    if (action.payload.replace) {
+      messages[messages.length - 1] = action.payload.messages[0];
+    } else {
+      messages.push(action.payload.messages);
+    }
     return {
       ...state,
       processamento: {
         messages,
         progress: action.payload.progress,
         status: action.payload.status,
+        replace: action.payload.replace,
       },
     };
   }
 
   function processamentoSiegReducer(action: IAction) {
     const messages = state.processamentoSieg.messages;
+    if (action.payload.replace) {
+      messages[messages.length - 1] = action.payload.messages[0];
+    } else {
+      messages.push(action.payload.messages);
+    }
     messages.push(action.payload.messages);
     return {
       ...state,
@@ -124,6 +136,7 @@ export const StateReducer = (
         messages,
         progress: action.payload.progress,
         status: action.payload.status,
+        replace: action.payload.replace,
       },
     };
   }

@@ -65,6 +65,7 @@ model DirectoryDiscovery {
   size         Int
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  @@unique([path], name: "unique_path")
 }
 
 model File {
@@ -82,6 +83,8 @@ model File {
   isFile            Boolean   @default(false)
   modifiedtime      DateTime?
   size              Int
+  @@unique([filepath], name: "unique_filepath")
+
 }
 
 model Configuration {

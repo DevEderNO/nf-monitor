@@ -2,6 +2,7 @@ export interface IProcessamento {
   messages: string[];
   progress: number;
   status: ProcessamentoStatus;
+  replace: boolean;
   id?: number;
 }
 
