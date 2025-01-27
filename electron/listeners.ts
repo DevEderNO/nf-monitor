@@ -1,8 +1,5 @@
 import { BrowserWindow, ipcMain } from "electron";
-import {
-  listDirectory,
-  selectDirectories,
-} from "./services/file-operation-service";
+import { selectDirectories } from "./services/file-operation-service";
 import { updateJobs } from "./services/schedules";
 import { encrypt } from "./lib/cryptography";
 import { signIn } from "./lib/axios";
@@ -125,10 +122,6 @@ export async function registerListeners(win: BrowserWindow | null) {
     await removeDirectory(directory);
     await removeFiles(directory);
     return await getDirectories();
-  });
-
-  ipcMain.handle("list-directory", async (_, directoryPath) => {
-    return listDirectory(directoryPath);
   });
 
   ipcMain.handle("get-config", async () => {

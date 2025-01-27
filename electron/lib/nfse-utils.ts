@@ -17,6 +17,7 @@ export const emissaoSelectors = [
   "data",
   "nfse:DataEmissao",
   "ns3:DataEmissao",
+  "ns2:DataEmissao",
 ];
 
 export function getDataEmissao(htmlString: string): Date | null {

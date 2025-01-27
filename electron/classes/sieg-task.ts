@@ -69,6 +69,7 @@ export class SiegTask {
 
   async run(connection: connection, dateInitial: Date, dateEnd: Date) {
     try {
+      await this.sendMessageClient([""]);
       this.initializeProperties(connection);
       const config = await getConfiguration();
       if (!config || !config.apiKeySieg)
@@ -122,11 +123,12 @@ export class SiegTask {
       await this.downloadNotes(SiegXmlType.CFe);
 
       await this.sendMessageClient(
-        [`Finalizado o processo de download das notas fiscais`],
+        [`😁 Finalizado o processo de download das notas fiscais`],
         0,
         ProcessamentoStatus.Concluded
       );
       console.log(`Finalizado o processo de download das notas fiscais`);
+      await this.sendMessageClient([""], 0, ProcessamentoStatus.Concluded);
     } catch (error) {
       throw error;
     }
@@ -140,6 +142,7 @@ export class SiegTask {
     const countNotesXmlType = Object.entries(countNotes).find(
       (x) => x[0].toLowerCase() === SiegXmlType[xmlType].toLowerCase()
     )?.[1];
+    if (!countNotesXmlType || countNotesXmlType === 0) return;
 
     //download NFe de 50 em 50 até o total de notas o xml esta em base64 deve ser salvo em arquivo na pasta de download
     for (let i = 0; i < countNotesXmlType; i += 50) {
@@ -151,7 +154,7 @@ export class SiegTask {
       } else {
         await this.sendMessageClient(
           [
-            `Iniciando o download das ${
+            `📦 Realizando o download das ${
               SiegXmlType[xmlType]
             } - ${i} a ${Math.min(
               i + 50,
@@ -162,7 +165,7 @@ export class SiegTask {
           ProcessamentoStatus.Running
         );
         console.log(
-          `Iniciando o download das ${SiegXmlType[xmlType]} - ${i} a ${Math.min(
+          `Realizando o download das ${SiegXmlType[xmlType]} - ${i} a ${Math.min(
             i + 50,
             countNotesXmlType
           )} de ${countNotesXmlType}`

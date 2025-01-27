@@ -118,41 +118,30 @@ export function Configuration() {
       <div className="flex flex-col flex-1 gap-2">
         <div className="flex items-center justify-between">
           <Label>Histórico de execuções</Label>
-          {state.auth.user?.nivel?.valueOf() <= ENivel.Suporte.valueOf() ? (
-            <Button
-              variant={"destructive"}
-              size={"sm"}
-              className="px-1 py-0.5"
-              onClick={() => {}}
-            >
-              <TrashIcon className="w-5 h-4" />
-            </Button>
-          ) : (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" className="text-primary">
-                  Limpar Histórico
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    Absolutamente! 🚀 Vamos dar um "reset" e começar do zero! 🔄
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Ao limpar o histórico, os dados anteriores serão removidos,
-                    então você não poderá mais acessá-los.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleCleanHistoric}>
-                    Continue
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" className="text-primary">
+                Limpar Histórico
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Absolutamente! 🚀 Vamos dar um "reset" e começar do zero! 🔄
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  Ao limpar o histórico, os dados anteriores serão removidos,
+                  então você não poderá mais acessá-los.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleCleanHistoric}>
+                  Continue
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
         <Textarea
           className="flex flex-1 cursor-default resize-none font-mono transition-colors "

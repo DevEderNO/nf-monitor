@@ -56,6 +56,7 @@ export class DiscoveryTask {
 
   async run(connection: connection) {
     try {
+      await this.sendMessageClient([""]);
       this.initializeProperties(connection);
       await this.sendMessageClient([
         "Tarefa de descoberta dos arquivos iniciada.",

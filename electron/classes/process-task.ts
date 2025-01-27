@@ -69,6 +69,7 @@ export class ProcessTask {
 
   async run(connection: connection, id?: number) {
     try {
+      await this.sendMessageClient([""]);
       this.initializeProperties(connection);
       this.files = (await getFiles()).filter((x) => !x.wasSend);
       this.filesSended = (await getFiles()).filter((x) => x.wasSend);
