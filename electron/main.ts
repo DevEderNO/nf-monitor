@@ -3,7 +3,10 @@ import path from "node:path";
 import { registerListeners } from "./listeners";
 import { createWebsocket } from "./websocket";
 import { autoUpdater } from "electron-updater";
-import { acceptStreamsEula } from "./services/file-operation-service";
+import {
+  acceptStreamsEula,
+  moveFileToUserData,
+} from "./services/file-operation-service";
 import { logError } from "./services/error-service";
 import { ErrorType } from "@prisma/client";
 
@@ -32,7 +35,7 @@ function createWindow() {
     width: 800,
     minHeight: 600,
     minWidth: 800,
-    icon: path.join(process.env.VITE_PUBLIC, "sittax.ico"),
+    icon: path.join(process.env.VITE_PUBLIC ?? "", "sittax.ico"),
     show: !VITE_DEV_SERVER_URL ? false : true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -43,13 +46,13 @@ function createWindow() {
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL);
   } else {
-    win.loadFile(path.join(process.env.DIST, "index.html"));
+    win.loadFile(path.join(process.env.DIST ?? "", "index.html"));
     // const menu = Menu.buildFromTemplate([]);
     // Menu.setApplicationMenu(menu);
   }
 
   const icon = nativeImage.createFromPath(
-    path.join(process.env.VITE_PUBLIC, "sittax.png")
+    path.join(process.env.VITE_PUBLIC ?? "", "sittax.png")
   );
 
   tray = new Tray(icon);
@@ -157,6 +160,7 @@ function createWindow() {
 }
 
 app.on("ready", async () => {
+  moveFileToUserData();
   createWindow();
   acceptStreamsEula();
   const isSecondInstance = app.requestSingleInstanceLock();

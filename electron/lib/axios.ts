@@ -39,12 +39,6 @@ export async function signIn(
       Origin: "https://app.sittax.com.br",
     },
   });
-  BrowserWindow.getAllWindows().forEach((window) => {
-    window.webContents.send(
-      "main-process-message",
-      `response.data: ${JSON.stringify(resp.data)}`
-    );
-  });
   return resp.data;
 }
 
@@ -145,22 +139,10 @@ export async function downloadNotes(
 }
 
 api.interceptors.request.use((config) => {
-  BrowserWindow.getAllWindows().forEach((window) => {
-    window.webContents.send(
-      "main-process-message",
-      `request: ${JSON.stringify(config)}`
-    );
-  });
   return config;
 });
 
 apiAuth.interceptors.request.use((config) => {
-  BrowserWindow.getAllWindows().forEach((window) => {
-    window.webContents.send(
-      "main-process-message",
-      `request: ${JSON.stringify(config)}`
-    );
-  });
   return config;
 });
 
@@ -168,12 +150,6 @@ apiAuth.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => {
     // Any status code within the range of 2xx triggers this function
-    BrowserWindow.getAllWindows().forEach((window) => {
-      window.webContents.send(
-        "main-process-message",
-        `response: ${JSON.stringify(response.data)}`
-      );
-    });
     return response;
   },
   (error) => {
@@ -191,12 +167,6 @@ api.interceptors.response.use(
 apiAuth.interceptors.response.use(
   (response) => {
     // Any status code within the range of 2xx triggers this function
-    BrowserWindow.getAllWindows().forEach((window) => {
-      window.webContents.send(
-        "main-process-message",
-        `response: ${JSON.stringify(response.data)}`
-      );
-    });
     return response;
   },
   (error) => {

@@ -1,6 +1,4 @@
-import { ErrorType, PrismaClient } from "@prisma/client";
-import { app } from "electron";
-import path from "path";
+import { ErrorType } from "@prisma/client";
 import { IUser } from "../interfaces/user";
 import { IDbHistoric } from "../interfaces/db-historic";
 import { IFileInfo } from "../interfaces/file-info";
@@ -9,22 +7,8 @@ import { IConfig } from "../interfaces/config";
 import { getDirectoryData } from "./file-operation-service";
 import { ICountedNotes } from "../interfaces/count-notes";
 import { IAuth } from "../interfaces/auth";
-
-// Configura o caminho do banco de dados
-const dbPath = app.isPackaged
-  ? path.join(process.resourcesPath, "prisma", "nfmonitor.db")
-  : path.join(__dirname, "..", "prisma", "dev.db");
-
-process.env.DATABASE_URL = `file:${dbPath}`;
-
-// Inicializa o PrismaClient com o banco de dados no caminho especificado
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: `file:${dbPath}`,
-    },
-  },
-});
+import prisma, { getDatabaseUrl } from "../lib/prisma";
+import { BrowserWindow } from "electron";
 
 export async function getConfiguration(): Promise<IConfig | null> {
   return prisma.configuration.findFirst();
@@ -44,6 +28,9 @@ export async function updateConfiguration(data: IConfig) {
 }
 
 export async function getAuth(): Promise<IAuth | null> {
+  BrowserWindow.getAllWindows().forEach((window) => {
+    window.webContents.send("main-process-message", getDatabaseUrl());
+  });
   const user = await prisma.user.findFirst();
   const auth = await prisma.auth.findFirst();
   if (!auth) return null;
@@ -62,11 +49,10 @@ export async function addAuth(data: {
     senhaSieg: string;
   };
 }) {
-  const result = await prisma.$transaction(async (tx) => {
+  try {
     // Create user record first
-    const savedUser = await tx.user.create({
+    const savedUser = await prisma.user.create({
       data: {
-        id: undefined,
         userId: data.user.userId,
         nome: data.user.nome,
         sobrenome: data.user.sobrenome,
@@ -81,12 +67,12 @@ export async function addAuth(data: {
         eUsuarioEmpresa: data.user.eUsuarioEmpresa,
         role: JSON.stringify(data.user.role),
         ePrimeiroAcesso: data.user.ePrimeiroAcesso,
-        nivel: data.user.nivel,
+        nivel: data.user.nivel.valueOf(),
       },
     });
 
     // Create empresas record with reference to user
-    await tx.empresa.createMany({
+    await prisma.empresa.createMany({
       data: data.empresas.map((empresa) => ({
         empresaId: empresa.empresaId,
         nome: empresa.nome,
@@ -96,7 +82,7 @@ export async function addAuth(data: {
     });
 
     // Create auth record with reference to user
-    const auth = await tx.auth.create({
+    const auth = await prisma.auth.create({
       data: {
         token: data.token,
         userId: savedUser.id,
@@ -105,9 +91,9 @@ export async function addAuth(data: {
         password: data.password,
       },
     });
-    const config = await tx.configuration.findFirst();
+    const config = await prisma.configuration.findFirst();
     if (config) {
-      await tx.configuration.update({
+      await prisma.configuration.update({
         where: { id: config?.id },
         data: {
           ...config,
@@ -117,7 +103,7 @@ export async function addAuth(data: {
         },
       });
     } else {
-      await tx.configuration.create({
+      await prisma.configuration.create({
         data: {
           timeForProcessing: "00:00",
           timeForConsultingSieg: "00:00",
@@ -130,8 +116,17 @@ export async function addAuth(data: {
     }
 
     return { ...auth, config, token: data.token };
-  });
-  return result;
+  } catch (error) {
+    BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.send(
+        "main-process-message",
+        `signIn error: ${JSON.stringify(
+          error,
+          Object.getOwnPropertyNames(error)
+        )}`
+      );
+    });
+  }
 }
 
 export async function updateAuth(data: {

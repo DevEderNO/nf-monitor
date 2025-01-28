@@ -253,3 +253,23 @@ export function unblockFile(filePath: string) {
 export function existsDirectory(path: string): boolean {
   return fs.existsSync(path);
 }
+
+export function moveFileToUserData() {
+  const userDataPath = app.getPath('userData');
+  const sourcePath = path.join(process.resourcesPath, 'prisma', 'nfmonitor.db');
+  const destinationPath = path.join(userDataPath, 'nfmonitor.db');
+
+  // Cria a pasta de destino se ela não existir
+  const destinationDir = path.dirname(destinationPath);
+  if (!fs.existsSync(destinationDir)) {
+    fs.mkdirSync(destinationDir, { recursive: true });
+  }
+
+  // Move o arquivo
+  if (fs.existsSync(sourcePath)) {
+    fs.copyFileSync(sourcePath, destinationPath);
+    console.log(`Arquivo movido para: ${destinationPath}`);
+  } else {
+    console.log('Arquivo não encontrado:', sourcePath);
+  }
+}

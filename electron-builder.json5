@@ -19,9 +19,9 @@
   ],
   extraResources: [
     {
-      from: "prisma/",
-      to: "prisma/",
-      filter: ["schema.prisma", "nfmonitor.db", "schema.sql"],
+      from: "prisma",
+      to: "prisma",
+      filter: ["nfmonitor.db"],
     },
     {
       from: "node_modules/@prisma/client",
@@ -30,10 +30,6 @@
     {
       from: "node_modules/.prisma",
       to: "node_modules/.prisma",
-    },
-    {
-      from: "resources",
-      to: ".",
     },
   ],
   publish: [

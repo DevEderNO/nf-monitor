@@ -66,7 +66,7 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
         ),
       },
     ]);
-    if (auth.token && auth.user) {
+    if (auth?.token && auth?.user) {
       navigate("/dashboard");
     }
   }

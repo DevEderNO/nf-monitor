@@ -17,8 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAppState } from "@/hooks/state";
 import { ActionType } from "@/hooks/state-reducer";
 import { IDirectory } from "@/interfaces/directory";
-import { ENivel } from "@/interfaces/user";
-import { FolderIcon, TrashIcon } from "lucide-react";
+import { FolderIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 export function Configuration() {
