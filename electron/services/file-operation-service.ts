@@ -256,6 +256,7 @@ export function existsDirectory(path: string): boolean {
 
 export async function copyMigrations(): Promise<void> {
   try {
+    if (!app.isPackaged) return;
     const prismaMigrations = path.join(process.resourcesPath, "prisma");
     if (fs.existsSync(prismaMigrations)) {
       fs.cpSync(prismaMigrations, app.getPath("userData"), {
@@ -269,16 +270,14 @@ export async function copyMigrations(): Promise<void> {
 
 export async function applyMigrations(): Promise<void> {
   try {
+    if (!app.isPackaged) return;
     const prismaBinary = path.join(
       process.resourcesPath,
       "node_modules",
       ".bin",
       "prisma"
     );
-    const prismaSchema = path.join(
-      app.getPath("userData"),
-      "schema.prisma"
-    );
+    const prismaSchema = path.join(app.getPath("userData"), "schema.prisma");
     const prismaMigrateDeploy = `"${prismaBinary}" migrate deploy --schema "${prismaSchema}"`;
     let prismaMigrateDeployString = fs.readFileSync(prismaSchema, "utf-8");
     prismaMigrateDeployString = prismaMigrateDeployString.replace(
