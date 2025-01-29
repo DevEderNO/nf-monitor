@@ -5,7 +5,8 @@ import { createWebsocket } from "./websocket";
 import { autoUpdater } from "electron-updater";
 import {
   acceptStreamsEula,
-  moveFileToUserData,
+  applyMigrations,
+  copyMigrations,
 } from "./services/file-operation-service";
 import { logError } from "./services/error-service";
 import { ErrorType } from "@prisma/client";
@@ -160,7 +161,8 @@ function createWindow() {
 }
 
 app.on("ready", async () => {
-  moveFileToUserData();
+  await copyMigrations();
+  await applyMigrations();
   createWindow();
   acceptStreamsEula();
   const isSecondInstance = app.requestSingleInstanceLock();

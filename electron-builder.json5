@@ -21,15 +21,24 @@
     {
       from: "prisma",
       to: "prisma",
-      filter: ["nfmonitor.db"],
+      filter: ["schema.prisma", "migrations"],
     },
     {
-      from: "node_modules/@prisma/client",
-      to: "node_modules/@prisma/client",
+      from: "node_modules/@prisma",
+      to: "node_modules/@prisma",
+    },
+    {
+      from: "node_modules/.bin",
+      to: "node_modules/.bin/",
+      filter: ["prisma*"],
     },
     {
       from: "node_modules/.prisma",
       to: "node_modules/.prisma",
+    },
+    {
+      from: "node_modules/prisma",
+      to: "node_modules/prisma",
     },
   ],
   publish: [

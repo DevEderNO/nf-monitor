@@ -254,22 +254,43 @@ export function existsDirectory(path: string): boolean {
   return fs.existsSync(path);
 }
 
-export function moveFileToUserData() {
-  const userDataPath = app.getPath('userData');
-  const sourcePath = path.join(process.resourcesPath, 'prisma', 'nfmonitor.db');
-  const destinationPath = path.join(userDataPath, 'nfmonitor.db');
-
-  // Cria a pasta de destino se ela não existir
-  const destinationDir = path.dirname(destinationPath);
-  if (!fs.existsSync(destinationDir)) {
-    fs.mkdirSync(destinationDir, { recursive: true });
+export async function copyMigrations(): Promise<void> {
+  try {
+    const prismaMigrations = path.join(process.resourcesPath, "prisma");
+    if (fs.existsSync(prismaMigrations)) {
+      fs.cpSync(prismaMigrations, app.getPath("userData"), {
+        recursive: true,
+      });
+    }
+  } catch (error) {
+    console.error("Erro ao copiar as migrations:", error);
   }
+}
 
-  // Move o arquivo
-  if (fs.existsSync(sourcePath)) {
-    fs.copyFileSync(sourcePath, destinationPath);
-    console.log(`Arquivo movido para: ${destinationPath}`);
-  } else {
-    console.log('Arquivo não encontrado:', sourcePath);
+export async function applyMigrations(): Promise<void> {
+  try {
+    const prismaBinary = path.join(
+      process.resourcesPath,
+      "node_modules",
+      ".bin",
+      "prisma"
+    );
+    const prismaSchema = path.join(
+      app.getPath("userData"),
+      "schema.prisma"
+    );
+    const prismaMigrateDeploy = `"${prismaBinary}" migrate deploy --schema "${prismaSchema}"`;
+    let prismaMigrateDeployString = fs.readFileSync(prismaSchema, "utf-8");
+    prismaMigrateDeployString = prismaMigrateDeployString.replace(
+      "file:./dev.db",
+      "file:./nfmonitor.db"
+    );
+    fs.writeFileSync(prismaSchema, prismaMigrateDeployString, "utf-8");
+
+    console.log("Aplicando migrations...");
+    execSync(prismaMigrateDeploy, { stdio: "inherit" });
+    console.log("Migrations aplicadas com sucesso.");
+  } catch (error) {
+    console.error("Erro ao aplicar migrations:", error);
   }
 }

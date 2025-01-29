@@ -27,4 +27,5 @@ release
 # Enviroments
 *.development
 *.production
-*dev.db
+*dev.db*
+migration_lock.toml

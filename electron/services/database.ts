@@ -7,8 +7,9 @@ import { IConfig } from "../interfaces/config";
 import { getDirectoryData } from "./file-operation-service";
 import { ICountedNotes } from "../interfaces/count-notes";
 import { IAuth } from "../interfaces/auth";
-import prisma, { getDatabaseUrl } from "../lib/prisma";
-import { BrowserWindow } from "electron";
+import prisma from "../lib/prisma";
+import { app, BrowserWindow } from "electron";
+import path from "node:path";
 
 export async function getConfiguration(): Promise<IConfig | null> {
   return prisma.configuration.findFirst();
@@ -28,8 +29,24 @@ export async function updateConfiguration(data: IConfig) {
 }
 
 export async function getAuth(): Promise<IAuth | null> {
+  const prismaBinary = path.join(
+    process.resourcesPath,
+    "node_modules",
+    ".bin",
+    "prisma"
+  );
+  const prismaMigrateDeploy = `${prismaBinary} migrate deploy --schema ${path.join(
+    app.getPath("userData"),
+    "prisma",
+    "schema.prisma"
+  )}`;
   BrowserWindow.getAllWindows().forEach((window) => {
-    window.webContents.send("main-process-message", getDatabaseUrl());
+    window.webContents.send(
+      "main-process-message",
+      `resource path: ${path.join(process.resourcesPath, "prisma")}`,
+      `user data: ${path.join(app.getPath("userData"), "prisma")}`,
+      `prisma migration command: ${prismaMigrateDeploy}`
+    );
   });
   const user = await prisma.user.findFirst();
   const auth = await prisma.auth.findFirst();
