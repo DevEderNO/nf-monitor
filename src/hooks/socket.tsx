@@ -26,6 +26,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
   const [processTask, setProcessStatus] = useState<"discovery" | "send">(
     "discovery"
   );
+  const [, setIsConnected] = useState(false);
 
   useEffect(() => {
     if (!client) return;
@@ -119,10 +120,37 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
   }, [client, dispatch]);
 
   useEffect(() => {
-    const cli = new w3cwebsocket("ws://127.0.0.1:4444");
-    setClient(() => cli);
+    const connectWebSocket = () => {
+      const cli = new w3cwebsocket("ws://127.0.0.1:4444");
+
+      cli.onopen = () => {
+        setIsConnected(true);
+        console.log("Conectado ao WebSocket");
+      };
+
+      cli.onclose = () => {
+        setIsConnected(false);
+        console.log("Conexão perdida. Tentando reconectar...");
+        // Tenta reconectar após 3 segundos
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      cli.onerror = (error) => {
+        setIsConnected(false);
+        console.error("Erro na conexão WebSocket", error);
+        connectWebSocket();
+      };
+
+      setClient(cli);
+    };
+
+    // Inicia a conexão WebSocket
+    connectWebSocket();
+
     return () => {
-      cli.close();
+      if (client) {
+        client.close();
+      }
     };
   }, []);
 
