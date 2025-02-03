@@ -1,5 +1,5 @@
 import { Button } from "@components/ui/button";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -12,10 +12,30 @@ import {
 import { useAppState } from "@hooks/state";
 import { ActionType } from "@hooks/state-reducer";
 import { TrashIcon } from "@radix-ui/react-icons";
-import { IDirectory } from "../interfaces/directory";
+import { IDirectory } from "@interfaces/directory";
+import { useLocation } from "react-router-dom";
 
 export function Directories() {
-  const { state, dispatch } = useAppState();
+  const {
+    state: { directories },
+    dispatch,
+  } = useAppState();
+  const location = useLocation();
+
+  const getDirectories = async () => {
+    const result = await window.ipcRenderer.invoke("get-directories");
+    dispatch({
+      type: ActionType.Directories,
+      payload: result,
+    });
+  };
+
+  useEffect(() => {
+    if (location.pathname === "/directories") {
+      getDirectories();
+    }
+  }, [location.pathname]);
+
   const handleSelectDirectories = useCallback(async () => {
     const filepaths: IDirectory[] = await window.ipcRenderer.invoke(
       "select-directories"
@@ -26,21 +46,18 @@ export function Directories() {
         payload: filepaths,
       });
     }
-  }, [dispatch]);
+  }, []);
 
-  const handleRemoveDirectory = useCallback(
-    async (item: string) => {
-      const directories = await window.ipcRenderer.invoke(
-        "remove-directory",
-        item
-      );
-      dispatch({
-        type: ActionType.Directories,
-        payload: directories,
-      });
-    },
-    [dispatch]
-  );
+  const handleRemoveDirectory = useCallback(async (item: string) => {
+    const directories = await window.ipcRenderer.invoke(
+      "remove-directory",
+      item
+    );
+    dispatch({
+      type: ActionType.Directories,
+      payload: directories,
+    });
+  }, []);
 
   return (
     <div className="p-4 m-4 flex flex-1 flex-col gap-4 border rounded-md h-full basis-full overflow-y-auto">
@@ -61,8 +78,8 @@ export function Directories() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {state.directories.length > 0 &&
-              state.directories?.map((item, index) => (
+            {directories.length > 0 &&
+              directories?.map((item, index) => (
                 <TableRow key={index}>
                   <TableCell className="text-sm text-ellipsis overflow-hidden">
                     {item.path}

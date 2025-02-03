@@ -22,21 +22,30 @@ export function selectDirectories(
     properties,
   });
   if (result) {
-    const dados: IDirectory[] = result.map((x) => {
-      return getDirectoryData(x);
+    const directories: IDirectory[] = [];
+    result.forEach((x) => {
+      const directory = getDirectoryData(x);
+      if (directory) {
+        directories.push(directory);
+      }
     });
-    return dados;
+    return directories;
   }
   return [];
 }
 
-export function getDirectoryData(path: string): IDirectory {
-  const directory = fs.statSync(path);
-  return {
-    path: path.includes("\\") ? path.split("\\").join("/").toString() : path,
-    modifiedtime: directory.mtime,
-    size: directory.size,
-  };
+export function getDirectoryData(path: string): IDirectory | null {
+  try {
+    const directory = fs.statSync(path);
+    return {
+      path: path.includes("\\") ? path.split("\\").join("/").toString() : path,
+      modifiedtime: directory.mtime,
+      size: directory.size,
+    };
+  } catch (error) {
+    console.log(`no such file or directory, stat ${path}`);
+    return null;
+  }
 }
 
 export function validXmlAndPdf(fileInfo: IFileInfo): {
@@ -250,19 +259,11 @@ export function unblockFile(filePath: string) {
   }
 }
 
-export function existsDirectory(path: string): boolean {
-  return fs.existsSync(path);
-}
-
 export async function copyMigrations(): Promise<void> {
   try {
     if (!app.isPackaged) return;
     const prismaMigrations = path.join(process.resourcesPath, "prisma");
-    if (fs.existsSync(prismaMigrations)) {
-      fs.cpSync(prismaMigrations, app.getPath("userData"), {
-        recursive: true,
-      });
-    }
+    copyRecursive(prismaMigrations, app.getPath("userData"));
   } catch (error) {
     console.error("Erro ao copiar as migrations:", error);
   }
@@ -271,14 +272,12 @@ export async function copyMigrations(): Promise<void> {
 export async function applyMigrations(): Promise<void> {
   try {
     if (!app.isPackaged) return;
-    const prismaBinary = path.join(
+    const prismaBinaryPath = path.join(
       process.resourcesPath,
       "node_modules",
-      ".bin",
-      "prisma"
+      ".bin"
     );
     const prismaSchema = path.join(app.getPath("userData"), "schema.prisma");
-    const prismaMigrateDeploy = `"${prismaBinary}" migrate deploy --schema "${prismaSchema}"`;
     let prismaMigrateDeployString = fs.readFileSync(prismaSchema, "utf-8");
     prismaMigrateDeployString = prismaMigrateDeployString.replace(
       "file:./dev.db",
@@ -287,9 +286,42 @@ export async function applyMigrations(): Promise<void> {
     fs.writeFileSync(prismaSchema, prismaMigrateDeployString, "utf-8");
 
     console.log("Aplicando migrations...");
-    execSync(prismaMigrateDeploy, { stdio: "inherit" });
+    execSync(
+      `cd "${prismaBinaryPath}" & prisma migrate deploy --schema "${prismaSchema}"`,
+      {
+        stdio: "inherit",
+      }
+    );
     console.log("Migrations aplicadas com sucesso.");
   } catch (error) {
     console.error("Erro ao aplicar migrations:", error);
+  }
+}
+
+export function copyRecursive(srcDir: string, destDir: string) {
+  try {
+    // Cria a pasta de destino se não existir
+    fs.mkdirSync(destDir, { recursive: true });
+
+    // Lê todos os arquivos e subpastas da origem
+    const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = path.join(srcDir, entry.name);
+      const destPath = path.join(destDir, entry.name);
+
+      if (entry.isDirectory()) {
+        // Se for uma pasta, copia recursivamente
+        copyRecursive(srcPath, destPath);
+      } else {
+        // Se for um arquivo, copia normalmente
+        fs.copyFileSync(srcPath, destPath);
+        console.log(`Copiado: ${srcPath} -> ${destPath}`);
+      }
+    }
+
+    console.log("✅ Todos os arquivos e pastas foram copiados!");
+  } catch (error) {
+    console.error("Erro ao copiar:", error);
   }
 }

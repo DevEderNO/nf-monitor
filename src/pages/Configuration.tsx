@@ -43,7 +43,7 @@ export function Configuration() {
         },
       });
     }
-  }, [dispatch]);
+  }, []);
 
   const handleTimeForProcessing = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,7 +52,7 @@ export function Configuration() {
         payload: { ...state.config, timeForProcessing: e.target.value },
       });
     },
-    [dispatch]
+    []
   );
 
   const handleTimeForConsultingSieg = useCallback(
@@ -62,7 +62,7 @@ export function Configuration() {
         payload: { ...state.config, timeForConsultingSieg: e.target.value },
       });
     },
-    [dispatch]
+    []
   );
 
   const handleCleanHistoric = useCallback(() => {

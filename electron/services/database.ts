@@ -9,7 +9,8 @@ import { ICountedNotes } from "../interfaces/count-notes";
 import { IAuth } from "../interfaces/auth";
 import prisma from "../lib/prisma";
 import { app, BrowserWindow } from "electron";
-import path from "node:path";
+import { endOfDay, startOfDay } from "date-fns";
+import path from "path";
 
 export async function getConfiguration(): Promise<IConfig | null> {
   return prisma.configuration.findFirst();
@@ -29,25 +30,19 @@ export async function updateConfiguration(data: IConfig) {
 }
 
 export async function getAuth(): Promise<IAuth | null> {
-  const prismaBinary = path.join(
+  const prismaBinaryPath = path.join(
     process.resourcesPath,
     "node_modules",
-    ".bin",
-    "prisma"
+    ".bin"
   );
-  const prismaMigrateDeploy = `${prismaBinary} migrate deploy --schema ${path.join(
-    app.getPath("userData"),
-    "prisma",
-    "schema.prisma"
-  )}`;
+  const prismaSchema = path.join(app.getPath("userData"), "schema.prisma");
   BrowserWindow.getAllWindows().forEach((window) => {
     window.webContents.send(
       "main-process-message",
-      `resource path: ${path.join(process.resourcesPath, "prisma")}`,
-      `user data: ${path.join(app.getPath("userData"), "prisma")}`,
-      `prisma migration command: ${prismaMigrateDeploy}`
+      `signIn error: ${`cd "${prismaBinaryPath}" && ./prisma migrate deploy --schema "${prismaSchema}"`}`
     );
   });
+
   const user = await prisma.user.findFirst();
   const auth = await prisma.auth.findFirst();
   if (!auth) return null;
@@ -196,10 +191,15 @@ export async function removeAuth() {
 
 export async function getDirectories(): Promise<IDirectory[]> {
   const directorySieg = await getDirectoriesDownloadSieg();
-  if (directorySieg) {
-    return [directorySieg, ...(await prisma.directory.findMany())];
+  const directories = await prisma.directory.findMany();
+  const result: IDirectory[] = [];
+  if (directories?.length > 0) {
+    result.push(...directories);
   }
-  return await prisma.directory.findMany();
+  if (directorySieg) {
+    result.push(directorySieg);
+  }
+  return result;
 }
 
 export async function getDirectoriesDownloadSieg(): Promise<IDirectory | null> {
@@ -242,18 +242,6 @@ export async function addDirectories(
   const existingPathSet = new Set(existingPaths.map((d) => d.path));
   const newDirectories = data.filter((d) => !existingPathSet.has(d.path));
   return prisma.directory.createMany({ data: newDirectories });
-}
-
-export async function existsDirectory(path: string): Promise<boolean> {
-  const result =
-    (await prisma.directory.findFirst({
-      where: {
-        path: {
-          equals: path,
-        },
-      },
-    })) !== null;
-  return result;
 }
 
 export async function removeDirectory(path: string) {
@@ -308,6 +296,15 @@ export async function updateFile(
 export async function removeFiles(path: string) {
   return prisma.file.deleteMany({
     where: { filepath: { contains: path } },
+  });
+}
+
+export async function countFilesSendedToDay() {
+  const todayStart = startOfDay(new Date());
+  const todayEnd = endOfDay(new Date());
+
+  return prisma.file.count({
+    where: { wasSend: true, dataSend: { gte: todayStart, lt: todayEnd } },
   });
 }
 
