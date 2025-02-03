@@ -21,9 +21,10 @@ import { ErrorType } from "@prisma/client";
 // │ │ └── preload.js
 // │
 process.env.DIST = path.join(__dirname, "../dist");
-process.env.VITE_PUBLIC = app.isPackaged
+const envVitePublic = app.isPackaged
   ? process.env.DIST
   : path.join(process.env.DIST, "../public");
+process.env.VITE_PUBLIC = envVitePublic;
 
 let win: BrowserWindow | null;
 let tray: Tray;
@@ -53,7 +54,7 @@ function createWindow() {
   }
 
   const icon = nativeImage.createFromPath(
-    path.join(process.env.VITE_PUBLIC ?? "", "sittax.png")
+    path.join(envVitePublic, "sittax.png")
   );
 
   tray = new Tray(icon);
@@ -161,14 +162,14 @@ function createWindow() {
 }
 
 app.on("ready", async () => {
-  await copyMigrations();
-  await applyMigrations();
-  createWindow();
-  acceptStreamsEula();
   const isSecondInstance = app.requestSingleInstanceLock();
   if (isSecondInstance) {
-    registerListeners(win);
+    await copyMigrations();
+    await applyMigrations();
+    acceptStreamsEula();
     createWebsocket();
+    createWindow();
+    registerListeners(win);
     autoUpdater.checkForUpdatesAndNotify();
   } else {
     app.quit();

@@ -485,7 +485,6 @@ export class SiegTask {
     progress = 0,
     status = ProcessamentoStatus.Running
   ) {
-    await timeout();
     messages.forEach((x) => this.historic.log?.push(x));
     if (
       [ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(
