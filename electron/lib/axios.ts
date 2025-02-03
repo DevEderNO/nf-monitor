@@ -9,6 +9,7 @@ import {
   ISiegDownloadNotesResponse,
 } from "../interfaces/sieg";
 import { BrowserWindow } from "electron";
+import { HealthErrorMessage } from "electron/interfaces/health-error-message";
 
 const apiAuth = axios.create({
   baseURL: import.meta.env.VITE_API_AUTH_URL,
@@ -23,6 +24,22 @@ const apiSieg = axios.create({
   baseURL: import.meta.env.VITE_API_SIEG_URL,
   timeout: 50000,
 });
+
+const apiHealthBroker = axios.create({
+  baseURL: import.meta.env.VITE_API_HEALTH_BROKER_URL,
+  timeout: 20000,
+});
+
+export async function checkRoute(url: string) {
+  try {
+    const response = await axios.head(url);
+    console.log(`A rota ${url} está disponível. Status: ${response.status}`);
+    return true;
+  } catch (error) {
+    console.log(`A rota ${url} não está acessível.`);
+    return false;
+  }
+}
 
 export async function signIn(
   username: string,
@@ -136,6 +153,10 @@ export async function downloadNotes(
 ): Promise<ISiegDownloadNotesResponse> {
   const response = await retrySieg(`/BaixarXmlsV2`, apiKey, data, 10);
   return response;
+}
+
+export async function healthBrokerSetHealf(message: HealthErrorMessage) {
+  await apiHealthBroker.post("/set-health", message);
 }
 
 api.interceptors.request.use((config) => {
