@@ -27,6 +27,7 @@ interface IStepProcess {
     icon: JSX.Element;
     onClick: () => void;
     onCancel?: () => void;
+    disabled?: boolean;
   };
 }
 
@@ -124,6 +125,7 @@ export function Sieg() {
           })
         );
       },
+      disabled: !config.directoryDownloadSieg,
     },
     Concluded: {
       label: "Baixar Notas",
@@ -144,6 +146,7 @@ export function Sieg() {
           })
         );
       },
+      disabled: !config.directoryDownloadSieg,
     },
   };
 
@@ -206,7 +209,7 @@ export function Sieg() {
           <Button
             className=""
             onClick={siegProcess[processamentoSieg.status].onClick}
-            disabled={!date?.from || !date?.to}
+            disabled={!date?.from || !date?.to || !config.directoryDownloadSieg}
           >
             {siegProcess[processamentoSieg.status].icon}
             {siegProcess[processamentoSieg.status].label}
