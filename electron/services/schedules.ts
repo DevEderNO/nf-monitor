@@ -4,13 +4,16 @@ import { wsConnection } from "../websocket";
 import { getConfiguration } from "./database";
 import { startSieg } from "./sieg-service";
 import { addMonths } from "date-fns";
+import { healthBrokerComunication } from "./health-broker-service";
 
 let jobDiscovery: Job | null = null;
 let jobSieg: Job | null = null;
+let jobHealth: Job | null = null;
 
 export function updateJobs() {
   initializeJob();
   initializeJobSieg();
+  initializeJobHealth();
 }
 
 export async function initializeJob() {
@@ -44,4 +47,11 @@ export async function initializeJobSieg() {
   } else {
     jobSieg?.cancel();
   }
+}
+
+export async function initializeJobHealth() {
+  if (jobHealth !== null) return;
+  jobHealth = scheduleJob(`*/1 * * * *`, () => {
+    healthBrokerComunication();
+  });
 }
