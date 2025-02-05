@@ -1,8 +1,12 @@
 export interface IDirectory {
   id: number;
-  createdAt: Date;
-  updatedAt: Date;
   path: string;
   modifiedtime: Date;
   size: number;
+  directories: number;
+  xmls: number;
+  pdfs: number;
+  zips: number;
+  createdAt: Date;
+  updatedAt: Date;
 }

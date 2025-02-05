@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import { useAppState } from "./state";
 import { w3cwebsocket } from "websocket";
 import {
@@ -33,6 +39,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
     client.onmessage = (message) => {
       if (typeof message.data === "string") {
         const response: WSMessage = JSON.parse(message.data);
+        console.log("response.message.type", response.message.type);
         if (response.message.type === WSMessageType.Discovery) {
           setProcessStatus("discovery");
           const {
@@ -119,31 +126,31 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
     };
   }, [client, dispatch]);
 
-  useEffect(() => {
-    const connectWebSocket = () => {
-      const cli = new w3cwebsocket("ws://127.0.0.1:4444");
+  const connectWebSocket = useCallback(() => {
+    const cli = new w3cwebsocket("ws://127.0.0.1:4444");
 
-      cli.onopen = () => {
-        setIsConnected(true);
-        console.log("Conectado ao WebSocket");
-      };
-
-      cli.onclose = () => {
-        setIsConnected(false);
-        console.log("Conexão perdida. Tentando reconectar...");
-        // Tenta reconectar após 3 segundos
-        setTimeout(connectWebSocket, 3000);
-      };
-
-      cli.onerror = (error) => {
-        setIsConnected(false);
-        console.error("Erro na conexão WebSocket", error);
-        connectWebSocket();
-      };
-
-      setClient(cli);
+    cli.onopen = () => {
+      setIsConnected(true);
+      console.log("Conectado ao WebSocket");
     };
 
+    cli.onclose = () => {
+      setIsConnected(false);
+      console.log("Conexão perdida. Tentando reconectar...");
+      // Tenta reconectar após 3 segundos
+      setTimeout(connectWebSocket, 3000);
+    };
+
+    cli.onerror = (error) => {
+      setIsConnected(false);
+      console.error("Erro na conexão WebSocket", error);
+      setTimeout(connectWebSocket, 3000);
+    };
+
+    setClient(cli);
+  }, []);
+
+  useEffect(() => {
     // Inicia a conexão WebSocket
     connectWebSocket();
 

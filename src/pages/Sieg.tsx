@@ -68,6 +68,26 @@ export function Sieg() {
     toast,
   ]);
 
+  const stepStart = useCallback(
+    (dateInitial: Date | undefined, dateEnd: Date | undefined) => {
+      dispatch({ type: ActionType.ClearMessagesSieg });
+      if (hasDerectories()) return;
+      client?.send(
+        JSON.stringify({
+          type: "message",
+          message: {
+            type: WSMessageType.StartSieg,
+            data: {
+              dateInitial,
+              dateEnd,
+            },
+          },
+        })
+      );
+    },
+    [date]
+  );
+
   const siegProcess: IStepProcess = {
     Running: {
       label: "Consultando...",
@@ -110,42 +130,13 @@ export function Sieg() {
     Stopped: {
       label: "Baixar Notas",
       icon: <Play />,
-      onClick: () => {
-        if (hasDerectories()) return;
-        client?.send(
-          JSON.stringify({
-            type: "message",
-            message: {
-              type: WSMessageType.StartSieg,
-              data: {
-                dateInitial: date?.from,
-                dateEnd: date?.to,
-              },
-            },
-          })
-        );
-      },
+      onClick: () => stepStart(date?.from, date?.to),
       disabled: !config.directoryDownloadSieg,
     },
     Concluded: {
       label: "Baixar Notas",
       icon: <Play />,
-      onClick: () => {
-        dispatch({ type: ActionType.ClearMessages });
-        if (hasDerectories()) return;
-        client?.send(
-          JSON.stringify({
-            type: "message",
-            message: {
-              type: WSMessageType.StartSieg,
-              data: {
-                dateInitial: date?.from,
-                dateEnd: date?.to,
-              },
-            },
-          })
-        );
-      },
+      onClick: () => stepStart(date?.from, date?.to),
       disabled: !config.directoryDownloadSieg,
     },
   };
@@ -207,6 +198,7 @@ export function Sieg() {
         </div>
         <div className="row-auto flex gap-2">
           <Button
+            key={siegProcess[processamentoSieg.status].label}
             className=""
             onClick={siegProcess[processamentoSieg.status].onClick}
             disabled={!date?.from || !date?.to || !config.directoryDownloadSieg}

@@ -8,7 +8,6 @@ interface ImportMetaEnv {
   readonly VITE_GITHUB_TOKEN: string;
   readonly VITE_API_SIEG_URL: string;
   readonly VITE_API_HEALTH_BROKER_URL: string;
-  readonly VITE_DATABASE_URL: string;
   // more env variables...
 }
 

@@ -69,7 +69,7 @@ export class SiegTask {
 
   async run(connection: connection, dateInitial: Date, dateEnd: Date) {
     try {
-      await this.sendMessageClient([""]);
+      await this.sendMessageClient([]);
       this.initializeProperties(connection);
       const config = await getConfiguration();
       if (!config || !config.apiKeySieg)
@@ -165,7 +165,9 @@ export class SiegTask {
           ProcessamentoStatus.Running
         );
         console.log(
-          `Realizando o download das ${SiegXmlType[xmlType]} - ${i} a ${Math.min(
+          `Realizando o download das ${
+            SiegXmlType[xmlType]
+          } - ${i} a ${Math.min(
             i + 50,
             countNotesXmlType
           )} de ${countNotesXmlType}`
@@ -485,6 +487,7 @@ export class SiegTask {
     progress = 0,
     status = ProcessamentoStatus.Running
   ) {
+    await timeout();
     messages.forEach((x) => this.historic.log?.push(x));
     if (
       [ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(
@@ -507,7 +510,7 @@ export class SiegTask {
         },
       } as WSMessageTyped<IProcessamento>)
     );
-    await timeout();
+    await timeout(5);
   }
 }
 

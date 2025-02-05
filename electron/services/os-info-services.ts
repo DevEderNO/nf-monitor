@@ -1,11 +1,15 @@
 import axios from "axios";
+import {
+  ISystemDisk,
+  ISystemInfo,
+  ISystemNetwork,
+} from "electron/interfaces/health-error-message";
 import { execSync } from "node:child_process";
 import os from "node:os";
 
-function getNetworkInterfaces() {
+export function getNetworkInterfaces(): ISystemNetwork[] {
   const interfaces = os.networkInterfaces();
-  const filteredInterfaces: { name: string; address: string; mac: string }[] =
-    [];
+  const filteredInterfaces: ISystemNetwork[] = [];
 
   for (const [name, netifs] of Object.entries(interfaces)) {
     if (netifs) {
@@ -13,6 +17,7 @@ function getNetworkInterfaces() {
         // Filtra apenas IPv4, que não seja interno (loopback) e seja Wi-Fi ou Ethernet
         if (netif.family === "IPv4" && !netif.internal) {
           filteredInterfaces.push({
+            $type: "HealthMessageWindowsSystemNetwork",
             name,
             address: netif.address,
             mac: netif.mac,
@@ -26,10 +31,17 @@ function getNetworkInterfaces() {
 }
 
 // Função para obter espaço livre e total do HD
-function getDiskInfo(): { disk: string; free: string; total: string }[] {
+export function getDiskInfo(): ISystemDisk[] {
   try {
     if (process.platform !== "win32")
-      return [{ disk: "N/A", free: "N/A", total: "N/A" }];
+      return [
+        {
+          $type: "HealthMessageWindowsSystemDisk",
+          name: "N/A",
+          free: "N/A",
+          total: "N/A",
+        },
+      ];
     const disks = execSync("wmic logicaldisk get size,freespace,caption")
       .toString()
       .split("\n")
@@ -40,14 +52,29 @@ function getDiskInfo(): { disk: string; free: string; total: string }[] {
       .filter((parts) => parts.length === 3);
 
     if (disks && disks.length <= 0)
-      return [{ disk: "N/A", free: "N/A", total: "N/A" }];
+      return [
+        {
+          $type: "HealthMessageWindowsSystemDisk",
+          name: "N/A",
+          free: "N/A",
+          total: "N/A",
+        },
+      ];
     return disks.map((diskInfo) => ({
-      disk: diskInfo[0],
+      $type: "HealthMessageWindowsSystemDisk",
+      name: diskInfo[0],
       free: `${(Number(diskInfo[1]) / 1e9).toFixed(2)} GB`,
       total: `${(Number(diskInfo[2]) / 1e9).toFixed(2)} GB`,
     }));
   } catch (error) {
-    return [{ disk: "N/A", free: "N/A", total: "N/A" }];
+    return [
+      {
+        $type: "HealthMessageWindowsSystemDisk",
+        name: "N/A",
+        free: "N/A",
+        total: "N/A",
+      },
+    ];
   }
 }
 
@@ -64,17 +91,16 @@ async function getExternalIp() {
 }
 
 // Função para obter as informações do sistema
-export async function getSystemInfo() {
+export async function getSystemInfo(): Promise<ISystemInfo> {
   return {
+    $type: "HealthMessageWindowsSystemInfo",
     platform: os.platform(), // win32, linux, darwin (MacOS)
     arch: os.arch(), // x64, arm, etc.
     hostname: os.hostname(),
     cpus: os.cpus().length, // Número de CPUs
-    totalRAM: `${(os.totalmem() / 1e9).toFixed(2)} GB`, // Memória RAM total
-    freeRAM: `${(os.freemem() / 1e9).toFixed(2)} GB`, // Memória RAM disponível
-    disk: getDiskInfo(), // Espaço de disco livre e total
+    totalRam: `${(os.totalmem() / 1e9).toFixed(2)} GB`, // Memória RAM total
+    freeRam: `${(os.freemem() / 1e9).toFixed(2)} GB`, // Memória RAM disponível
     uptime: `${(os.uptime() / 3600).toFixed(2)} horas`, // Tempo ligado
-    networks: getNetworkInterfaces(),
     externalIp: await getExternalIp(),
   };
 }

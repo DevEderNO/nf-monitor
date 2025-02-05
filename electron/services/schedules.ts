@@ -51,7 +51,7 @@ export async function initializeJobSieg() {
 
 export async function initializeJobHealth() {
   if (jobHealth !== null) return;
-  jobHealth = scheduleJob(`*/1 * * * *`, () => {
+  jobHealth = scheduleJob(`0 * * * *`, () => {
     healthBrokerComunication();
   });
 }

@@ -54,6 +54,10 @@ model Directory {
   path         String
   modifiedtime DateTime
   size         Int
+  directories  Int
+  xmls         Int
+  pdfs         Int
+  zips         Int
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -63,6 +67,10 @@ model DirectoryDiscovery {
   path         String
   modifiedtime DateTime
   size         Int
+  directories  Int
+  xmls         Int
+  pdfs         Int
+  zips         Int
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

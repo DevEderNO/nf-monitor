@@ -8,9 +8,8 @@ import { getDirectoryData } from "./file-operation-service";
 import { ICountedNotes } from "../interfaces/count-notes";
 import { IAuth } from "../interfaces/auth";
 import prisma from "../lib/prisma";
-import { app, BrowserWindow } from "electron";
+import { BrowserWindow } from "electron";
 import { endOfDay, startOfDay } from "date-fns";
-import path from "path";
 
 export async function getConfiguration(): Promise<IConfig | null> {
   return prisma.configuration.findFirst();
@@ -30,19 +29,6 @@ export async function updateConfiguration(data: IConfig) {
 }
 
 export async function getAuth(): Promise<IAuth | null> {
-  const prismaBinaryPath = path.join(
-    process.resourcesPath,
-    "node_modules",
-    ".bin"
-  );
-  const prismaSchema = path.join(app.getPath("userData"), "schema.prisma");
-  BrowserWindow.getAllWindows().forEach((window) => {
-    window.webContents.send(
-      "main-process-message",
-      `signIn error: ${`cd "${prismaBinaryPath}" && ./prisma migrate deploy --schema "${prismaSchema}"`}`
-    );
-  });
-
   const user = await prisma.user.findFirst();
   const auth = await prisma.auth.findFirst();
   if (!auth) return null;
@@ -308,8 +294,11 @@ export async function countFilesSendedToDay() {
   });
 }
 
-export async function getDirectoryDiscovery() {
-  return prisma.directoryDiscovery.findMany();
+export async function getDirectoryDiscovery(term?: string) {
+  if (!term || term.length === 0) return prisma.directoryDiscovery.findMany();
+  return prisma.directoryDiscovery.findMany({
+    where: { path: { equals: term } },
+  });
 }
 
 export async function addDirectoryDiscovery(data: IDirectory[]) {
@@ -326,14 +315,22 @@ export async function addDirectoryDiscovery(data: IDirectory[]) {
   return prisma.directoryDiscovery.createMany({ data });
 }
 
-export async function addDirectoryDiscoveries(
-  data: {
-    path: string;
-    modifiedtime: Date;
-    size: number;
-  }[]
+export async function updateDirectoryDiscovery(
+  directoryPath: string,
+  data: Partial<IDirectory>
 ) {
-  return prisma.directoryDiscovery.createMany({ data });
+  if (directoryPath.length === 0) return;
+  const directory = await prisma.directoryDiscovery.findFirst({
+    where: { path: directoryPath },
+  });
+  if (directory?.id === undefined) return;
+  await prisma.directoryDiscovery.update({
+    where: { id: directory.id },
+    data: {
+      ...directory,
+      ...data,
+    },
+  });
 }
 
 export async function addHistoric(data: {

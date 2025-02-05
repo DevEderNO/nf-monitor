@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain } from "electron";
+import { BrowserWindow, ipcMain, Notification } from "electron";
 import { selectDirectories } from "./services/file-operation-service";
 import { updateJobs } from "./services/schedules";
 import { encrypt } from "./lib/cryptography";
@@ -145,5 +145,9 @@ export async function registerListeners(win: BrowserWindow | null) {
 
   ipcMain.on("clear-historic", async () => {
     await clearHistoric();
+  });
+
+  ipcMain.on("show-notification", async (_, { title, body }) => {
+    new Notification({ title, body }).show();
   });
 }

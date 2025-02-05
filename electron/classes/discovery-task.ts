@@ -13,6 +13,7 @@ import {
   addHistoric,
   getDirectories,
   getFiles,
+  updateDirectoryDiscovery,
   updateHistoric,
 } from "../services/database";
 import path from "path";
@@ -104,25 +105,60 @@ export class DiscoveryTask {
         await timeout(500);
         index--;
       } else {
-        const filesInfo = await this.listDirectory(directories[index].path);
+        let subDirectories: IDirectory[] = [];
+        const directoryPath = directories[index].path;
+        // const { hasListed, directoriesDiscovery } =
+        //   await this.checkDirectoryHasListed(directoryPath);
+        // if (hasListed) {
+        //   const currentDirectory = directoriesDiscovery.find(
+        //     (x) => x.path === directoryPath
+        //   );
+        //   if (!currentDirectory) continue;
+        //   await this.sendMessageClient(
+        //     [
+        //       `🔍 Arquivos do diretorio já processado ${currentDirectory.directories} 📁 | ${currentDirectory.xmls} XML | ${currentDirectory.pdfs} PDF | ${currentDirectory.zips} Zip no diretório ${directories[index].path}`,
+        //     ],
+        //     0,
+        //     ProcessamentoStatus.Running
+        //   );
+        //   subDirectories = directoriesDiscovery.filter(
+        //     (x) => x.path !== directoryPath
+        //   );
+        // } else {
+        const filesInfo = await this.listDirectory(directoryPath);
         if (await this.checkIsCancelled()) break;
+        const counts = filesInfo.reduce(
+          (acc, file) => {
+            if (file.isDirectory) {
+              acc.directory++;
+            }
+            if (file.extension === ".xml") {
+              acc.xml++;
+            }
+            if (file.extension === ".pdf") {
+              acc.pdf++;
+            }
+            if (file.extension === ".zip") {
+              acc.zip++;
+            }
+            return acc;
+          },
+          {
+            directory: 0,
+            xml: 0,
+            pdf: 0,
+            zip: 0,
+          }
+        );
         await this.sendMessageClient(
           [
-            `🔍 Foram encontrados ${
-              filesInfo.filter((x) => x.isDirectory).length
-            } 📁 | ${
-              filesInfo.filter((x) => x.extension === ".xml").length
-            } XML | ${
-              filesInfo.filter((x) => x.extension === ".pdf").length
-            } PDF | ${
-              filesInfo.filter((x) => x.extension === ".zip").length
-            } Zip no diretório ${directories[index].path}`,
+            `🔍 Foram encontrados ${counts.directory} 📁 | ${counts.xml} XML | ${counts.pdf} PDF | ${counts.zip} Zip no diretório ${directoryPath}`,
           ],
           0,
           ProcessamentoStatus.Running
         );
         await timeout();
-        const subDirectories = filesInfo
+        subDirectories = filesInfo
           .filter((x) => x.isDirectory)
           .map(
             (x) =>
@@ -132,22 +168,45 @@ export class DiscoveryTask {
                 size: x.size,
               } as IDirectory)
           );
-        console.log(`addDirectoryDiscovery ${subDirectories.length} start`);
-        addDirectoryDiscovery(subDirectories);
-        console.log(`addDirectoryDiscovery ${subDirectories.length} end`);
-        let filesFiltered = filesInfo.filter(
+        await updateDirectoryDiscovery(directoryPath, {
+          directories: counts.directory,
+          xmls: counts.xml,
+          pdfs: counts.pdf,
+          zips: counts.zip,
+        });
+        await addDirectoryDiscovery(subDirectories);
+        const filesFiltered = filesInfo.filter(
           (x) =>
             x.isFile &&
             [".xml", ".pdf", ".zip"].includes(x.extension.toLowerCase())
         );
-        console.log(`addFiles ${filesFiltered.length} start`);
-        addFiles(filesFiltered);
-        console.log(`addFiles ${filesFiltered.length} end`);
+        await addFiles(filesFiltered);
+        // }
 
         await this.discoveryDirectories(subDirectories);
       }
     }
   }
+
+  // private async checkDirectoryHasListed(
+  //   directoryPath: string
+  // ): Promise<{ hasListed: boolean; directoriesDiscovery: IDirectory[] }> {
+  //   const directoriesDiscovery = await getDirectoryDiscovery(directoryPath);
+  //   const directoryContents = fs.readdirSync(directoryPath, {
+  //     encoding: "utf-8",
+  //     recursive: true,
+  //   });
+  //   if (
+  //     directoriesDiscovery &&
+  //     directoriesDiscovery.length > 0 &&
+  //     directoryContents &&
+  //     directoryContents.length > 0
+  //   ) {
+  //     if (directoriesDiscovery.length === directoryContents.length)
+  //       return { hasListed: true, directoriesDiscovery };
+  //   }
+  //   return { hasListed: false, directoriesDiscovery: [] };
+  // }
 
   private async listDirectory(
     directoryPath: string,
@@ -164,7 +223,7 @@ export class DiscoveryTask {
         } else {
           await this.sendMessageClient(
             [
-              `Processando arquivos do diretório: ${directoryPath} ${
+              `⚙️ Processando arquivos do diretório: ${directoryPath} ${
                 index + 1
               } de ${directoryContents.length}`,
             ],
@@ -177,19 +236,18 @@ export class DiscoveryTask {
           try {
             const stats = fs.statSync(itemPath);
             const isDirectory = stats.isDirectory();
-            const isFile = stats.isFile();
 
             filesAndFolders.push({
               filename: element,
               isDirectory,
-              isFile,
+              isFile: !isDirectory,
               filepath: itemPath.split("\\").join("/"),
-              extension: !isDirectory ? path.extname(element) : "",
+              extension: path.extname(element),
               modifiedtime: stats.mtime,
               size: stats.size,
               wasSend: false,
               isValid: false,
-              bloqued: isFile && isFileBlocked(itemPath),
+              bloqued: !isDirectory && isFileBlocked(itemPath),
               dataSend: null,
             });
           } catch (_) {
@@ -197,7 +255,7 @@ export class DiscoveryTask {
               callback(`A pasta/arquivo não pode ser lido ${itemPath}`);
             }
           }
-          await timeout(10);
+          await timeout(5);
         }
       }
     } catch (_) {

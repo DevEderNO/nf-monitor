@@ -31,13 +31,15 @@ let tray: Tray;
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 
+app.setAppUserModelId("Monitor");
+
 function createWindow() {
   win = new BrowserWindow({
     height: 600,
     width: 800,
     minHeight: 600,
     minWidth: 800,
-    icon: path.join(process.env.VITE_PUBLIC ?? "", "sittax.ico"),
+    icon: path.join(process.env.VITE_PUBLIC ?? "", "sittax.png"),
     show: !VITE_DEV_SERVER_URL ? false : true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),

@@ -41,6 +41,10 @@ export function getDirectoryData(path: string): IDirectory | null {
       path: path.includes("\\") ? path.split("\\").join("/").toString() : path,
       modifiedtime: directory.mtime,
       size: directory.size,
+      directories: 0,
+      xmls: 0,
+      pdfs: 0,
+      zips: 0,
     };
   } catch (error) {
     console.log(`no such file or directory, stat ${path}`);

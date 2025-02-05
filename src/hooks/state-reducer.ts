@@ -56,6 +56,7 @@ export enum ActionType {
   Processamento,
   ProcessamentoSieg,
   ClearMessages,
+  ClearMessagesSieg,
   Clear,
   Historic,
   Config,
@@ -100,15 +101,21 @@ export const StateReducer = (
         ...state,
         processamento: { ...state.processamento, messages: [] },
       };
+    case ActionType.ClearMessagesSieg:
+      return {
+        ...state,
+        processamentoSieg: { ...state.processamentoSieg, messages: [] },
+      };
     default:
       return state;
   }
 
   function processamentoReducer(action: IAction) {
     const messages = state.processamento.messages;
-    if (action.payload.replace) {
-      messages[messages.length - 1] = action.payload.messages[0];
-    } else {
+    if (action.payload.messages.length > 0) {
+      if (action.payload.replace) {
+        messages.splice(messages.length - 1, 1);
+      }
       messages.push(action.payload.messages);
     }
     return {
@@ -124,12 +131,12 @@ export const StateReducer = (
 
   function processamentoSiegReducer(action: IAction) {
     const messages = state.processamentoSieg.messages;
-    if (action.payload.replace) {
-      messages[messages.length - 1] = action.payload.messages[0];
-    } else {
+    if (action.payload.messages.length > 0) {
+      if (action.payload.replace) {
+        messages.splice(messages.length - 1, 1);
+      }
       messages.push(action.payload.messages);
     }
-    messages.push(action.payload.messages);
     return {
       ...state,
       processamentoSieg: {
