@@ -197,37 +197,15 @@ export async function getDirectoriesDownloadSieg(): Promise<IDirectory | null> {
   return null;
 }
 
-export async function addDirectory(data: {
-  path: string;
-  modifiedtime: Date;
-  size: number;
-}) {
-  const existingPath = await prisma.directory.findFirst({
-    where: {
-      path: {
-        equals: data.path,
-      },
-    },
-  });
-  if (existingPath) {
-    return existingPath;
-  }
-  return prisma.directory.create({ data });
-}
-
-export async function addDirectories(
-  data: {
-    path: string;
-    modifiedtime: Date;
-    size: number;
-  }[]
-) {
+export async function addDirectories(data: IDirectory[]) {
   const existingPaths = await prisma.directory.findMany({
     select: { path: true },
   });
   const existingPathSet = new Set(existingPaths.map((d) => d.path));
   const newDirectories = data.filter((d) => !existingPathSet.has(d.path));
-  return prisma.directory.createMany({ data: newDirectories });
+  return prisma.directory.createMany({
+    data: { ...newDirectories },
+  });
 }
 
 export async function removeDirectory(path: string) {

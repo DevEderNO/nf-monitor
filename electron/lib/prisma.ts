@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client/index";
+import { PrismaClient } from "@prisma/client";
 import path from "path";
 import { app } from "electron";
 

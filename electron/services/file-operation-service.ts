@@ -276,10 +276,13 @@ export async function copyMigrations(): Promise<void> {
 export async function applyMigrations(): Promise<void> {
   try {
     if (!app.isPackaged) return;
-    const prismaBinaryPath = path.join(
+    const nodePath = path.join(process.resourcesPath, "nodejs", "node.exe");
+    const prismaPath = path.join(
       process.resourcesPath,
       "node_modules",
-      ".bin"
+      "prisma",
+      "build",
+      "index.js"
     );
     const prismaSchema = path.join(app.getPath("userData"), "schema.prisma");
     let prismaMigrateDeployString = fs.readFileSync(prismaSchema, "utf-8");
@@ -291,7 +294,7 @@ export async function applyMigrations(): Promise<void> {
 
     console.log("Aplicando migrations...");
     execSync(
-      `cd "${prismaBinaryPath}" & prisma migrate deploy --schema "${prismaSchema}"`,
+      `"${nodePath}" "${prismaPath}" migrate deploy --schema "${prismaSchema}"`,
       {
         stdio: "inherit",
       }

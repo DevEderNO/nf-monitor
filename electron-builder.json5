@@ -40,6 +40,10 @@
       from: "node_modules/prisma",
       to: "node_modules/prisma",
     },
+    {
+      from: "resources/nodejs",
+      to: "nodejs",
+    },
   ],
   publish: [
     {
@@ -71,6 +75,7 @@
     installerIcon: "dist/sittax.ico",
     installerHeaderIcon: "dist/sittax.ico",
     deleteAppDataOnUninstall: false,
+    installerLanguages: ["pt_BR"],
   },
   linux: {
     target: ["AppImage"],

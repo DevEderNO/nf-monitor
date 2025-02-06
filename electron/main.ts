@@ -6,6 +6,7 @@ import { autoUpdater } from "electron-updater";
 import {
   acceptStreamsEula,
   applyMigrations,
+  // applyMigrations,
   copyMigrations,
 } from "./services/file-operation-service";
 import { logError } from "./services/error-service";

@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { StopIcon } from "@radix-ui/react-icons";
 import { addMonths, format } from "date-fns";
 import { CalendarIcon, Pause, Play } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DateRange } from "react-day-picker";
 
 interface IStepProcess {
@@ -44,6 +44,12 @@ export function Sieg() {
     from: addMonths(new Date(newDate.getFullYear(), newDate.getMonth(), 1), -1),
     to: newDate,
   });
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
+    }
+  }, [processamentoSieg]);
 
   const hasDerectories = useCallback(() => {
     if (
