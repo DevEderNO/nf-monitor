@@ -179,7 +179,7 @@ export async function removeAuth() {
 
 export async function getDirectories(): Promise<IDirectory[]> {
   const directorySieg = await getDirectoriesDownloadSieg();
-  const directories = await prisma.directory.findMany();
+  const directories = (await prisma.directory.findMany()) ?? [];
   const result: IDirectory[] = [];
   if (directories?.length > 0) {
     result.push(...directories);
@@ -207,7 +207,7 @@ export async function addDirectories(data: IDirectory[]) {
   const existingPathSet = new Set(existingPaths.map((d) => d.path));
   const newDirectories = data.filter((d) => !existingPathSet.has(d.path));
   return prisma.directory.createMany({
-    data: { ...newDirectories },
+    data: newDirectories,
   });
 }
 
@@ -237,9 +237,10 @@ export async function addFiles(
     size: number;
   }[]
 ) {
-  const existingPaths = await prisma.file.findMany({
-    select: { filepath: true },
-  }) ?? [];
+  const existingPaths =
+    (await prisma.file.findMany({
+      select: { filepath: true },
+    })) ?? [];
   const existingPathSet = new Set(existingPaths.map((d) => d.filepath));
   const newDirectories = data.filter((d) => !existingPathSet.has(d.filepath));
   return prisma.file.createMany({ data: newDirectories });

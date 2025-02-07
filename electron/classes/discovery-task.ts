@@ -166,6 +166,10 @@ export class DiscoveryTask {
                 path: x.filepath,
                 modifiedtime: x.modifiedtime,
                 size: x.size,
+                directories: 0,
+                xmls: 0,
+                pdfs: 0,
+                zips: 0,
               } as IDirectory)
           );
         await updateDirectoryDiscovery(directoryPath, {

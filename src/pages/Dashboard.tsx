@@ -84,7 +84,6 @@ export function Dashboard() {
             type: "message",
             message: {
               type: WSMessageType.StartDiscovery,
-              data: directories,
             },
           })
         );
@@ -101,7 +100,6 @@ export function Dashboard() {
             type: "message",
             message: {
               type: WSMessageType.StartDiscovery,
-              data: directories,
             },
           })
         );
@@ -175,7 +173,6 @@ export function Dashboard() {
             type: "message",
             message: {
               type: WSMessageType.StartProcess,
-              data: directories,
             },
           })
         );
@@ -190,7 +187,6 @@ export function Dashboard() {
             type: "message",
             message: {
               type: WSMessageType.StartProcess,
-              data: directories,
             },
           })
         );

@@ -226,10 +226,6 @@ export class ProcessTask {
     const validFile = validXmlAndPdf(this.files[index]);
     if (validFile.valid) {
       this.files[index].isValid = true;
-      await this.sendMessageClient(
-        [`🚀 Enviando ${this.files[index].filepath}`],
-        currentProgress
-      );
       try {
         await upload(this.auth?.token ?? "", this.files[index].filepath);
         updateFile(this.files[index].filepath, {
