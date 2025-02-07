@@ -42,7 +42,7 @@ export interface ISystemProgama extends IBaseHealthMessage {
   folder: string;
 }
 
-export interface HealthErrorMessage {
+export interface NFMoniotorHealth {
   $type: string;
   source: number;
   childrens: (
@@ -53,5 +53,7 @@ export interface HealthErrorMessage {
     | ISystemDisk
   )[];
   escritorio: string;
+  usuario: string;
+  maquina: string;
   message: string;
 }

@@ -1,5 +1,5 @@
 import { app } from "electron";
-import { HealthErrorMessage } from "../interfaces/health-error-message";
+import { NFMoniotorHealth } from "../interfaces/health-error-message";
 import { countFilesSendedToDay, getUser } from "./database";
 import {
   getDiskInfo,
@@ -7,16 +7,17 @@ import {
   getSystemInfo,
 } from "./os-info-services";
 import { healthBrokerSetHealf } from "../lib/axios";
+import os from 'node:os';
 
 export async function healthBrokerComunication() {
   const user = await getUser();
   const filesSendedToDay = await countFilesSendedToDay();
-  const message: HealthErrorMessage = {
-    $type: "HealthMessageWindows",
+  const message: NFMoniotorHealth = {
+    $type: "NFMoniotorHealth",
     source: 1,
     childrens: [
       {
-        $type: "HealthMessageWindowsUsuario",
+        $type: "NFMoniotorHealthUsuario",
         id: user?.userId ?? "",
         name: user?.nome ?? "",
         email: user?.email ?? "",
@@ -25,12 +26,14 @@ export async function healthBrokerComunication() {
       ...getDiskInfo(),
       ...getNetworkInterfaces(),
       {
-        $type: "HealthMessageWindowsProgram",
+        $type: "NFMoniotorHealthProgram",
         name: app.getName(),
         folder: app.getAppPath().replace(/\\/g, "/"),
       },
     ],
-    escritorio: "27379587000148 - FERRARI SERVICOS CONTABEIS LTDA",
+    escritorio: "",
+    usuario: user?.userId ?? "",
+    maquina: os.hostname(),
     message: `Arquivos enviados hoje ${filesSendedToDay}`,
   };
   await healthBrokerSetHealf(message);

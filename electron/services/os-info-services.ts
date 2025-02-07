@@ -17,7 +17,7 @@ export function getNetworkInterfaces(): ISystemNetwork[] {
         // Filtra apenas IPv4, que não seja interno (loopback) e seja Wi-Fi ou Ethernet
         if (netif.family === "IPv4" && !netif.internal) {
           filteredInterfaces.push({
-            $type: "HealthMessageWindowsSystemNetwork",
+            $type: "NFMoniotorHealthSystemNetwork",
             name,
             address: netif.address,
             mac: netif.mac,
@@ -36,7 +36,7 @@ export function getDiskInfo(): ISystemDisk[] {
     if (process.platform !== "win32")
       return [
         {
-          $type: "HealthMessageWindowsSystemDisk",
+          $type: "NFMoniotorHealthSystemDisk",
           name: "N/A",
           free: "N/A",
           total: "N/A",
@@ -54,14 +54,14 @@ export function getDiskInfo(): ISystemDisk[] {
     if (disks && disks.length <= 0)
       return [
         {
-          $type: "HealthMessageWindowsSystemDisk",
+          $type: "NFMoniotorHealthSystemDisk",
           name: "N/A",
           free: "N/A",
           total: "N/A",
         },
       ];
     return disks.map((diskInfo) => ({
-      $type: "HealthMessageWindowsSystemDisk",
+      $type: "NFMoniotorHealthSystemDisk",
       name: diskInfo[0],
       free: `${(Number(diskInfo[1]) / 1e9).toFixed(2)} GB`,
       total: `${(Number(diskInfo[2]) / 1e9).toFixed(2)} GB`,
@@ -69,7 +69,7 @@ export function getDiskInfo(): ISystemDisk[] {
   } catch (error) {
     return [
       {
-        $type: "HealthMessageWindowsSystemDisk",
+        $type: "NFMoniotorHealthSystemDisk",
         name: "N/A",
         free: "N/A",
         total: "N/A",
@@ -93,7 +93,7 @@ async function getExternalIp() {
 // Função para obter as informações do sistema
 export async function getSystemInfo(): Promise<ISystemInfo> {
   return {
-    $type: "HealthMessageWindowsSystemInfo",
+    $type: "NFMoniotorHealthSystemInfo",
     platform: os.platform(), // win32, linux, darwin (MacOS)
     arch: os.arch(), // x64, arm, etc.
     hostname: os.hostname(),
