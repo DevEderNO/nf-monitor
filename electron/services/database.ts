@@ -25,6 +25,8 @@ export async function updateConfiguration(data: IConfig) {
         id: undefined,
       },
     });
+  } else {
+    return await prisma.configuration.create({ data });
   }
 }
 
@@ -198,9 +200,10 @@ export async function getDirectoriesDownloadSieg(): Promise<IDirectory | null> {
 }
 
 export async function addDirectories(data: IDirectory[]) {
-  const existingPaths = await prisma.directory.findMany({
-    select: { path: true },
-  });
+  const existingPaths =
+    (await prisma.directory.findMany({
+      select: { path: true },
+    })) ?? [];
   const existingPathSet = new Set(existingPaths.map((d) => d.path));
   const newDirectories = data.filter((d) => !existingPathSet.has(d.path));
   return prisma.directory.createMany({
@@ -236,7 +239,7 @@ export async function addFiles(
 ) {
   const existingPaths = await prisma.file.findMany({
     select: { filepath: true },
-  });
+  }) ?? [];
   const existingPathSet = new Set(existingPaths.map((d) => d.filepath));
   const newDirectories = data.filter((d) => !existingPathSet.has(d.filepath));
   return prisma.file.createMany({ data: newDirectories });
@@ -280,9 +283,10 @@ export async function getDirectoryDiscovery(term?: string) {
 }
 
 export async function addDirectoryDiscovery(data: IDirectory[]) {
-  const existingPaths = await prisma.directoryDiscovery.findMany({
-    select: { path: true },
-  });
+  const existingPaths =
+    (await prisma.directoryDiscovery.findMany({
+      select: { path: true },
+    })) ?? [];
 
   const existingPathSet = new Set(existingPaths.map((d) => d.path));
   const newDirectories = data.filter((d) => !existingPathSet.has(d.path));

@@ -6,8 +6,8 @@ import { autoUpdater } from "electron-updater";
 import {
   acceptStreamsEula,
   applyMigrations,
-  // applyMigrations,
   copyMigrations,
+  recicleDb,
 } from "./services/file-operation-service";
 import { logError } from "./services/error-service";
 import { ErrorType } from "@prisma/client";
@@ -169,6 +169,7 @@ app.on("ready", async () => {
   if (isSecondInstance) {
     await copyMigrations();
     await applyMigrations();
+    await recicleDb();
     acceptStreamsEula();
     createWebsocket();
     createWindow();

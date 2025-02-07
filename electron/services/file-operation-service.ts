@@ -10,6 +10,10 @@ import { isBefore, addMonths } from "date-fns";
 import { app } from "electron";
 import { createDocumentParser } from "@arbs.io/asset-extractor-wasm";
 import { getDataEmissao } from "../lib/nfse-utils";
+import { IDb } from "../interfaces/db";
+import { IConfig } from "../interfaces/config";
+import { signInSittax } from "../listeners";
+import prisma from "../lib/prisma";
 
 export function selectDirectories(
   win: BrowserWindow,
@@ -293,16 +297,72 @@ export async function applyMigrations(): Promise<void> {
     fs.writeFileSync(prismaSchema, prismaMigrateDeployString, "utf-8");
 
     console.log("Aplicando migrations...");
-    execSync(
+    const result = execSync(
       `"${nodePath}" "${prismaPath}" migrate deploy --schema "${prismaSchema}"`,
       {
-        stdio: "inherit",
+        stdio: "pipe",
       }
     );
-    console.log("Migrations aplicadas com sucesso.");
+    console.log(`Migrations aplicadas com sucesso. ${result}}`);
   } catch (error) {
     console.error("Erro ao aplicar migrations:", error);
   }
+}
+
+export async function recicleDb() {
+  if (!app.isPackaged) return;
+  const dbPath = path.join(app.getPath("userData"), "db.json");
+  if (!fs.existsSync(dbPath)) return;
+  const db: IDb = JSON.parse(fs.readFileSync(dbPath, "utf-8"));
+  const config: IConfig = {
+    timeForProcessing: db.timeForProcessing ?? "00:00",
+    timeForConsultingSieg: "00:00",
+    directoryDownloadSieg: "",
+    viewUploadedFiles: false,
+    apiKeySieg: "",
+    emailSieg: "",
+    senhaSieg: "",
+  };
+  const directories: IDirectory[] = db.directories.map((x) => ({
+    ...x,
+    directories: 0,
+    xmls: 0,
+    pdfs: 0,
+    zips: 0,
+  }));
+  const discoredDirecories: IDirectory[] = db.directoriesAndSubDirectories.map(
+    (x) => ({
+      ...x,
+      directories: 0,
+      xmls: 0,
+      pdfs: 0,
+      zips: 0,
+    })
+  );
+  const files: IFileInfo[] = db.files.map((x) => ({
+    filepath: x.filepath,
+    filename: x.name,
+    extension: x.extension,
+    wasSend: x.wasSend,
+    dataSend: x.dataSend,
+    isValid: x.isValid,
+    isDirectory: x.isDirectory,
+    bloqued: x.bloqued,
+    isFile: x.isFile,
+    modifiedtime: x.modifiedtime,
+    size: x.size,
+  }));
+  await prisma.file.createMany({ data: files });
+  await prisma.directory.createMany({ data: directories });
+  await prisma.directoryDiscovery.createMany({ data: discoredDirecories });
+  await prisma.configuration.create({ data: config });
+  await signInSittax(
+    db.auth.credentials.user,
+    db.auth.credentials.password,
+    true
+  );
+  const newDbPath = dbPath.replace("db.json", "oldDb.json");
+  fs.renameSync(dbPath, newDbPath);
 }
 
 export function copyRecursive(srcDir: string, destDir: string) {
