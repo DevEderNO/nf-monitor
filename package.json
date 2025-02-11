@@ -79,7 +79,7 @@
   },
   "description": "O NFMonitor, desenvolvido pela empresa Sittax, é um sistema projetado para escanear diretórios em busca de arquivos de notas fiscais nos formatos XML, PDF e ZIP, encaminhando-os posteriormente para o Sittax.",
   "main": "dist-electron/main.js",
-  "version": "1.0.21",
+  "version": "1.1.0",
   "prisma": {
     "schema": "prisma/schema.prisma"
   }
