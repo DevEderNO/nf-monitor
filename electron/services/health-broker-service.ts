@@ -1,5 +1,5 @@
 import { app } from "electron";
-import { NFMoniotorHealth } from "../interfaces/health-error-message";
+import { NFMoniotorHealth, XHealthType } from "../interfaces/health-message";
 import { countFilesSendedToDay, getUser } from "./database";
 import {
   getDiskInfo,
@@ -7,7 +7,7 @@ import {
   getSystemInfo,
 } from "./os-info-services";
 import { healthBrokerSetHealf } from "../lib/axios";
-import os from 'node:os';
+import os from "node:os";
 
 export async function healthBrokerComunication() {
   const user = await getUser();
@@ -15,6 +15,8 @@ export async function healthBrokerComunication() {
   const message: NFMoniotorHealth = {
     $type: "NFMoniotorHealth",
     source: 1,
+    type: XHealthType.Info,
+    data: new Date(),
     childrens: [
       {
         $type: "NFMoniotorHealthUsuario",

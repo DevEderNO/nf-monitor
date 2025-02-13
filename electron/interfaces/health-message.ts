@@ -42,9 +42,20 @@ export interface ISystemProgama extends IBaseHealthMessage {
   folder: string;
 }
 
+export enum XHealthType {
+  None = 0,
+  Success = 1,
+  Warning = 2,
+  Error = 3,
+  Info = 4,
+  Debug = 5,
+}
+
 export interface NFMoniotorHealth {
   $type: string;
+  type: XHealthType;
   source: number;
+  data: Date;
   childrens: (
     | ISystemProgama
     | ISystemUser

@@ -3,7 +3,7 @@ import {
   ISystemDisk,
   ISystemInfo,
   ISystemNetwork,
-} from "electron/interfaces/health-error-message";
+} from "electron/interfaces/health-message";
 import { execSync } from "node:child_process";
 import os from "node:os";
 

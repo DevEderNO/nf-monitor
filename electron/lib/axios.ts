@@ -9,7 +9,7 @@ import {
   ISiegDownloadNotesResponse,
 } from "../interfaces/sieg";
 import { BrowserWindow } from "electron";
-import { NFMoniotorHealth } from "electron/interfaces/health-error-message";
+import { NFMoniotorHealth } from "../interfaces/health-message";
 
 const apiAuth = axios.create({
   baseURL: import.meta.env.VITE_API_AUTH_URL,
@@ -156,7 +156,7 @@ export async function downloadNotes(
 }
 
 export async function healthBrokerSetHealf(message: NFMoniotorHealth) {
-  await apiHealthBroker.post("/set-health", message);
+  await apiHealthBroker.post("set-health", message);
 }
 
 api.interceptors.request.use((config) => {
