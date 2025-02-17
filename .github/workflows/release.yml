@@ -33,4 +33,6 @@ jobs:
           VITE_API_UPLOAD_URL: ${{ vars.VITE_API_UPLOAD_URL }}
           VITE_GITHUB_TOKEN: ${{ vars.VITE_GITHUB_TOKEN }}
           VITE_PASSWORD_SECRET: ${{ vars.VITE_PASSWORD_SECRET }}
+          VITE_API_HEALTH_BROKER_URL: ${{ vars.VITE_API_HEALTH_BROKER_URL }}
+          VITE_API_SIEG_URL: ${{ vars.VITE_API_SIEG_URL }}
         run: yarn build:win

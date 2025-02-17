@@ -39,7 +39,6 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
     client.onmessage = (message) => {
       if (typeof message.data === "string") {
         const response: WSMessage = JSON.parse(message.data);
-        console.log("response.message.type", response.message.type);
         if (response.message.type === WSMessageType.Discovery) {
           setProcessStatus("discovery");
           const {
