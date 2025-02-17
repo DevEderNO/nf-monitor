@@ -10,9 +10,10 @@ import { IAuth } from "../interfaces/auth";
 import prisma from "../lib/prisma";
 import { BrowserWindow } from "electron";
 import { endOfDay, startOfDay } from "date-fns";
+import { IEmpresa } from "electron/interfaces/empresa";
 
 export async function getConfiguration(): Promise<IConfig | null> {
-  return prisma.configuration.findFirst();
+  return (await prisma.configuration.findFirst()) ?? null;
 }
 
 export async function updateConfiguration(data: IConfig) {
@@ -168,7 +169,7 @@ export async function getUser(): Promise<IUser | null> {
   };
 }
 
-export async function removeAuth() {
+export async function removeAuth(): Promise<void> {
   return await prisma.$transaction(async (tx) => {
     await tx.countedNotes.deleteMany();
     await tx.empresa.deleteMany();
@@ -178,16 +179,27 @@ export async function removeAuth() {
 }
 
 export async function getDirectories(): Promise<IDirectory[]> {
-  const directorySieg = await getDirectoriesDownloadSieg();
-  const directories = (await prisma.directory.findMany()) ?? [];
-  const result: IDirectory[] = [];
-  if (directories?.length > 0) {
-    result.push(...directories);
+  try {
+    const result: IDirectory[] = [];
+    const directories = (await prisma.directory.findMany()) ?? [];
+    const directorySieg = await getDirectoriesDownloadSieg();
+    if (directories?.length > 0) {
+      result.push(...directories);
+    }
+    if (directorySieg) {
+      result.push(directorySieg);
+    }
+    return result;
+  } catch (error) {
+    return [];
   }
-  if (directorySieg) {
-    result.push(directorySieg);
-  }
-  return result;
+}
+
+export async function getDirectory(path: string): Promise<IDirectory | null> {
+  let directory: IDirectory | null =
+    (await prisma.directory.findFirst({ where: { path } })) ??
+    (await getDirectoriesDownloadSieg());
+  return directory;
 }
 
 export async function getDirectoriesDownloadSieg(): Promise<IDirectory | null> {
@@ -199,30 +211,62 @@ export async function getDirectoriesDownloadSieg(): Promise<IDirectory | null> {
   return null;
 }
 
-export async function addDirectories(data: IDirectory[]) {
+export async function addDirectories(data: IDirectory[]): Promise<number> {
   const existingPaths =
     (await prisma.directory.findMany({
       select: { path: true },
     })) ?? [];
   const existingPathSet = new Set(existingPaths.map((d) => d.path));
   const newDirectories = data.filter((d) => !existingPathSet.has(d.path));
-  return prisma.directory.createMany({
-    data: newDirectories,
+  return (
+    (
+      await prisma.directory.createMany({
+        data: newDirectories,
+      })
+    )?.count ?? 0
+  );
+}
+
+export async function updateDirectoryByPath(
+  path: string,
+  data: Partial<IDirectory>
+): Promise<void> {
+  await prisma.directory.updateMany({
+    where: { path },
+    data,
   });
 }
 
-export async function removeDirectory(path: string) {
-  return await prisma.directory.deleteMany({
-    where: {
-      path: {
-        equals: path,
-      },
-    },
-  });
+export async function removeDirectory(path: string): Promise<number> {
+  return (
+    (
+      await prisma.directory.deleteMany({
+        where: {
+          path: {
+            equals: path,
+          },
+        },
+      })
+    )?.count ?? 0
+  );
+}
+
+export async function removeDirectoryStartsWith(path: string): Promise<number> {
+  return (
+    (
+      await prisma.directory.deleteMany({
+        where: {
+          path: {
+            startsWith: path,
+          },
+        },
+      })
+    )?.count ?? 0
+  );
 }
 
 export async function getFiles(): Promise<IFileInfo[]> {
-  return await prisma.file.findMany();
+  return (await prisma.file.findMany()) ?? [];
 }
 
 export async function addFiles(
@@ -236,14 +280,14 @@ export async function addFiles(
     extension: string;
     size: number;
   }[]
-) {
+): Promise<number> {
   const existingPaths =
     (await prisma.file.findMany({
       select: { filepath: true },
     })) ?? [];
   const existingPathSet = new Set(existingPaths.map((d) => d.filepath));
   const newDirectories = data.filter((d) => !existingPathSet.has(d.filepath));
-  return prisma.file.createMany({ data: newDirectories });
+  return (await prisma.file.createMany({ data: newDirectories }))?.count ?? 0;
 }
 
 export async function updateFile(
@@ -254,20 +298,28 @@ export async function updateFile(
     isValid?: boolean;
     bloqued?: boolean;
   }
-) {
-  return prisma.file.updateMany({
-    where: { filepath },
-    data,
-  });
+): Promise<number> {
+  return (
+    (
+      await prisma.file.updateMany({
+        where: { filepath },
+        data,
+      })
+    )?.count ?? 0
+  );
 }
 
-export async function removeFiles(path: string) {
-  return prisma.file.deleteMany({
-    where: { filepath: { contains: path } },
-  });
+export async function removeFiles(path: string): Promise<number> {
+  return (
+    (
+      await prisma.file.deleteMany({
+        where: { filepath: { contains: path } },
+      })
+    )?.count ?? 0
+  );
 }
 
-export async function countFilesSendedToDay() {
+export async function countFilesSendedToDay(): Promise<number> {
   const todayStart = startOfDay(new Date());
   const todayEnd = endOfDay(new Date());
 
@@ -276,14 +328,31 @@ export async function countFilesSendedToDay() {
   });
 }
 
-export async function getDirectoryDiscovery(term?: string) {
-  if (!term || term.length === 0) return prisma.directoryDiscovery.findMany();
-  return prisma.directoryDiscovery.findMany({
+export async function getDirectoriesDiscovery(): Promise<IDirectory[]> {
+  return prisma.directoryDiscovery.findMany() ?? [];
+}
+
+export async function getDirectoriesDiscoveryInPath(
+  path: string
+): Promise<IDirectory[]> {
+  return (
+    prisma.directoryDiscovery.findMany({
+      where: { path: { startsWith: path, not: path } },
+    }) ?? []
+  );
+}
+
+export async function getDirectoryDiscovery(
+  term: string
+): Promise<IDirectory | null> {
+  return prisma.directoryDiscovery.findFirst({
     where: { path: { equals: term } },
   });
 }
 
-export async function addDirectoryDiscovery(data: IDirectory[]) {
+export async function addDirectoryDiscovery(
+  data: IDirectory[]
+): Promise<{ count: number }> {
   const existingPaths =
     (await prisma.directoryDiscovery.findMany({
       select: { path: true },
@@ -301,7 +370,7 @@ export async function addDirectoryDiscovery(data: IDirectory[]) {
 export async function updateDirectoryDiscovery(
   directoryPath: string,
   data: Partial<IDirectory>
-) {
+): Promise<void> {
   if (directoryPath.length === 0) return;
   const directory = await prisma.directoryDiscovery.findFirst({
     where: { path: directoryPath },
@@ -314,6 +383,18 @@ export async function updateDirectoryDiscovery(
       ...data,
     },
   });
+}
+
+export async function removeDirectoryDiscoveryStartsWith(
+  path: string
+): Promise<number> {
+  return (
+    (
+      await prisma.directoryDiscovery.deleteMany({
+        where: { path: { startsWith: path } },
+      })
+    )?.count ?? 0
+  );
 }
 
 export async function addHistoric(data: {
@@ -334,8 +415,8 @@ export async function addHistoric(data: {
   };
 }
 
-export async function updateHistoric(data: IDbHistoric) {
-  return prisma.historic.update({
+export async function updateHistoric(data: IDbHistoric): Promise<void> {
+  await prisma.historic.update({
     where: { id: data.id },
     data: { ...data, log: JSON.stringify(data.log) },
   });
@@ -353,24 +434,24 @@ export async function getHistoric(): Promise<IDbHistoric[]> {
   }));
 }
 
-export async function clearHistoric() {
-  return prisma.historic.deleteMany();
+export async function clearHistoric(): Promise<void> {
+  await prisma.historic.deleteMany();
 }
 
 export async function addError(data: {
   message: string;
   stack: string;
   type: ErrorType;
-}) {
-  return prisma.error.create({ data });
+}): Promise<void> {
+  await prisma.error.create({ data });
 }
 
-export async function getEmpresas() {
-  return prisma.empresa.findMany({ orderBy: { cnpj: "asc" } });
+export async function getEmpresas(): Promise<IEmpresa[]> {
+  return (await prisma.empresa.findMany({ orderBy: { cnpj: "asc" } })) ?? [];
 }
 
-export async function addCountedNotes(data: ICountedNotes) {
-  return prisma.countedNotes.create({
+export async function addCountedNotes(data: ICountedNotes): Promise<void> {
+  await prisma.countedNotes.create({
     data,
   });
 }
@@ -379,16 +460,18 @@ export async function getCountedNotes(
   dataInicio: Date,
   dataFim: Date
 ): Promise<ICountedNotes | null> {
-  return prisma.countedNotes.findFirst({
-    where: {
-      dataInicio,
-      dataFim,
-    },
-  });
+  return (
+    (await prisma.countedNotes.findFirst({
+      where: {
+        dataInicio,
+        dataFim,
+      },
+    })) ?? null
+  );
 }
 
-export async function updateCountedNotes(data: ICountedNotes) {
-  return prisma.countedNotes.update({
+export async function updateCountedNotes(data: ICountedNotes): Promise<void> {
+  await prisma.countedNotes.update({
     where: { id: data.id },
     data,
   });

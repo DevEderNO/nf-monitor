@@ -12,9 +12,14 @@ import {
   addFiles,
   addHistoric,
   getDirectories,
+  getDirectoriesDiscoveryInPath,
+  getDirectory,
+  getDirectoryDiscovery,
   getFiles,
+  removeDirectoryStartsWith as removeDirectoriesStartsWith,
   updateDirectoryDiscovery,
   updateHistoric,
+  removeDirectoryDiscoveryStartsWith,
 } from "../services/database";
 import path from "path";
 import * as fs from "node:fs";
@@ -67,6 +72,7 @@ export class DiscoveryTask {
       this.files = await getFiles();
       this.historic = await addHistoric(this.historic);
       const directories = await getDirectories();
+      await addDirectoryDiscovery(directories);
       await this.discoveryDirectories(directories);
       if (!this.isCancelled) {
         await this.sendMessageClient(
@@ -107,120 +113,145 @@ export class DiscoveryTask {
       } else {
         let subDirectories: IDirectory[] = [];
         const directoryPath = directories[index].path;
-        // const { hasListed, directoriesDiscovery } =
-        //   await this.checkDirectoryHasListed(directoryPath);
-        // if (hasListed) {
-        //   const currentDirectory = directoriesDiscovery.find(
-        //     (x) => x.path === directoryPath
-        //   );
-        //   if (!currentDirectory) continue;
-        //   await this.sendMessageClient(
-        //     [
-        //       `🔍 Arquivos do diretorio já processado ${currentDirectory.directories} 📁 | ${currentDirectory.xmls} XML | ${currentDirectory.pdfs} PDF | ${currentDirectory.zips} Zip no diretório ${directories[index].path}`,
-        //     ],
-        //     0,
-        //     ProcessamentoStatus.Running
-        //   );
-        //   subDirectories = directoriesDiscovery.filter(
-        //     (x) => x.path !== directoryPath
-        //   );
-        // } else {
-        const filesInfo = await this.listDirectory(directoryPath);
-        if (await this.checkIsCancelled()) break;
-        const counts = filesInfo.reduce(
-          (acc, file) => {
-            if (file.isDirectory) {
-              acc.directory++;
-            }
-            if (file.extension === ".xml") {
-              acc.xml++;
-            }
-            if (file.extension === ".pdf") {
-              acc.pdf++;
-            }
-            if (file.extension === ".zip") {
-              acc.zip++;
-            }
-            return acc;
-          },
-          {
-            directory: 0,
-            xml: 0,
-            pdf: 0,
-            zip: 0,
-          }
-        );
-        await this.sendMessageClient(
-          [
-            `🔍 Foram encontrados ${counts.directory} 📁 | ${counts.xml} XML | ${counts.pdf} PDF | ${counts.zip} Zip no diretório ${directoryPath}`,
-          ],
-          0,
-          ProcessamentoStatus.Running
-        );
-        await timeout();
-        subDirectories = filesInfo
-          .filter((x) => x.isDirectory)
-          .map(
-            (x) =>
-              ({
-                path: x.filepath,
-                modifiedtime: x.modifiedtime,
-                size: x.size,
-                directories: 0,
-                xmls: 0,
-                pdfs: 0,
-                zips: 0,
-              } as IDirectory)
+        if (!fs.existsSync(directoryPath)) {
+          await this.sendMessageClient(
+            [
+              `🗑️ O diretório ${directoryPath} não existe, será removido da lista de diretórios`,
+            ],
+            0,
+            ProcessamentoStatus.Running
           );
-        await updateDirectoryDiscovery(directoryPath, {
-          directories: counts.directory,
-          xmls: counts.xml,
-          pdfs: counts.pdf,
-          zips: counts.zip,
-        });
-        await addDirectoryDiscovery(subDirectories);
-        const filesFiltered = filesInfo.filter(
-          (x) =>
-            x.isFile &&
-            [".xml", ".pdf", ".zip"].includes(x.extension.toLowerCase())
-        );
-        await addFiles(filesFiltered);
-        // }
+          await removeDirectoriesStartsWith(directoryPath);
+          await removeDirectoryDiscoveryStartsWith(directoryPath);
+          continue;
+        }
+        const { hasListed, directoryDiscovery, directoriesDiscovery } =
+          await this.checkDirectoryHasListed(directoryPath);
+        if (hasListed) {
+          if (!directoryDiscovery) continue;
+          await this.sendMessageClient(
+            [
+              `🔍 Arquivos do diretorio já processado ${directoryDiscovery.directories} 📁 | ${directoryDiscovery.xmls} XML | ${directoryDiscovery.pdfs} PDF | ${directoryDiscovery.zips} Zip no diretório ${directoryPath}`,
+            ],
+            0,
+            ProcessamentoStatus.Running
+          );
+          subDirectories = directoriesDiscovery;
+        } else {
+          const { filesAndFolders, totalFiles } = await this.listDirectory(
+            directoryPath
+          );
+          if (await this.checkIsCancelled()) break;
+          const counts = filesAndFolders.reduce(
+            (acc, file) => {
+              if (file.isDirectory) {
+                acc.directory++;
+              }
+              if (file.extension === ".xml") {
+                acc.xml++;
+              }
+              if (file.extension === ".pdf") {
+                acc.pdf++;
+              }
+              if (file.extension === ".zip") {
+                acc.zip++;
+              }
+              return acc;
+            },
+            {
+              directory: 0,
+              xml: 0,
+              pdf: 0,
+              zip: 0,
+            }
+          );
+          await this.sendMessageClient(
+            [
+              `🔍 Foram encontrados ${counts.directory} 📁 | ${counts.xml} XML | ${counts.pdf} PDF | ${counts.zip} Zip no diretório ${directoryPath}`,
+            ],
+            0,
+            ProcessamentoStatus.Running
+          );
+          await timeout();
+          subDirectories = filesAndFolders
+            .filter((x) => x.isDirectory)
+            .map(
+              (x) =>
+                ({
+                  path: x.filepath,
+                  modifiedtime: x.modifiedtime,
+                  size: x.size,
+                  directories: 0,
+                  xmls: 0,
+                  pdfs: 0,
+                  zips: 0,
+                  totalFiles: 0,
+                } as IDirectory)
+            );
+          await updateDirectoryDiscovery(directoryPath, {
+            directories: counts.directory,
+            xmls: counts.xml,
+            pdfs: counts.pdf,
+            zips: counts.zip,
+            totalFiles,
+          });
+          await addDirectoryDiscovery(subDirectories);
+          const filesFiltered = filesAndFolders.filter(
+            (x) =>
+              x.isFile &&
+              [".xml", ".pdf", ".zip"].includes(x.extension.toLowerCase())
+          );
+          await addFiles(filesFiltered);
+        }
 
         await this.discoveryDirectories(subDirectories);
       }
     }
   }
 
-  // private async checkDirectoryHasListed(
-  //   directoryPath: string
-  // ): Promise<{ hasListed: boolean; directoriesDiscovery: IDirectory[] }> {
-  //   const directoriesDiscovery = await getDirectoryDiscovery(directoryPath);
-  //   const directoryContents = fs.readdirSync(directoryPath, {
-  //     encoding: "utf-8",
-  //     recursive: true,
-  //   });
-  //   if (
-  //     directoriesDiscovery &&
-  //     directoriesDiscovery.length > 0 &&
-  //     directoryContents &&
-  //     directoryContents.length > 0
-  //   ) {
-  //     if (directoriesDiscovery.length === directoryContents.length)
-  //       return { hasListed: true, directoriesDiscovery };
-  //   }
-  //   return { hasListed: false, directoriesDiscovery: [] };
-  // }
+  private async checkDirectoryHasListed(directoryPath: string): Promise<{
+    hasListed: boolean;
+    directoryDiscovery: IDirectory | null;
+    directoriesDiscovery: IDirectory[];
+  }> {
+    const directoryDiscovery =
+      (await getDirectoryDiscovery(directoryPath)) ??
+      (await getDirectory(directoryPath));
+    const directoryContents = fs.readdirSync(directoryPath);
+    if (directoryDiscovery && directoryContents) {
+      if (directoryDiscovery.totalFiles === directoryContents.length) {
+        const directoriesDiscovery = await getDirectoriesDiscoveryInPath(
+          directoryPath
+        );
+        return {
+          hasListed: true,
+          directoryDiscovery,
+          directoriesDiscovery,
+        };
+      }
+    }
+    return {
+      hasListed: false,
+      directoryDiscovery: null,
+      directoriesDiscovery: [],
+    };
+  }
 
   private async listDirectory(
     directoryPath: string,
     callback?: (message: string) => void
-  ): Promise<IFileInfo[]> {
+  ): Promise<{ filesAndFolders: IFileInfo[]; totalFiles: number }> {
     const filesAndFolders: IFileInfo[] = [];
+    let totalFiles = 0;
     try {
       const directoryContents = fs.readdirSync(directoryPath);
+      totalFiles = directoryContents.length;
       for (let index = 0; index < directoryContents.length; index++) {
-        if (await this.checkIsCancelled()) return filesAndFolders;
+        if (await this.checkIsCancelled())
+          return {
+            filesAndFolders,
+            totalFiles,
+          };
         if (await this.checkIsPaused()) {
           await timeout(500);
           index--;
@@ -268,7 +299,7 @@ export class DiscoveryTask {
       }
     }
     await timeout(10);
-    return filesAndFolders;
+    return { filesAndFolders, totalFiles };
   }
 
   private async sendMessageClient(

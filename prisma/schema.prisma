@@ -58,6 +58,7 @@ model Directory {
   xmls         Int
   pdfs         Int
   zips         Int
+  totalFiles   Int
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -71,6 +72,7 @@ model DirectoryDiscovery {
   xmls         Int
   pdfs         Int
   zips         Int
+  totalFiles   Int
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

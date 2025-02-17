@@ -6,6 +6,7 @@ import {
   unblockFile,
   validXmlAndPdf,
   validZip,
+  validateDFileExists,
   validateDiretoryFileExists,
 } from "../services/file-operation-service";
 import { connection } from "websocket";
@@ -17,6 +18,7 @@ import {
   getAuth,
   getConfiguration,
   getFiles,
+  removeFiles,
   updateAuth,
   updateFile,
   updateHistoric,
@@ -158,6 +160,17 @@ export class ProcessTask {
               currentProgress
             );
           } else {
+            if (!validateDFileExists(element)) {
+              await this.sendMessageClient(
+                [
+                  `🗑️ O arquivo ${element.filepath} não existe, será removido da lista de arquivos`,
+                ],
+                currentProgress,
+                ProcessamentoStatus.Running
+              );
+              await removeFiles(element.filepath);
+              continue;
+            }
             if (element.bloqued) {
               await this.sendMessageClient(
                 [`🔓 desbloqueando o arquivo ${element.filepath}`],

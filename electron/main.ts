@@ -1,4 +1,11 @@
-import { app, BrowserWindow, Menu, nativeImage, Tray } from "electron";
+import {
+  app,
+  BrowserWindow,
+  globalShortcut,
+  Menu,
+  nativeImage,
+  Tray,
+} from "electron";
 import path from "node:path";
 import { registerListeners } from "./listeners";
 import { createWebsocket } from "./websocket";
@@ -52,8 +59,23 @@ function createWindow() {
     win.loadURL(VITE_DEV_SERVER_URL);
   } else {
     win.loadFile(path.join(process.env.DIST ?? "", "index.html"));
-    const menu = Menu.buildFromTemplate([]);
-    Menu.setApplicationMenu(menu);
+    Menu.setApplicationMenu(null);
+    const toggleMenu = () => {
+      if (Menu.getApplicationMenu()) {
+        Menu.setApplicationMenu(null);
+      } else {
+        const defaultMenu = Menu.buildFromTemplate([
+          { role: "fileMenu" },
+          { role: "editMenu" },
+          { role: "viewMenu" },
+          { role: "windowMenu" },
+          { role: "help" },
+        ]);
+        Menu.setApplicationMenu(defaultMenu);
+      }
+    };
+
+    globalShortcut.register("Shift+Ctrl+R", toggleMenu);
   }
 
   const icon = nativeImage.createFromPath(

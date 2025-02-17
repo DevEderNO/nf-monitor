@@ -106,7 +106,7 @@ export async function registerListeners(win: BrowserWindow | null) {
   });
 
   ipcMain.handle("get-directories", async () => {
-    const directories: Partial<IDirectory>[] = (await getDirectories()) ?? [];
+    const directories: Partial<IDirectory>[] = await getDirectories();
     return directories;
   });
 

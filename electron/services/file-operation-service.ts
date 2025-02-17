@@ -49,6 +49,7 @@ export function getDirectoryData(path: string): IDirectory | null {
       xmls: 0,
       pdfs: 0,
       zips: 0,
+      totalFiles: 0,
     };
   } catch (error) {
     console.log(`no such file or directory, stat ${path}`);
@@ -222,6 +223,10 @@ export function validateDiretoryFileExists(fileInfo: IFileInfo): boolean {
   }
 }
 
+export function validateDFileExists(fileInfo: IFileInfo): boolean {
+  return fs.existsSync(fileInfo.filepath);
+}
+
 export function acceptStreamsEula() {
   try {
     // Comando para adicionar a entrada no registro
@@ -323,42 +328,45 @@ export async function recicleDb() {
     emailSieg: "",
     senhaSieg: "",
   };
-  const directories: IDirectory[] = db.directories.map((x) => ({
-    ...x,
-    directories: 0,
-    xmls: 0,
-    pdfs: 0,
-    zips: 0,
-  }));
-  const discoredDirecories: IDirectory[] = db.directoriesAndSubDirectories.map(
-    (x) => ({
+  const directories: IDirectory[] =
+    db.directories?.map((x) => ({
       ...x,
       directories: 0,
       xmls: 0,
       pdfs: 0,
       zips: 0,
-    })
-  );
-  const files: IFileInfo[] = db.files.map((x) => ({
-    filepath: x.filepath,
-    filename: x.name,
-    extension: x.extension,
-    wasSend: x.wasSend,
-    dataSend: x.dataSend,
-    isValid: x.isValid,
-    isDirectory: x.isDirectory,
-    bloqued: x.bloqued,
-    isFile: x.isFile,
-    modifiedtime: x.modifiedtime,
-    size: x.size,
-  }));
+      totalFiles: 0,
+    })) ?? [];
+  const discoredDirecories: IDirectory[] =
+    db.directoriesAndSubDirectories?.map((x) => ({
+      ...x,
+      directories: 0,
+      xmls: 0,
+      pdfs: 0,
+      zips: 0,
+      totalFiles: 0,
+    })) ?? [];
+  const files: IFileInfo[] =
+    db.files?.map((x) => ({
+      filepath: x.filepath,
+      filename: x.name,
+      extension: x.extension,
+      wasSend: x.wasSend,
+      dataSend: x.dataSend,
+      isValid: x.isValid,
+      isDirectory: x.isDirectory,
+      bloqued: x.bloqued,
+      isFile: x.isFile,
+      modifiedtime: x.modifiedtime,
+      size: x.size,
+    })) ?? [];
   await prisma.file.createMany({ data: files });
   await prisma.directory.createMany({ data: directories });
   await prisma.directoryDiscovery.createMany({ data: discoredDirecories });
   await prisma.configuration.create({ data: config });
   await signInSittax(
-    db.auth.credentials.user,
-    db.auth.credentials.password,
+    db.auth?.credentials?.user ?? "",
+    db.auth?.credentials?.password ?? "",
     true
   );
   const newDbPath = dbPath.replace("db.json", "oldDb.json");

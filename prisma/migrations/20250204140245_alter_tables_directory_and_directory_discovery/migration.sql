@@ -1,7 +1,7 @@
 -- RedefineTables
 PRAGMA defer_foreign_keys=ON;
 PRAGMA foreign_keys=OFF;
-CREATE TABLE "new_Directory" (
+CREATE TABLE IF NOT EXISTS "new_Directory" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "path" TEXT NOT NULL,
     "modifiedtime" DATETIME NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE "new_Directory" (
 INSERT INTO "new_Directory" ("createdAt", "id", "modifiedtime", "path", "size", "updatedAt") SELECT "createdAt", "id", "modifiedtime", "path", "size", "updatedAt" FROM "Directory";
 DROP TABLE "Directory";
 ALTER TABLE "new_Directory" RENAME TO "Directory";
-CREATE TABLE "new_DirectoryDiscovery" (
+CREATE TABLE IF NOT EXISTS "new_DirectoryDiscovery" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "path" TEXT NOT NULL,
     "modifiedtime" DATETIME NOT NULL,

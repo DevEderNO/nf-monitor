@@ -7,6 +7,7 @@ export interface IDirectory {
   xmls: number;
   pdfs: number;
   zips: number;
+  totalFiles: number;
   createdAt: Date;
   updatedAt: Date;
 }
