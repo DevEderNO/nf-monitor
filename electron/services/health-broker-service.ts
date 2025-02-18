@@ -11,6 +11,7 @@ import os from "node:os";
 
 export async function healthBrokerComunication() {
   const user = await getUser();
+  if (!user?.userId) return;
   const filesSendedToDay = await countFilesSendedToDay();
   const message: NFMoniotorHealth = {
     $type: "NFMoniotorHealth",
