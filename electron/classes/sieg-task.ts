@@ -327,10 +327,10 @@ export class SiegTask {
     xml: string
   ) {
     ensureDirSync(
-      `${this.config?.directoryDownloadSieg}/${ano}/${mes}/${SiegXmlType[xmlType]}/${cnpj}`
+      `${this.config?.directoryDownloadSieg}/${ano}/${mes}/${cnpj}/${SiegXmlType[xmlType]}`
     );
     fs.writeFileSync(
-      `${this.config?.directoryDownloadSieg}/${ano}/${mes}/${SiegXmlType[xmlType]}/${cnpj}/${chave}.xml`,
+      `${this.config?.directoryDownloadSieg}/${ano}/${mes}/${cnpj}/${SiegXmlType[xmlType]}/${chave}.xml`,
       xml
     );
   }

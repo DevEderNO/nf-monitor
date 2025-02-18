@@ -4,20 +4,21 @@ import { IDbHistoric } from "../interfaces/db-historic";
 import { IFileInfo } from "../interfaces/file-info";
 import { IDirectory } from "../interfaces/directory";
 import { IConfig } from "../interfaces/config";
-import { getDirectoryData } from "./file-operation-service";
+import { createDirectoryFolder, getDirectoryData } from "./file-operation-service";
 import { ICountedNotes } from "../interfaces/count-notes";
 import { IAuth } from "../interfaces/auth";
 import prisma from "../lib/prisma";
 import { BrowserWindow } from "electron";
 import { endOfDay, startOfDay } from "date-fns";
 import { IEmpresa } from "electron/interfaces/empresa";
+import path from "node:path";
 
 export async function getConfiguration(): Promise<IConfig | null> {
   return (await prisma.configuration.findFirst()) ?? null;
 }
 
 export async function updateConfiguration(data: IConfig) {
-  const config = await prisma.configuration.findFirst();
+  const config = await getConfiguration();
   if (config) {
     return await prisma.configuration.update({
       where: { id: config.id },
@@ -92,7 +93,7 @@ export async function addAuth(data: {
         password: data.password,
       },
     });
-    const config = await prisma.configuration.findFirst();
+    const config = await getConfiguration();
     if (config) {
       await prisma.configuration.update({
         where: { id: config?.id },
@@ -221,7 +222,7 @@ export async function addDirectories(data: IDirectory[]): Promise<number> {
   return (
     (
       await prisma.directory.createMany({
-        data: newDirectories,
+        data: newDirectories.map((d) => ({ ...d, id: undefined })),
       })
     )?.count ?? 0
   );
@@ -364,7 +365,9 @@ export async function addDirectoryDiscovery(
   if (newDirectories.length === 0) {
     return { count: 0 };
   }
-  return prisma.directoryDiscovery.createMany({ data });
+  return prisma.directoryDiscovery.createMany({
+    data: newDirectories.map((d) => ({ ...d, id: undefined })),
+  });
 }
 
 export async function updateDirectoryDiscovery(
@@ -475,4 +478,31 @@ export async function updateCountedNotes(data: ICountedNotes): Promise<void> {
     where: { id: data.id },
     data,
   });
+}
+
+export async function autoConfigureSieg(): Promise<boolean> {
+  const config = await getConfiguration();
+  const auth = await getAuth();
+  if (!config) return false;
+  if (!auth) return false;
+  if (!auth.token) return false;
+  if (config.apiKeySieg.length === 0) return false;
+  if (config.directoryDownloadSieg && config.directoryDownloadSieg?.length > 0)
+    return false;
+
+  const directories = await getDirectories();
+  if (directories.length > 0) {
+    const directory = directories[0];
+    createDirectoryFolder(path.join(directory.path, "SIEG"));
+    await updateConfiguration({
+      ...config,
+      directoryDownloadSieg: path.join(directory.path, "SIEG"),
+      timeForConsultingSieg:
+        config.timeForConsultingSieg !== "00:00"
+          ? config.timeForConsultingSieg
+          : "19:00",
+    });
+    return true;
+  }
+  return false;
 }

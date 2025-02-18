@@ -1,7 +1,7 @@
 import { Job, scheduleJob } from "node-schedule";
 import { startDiscovery } from "./discovery-service";
 import { wsConnection } from "../websocket";
-import { getConfiguration } from "./database";
+import { autoConfigureSieg, getConfiguration } from "./database";
 import { startSieg } from "./sieg-service";
 import { addMonths } from "date-fns";
 import { healthBrokerComunication } from "./health-broker-service";
@@ -11,6 +11,7 @@ let jobSieg: Job | null = null;
 let jobHealth: Job | null = null;
 
 export function updateJobs() {
+  initializeJobAutoConfigureSieg();
   initializeJob();
   initializeJobSieg();
   initializeJobHealth();
@@ -54,4 +55,8 @@ export async function initializeJobHealth() {
   jobHealth = scheduleJob(`0 * * * *`, () => {
     healthBrokerComunication();
   });
+}
+
+export async function initializeJobAutoConfigureSieg() {
+  autoConfigureSieg();
 }

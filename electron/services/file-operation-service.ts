@@ -400,3 +400,9 @@ export function copyRecursive(srcDir: string, destDir: string) {
     console.error("Erro ao copiar:", error);
   }
 }
+
+export function createDirectoryFolder(directoryPath: string) {
+  if (!fs.existsSync(directoryPath)) {
+    fs.mkdirSync(path.resolve(directoryPath), { recursive: true });
+  }
+}
