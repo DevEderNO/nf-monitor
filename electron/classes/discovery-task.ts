@@ -71,7 +71,9 @@ export class DiscoveryTask {
       ]);
       this.files = await getFiles();
       this.historic = await addHistoric(this.historic);
-      const directories = await getDirectories();
+      let directories = await getDirectories();
+      directories = this.getRootDirectories(directories);
+      console.log("directories", directories);
       await addDirectoryDiscovery(directories);
       await this.discoveryDirectories(directories);
       if (!this.isCancelled) {
@@ -89,6 +91,15 @@ export class DiscoveryTask {
       );
       throw error;
     }
+  }
+
+  private getRootDirectories(directories: IDirectory[]): IDirectory[] {
+    directories = directories.sort((a, b) => a.path.length - b.path.length);
+    directories = directories.filter((x, index, array) => {
+      if (index === 0) return true;
+      return !x.path.startsWith(array[index - 1].path);
+    });
+    return directories;
   }
 
   private initializeProperties(connection: connection) {
