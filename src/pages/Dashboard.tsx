@@ -21,7 +21,7 @@ interface IStepProcess {
 }
 
 export function Dashboard() {
-  const { client, processTask } = useSocket();
+  const { client } = useSocket();
   const {
     state: { processamento, directories },
     dispatch,
@@ -34,78 +34,6 @@ export function Dashboard() {
       textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
     }
   }, [processamento]);
-
-  const discovery: IStepProcess = {
-    Running: {
-      label: "Localizando...",
-      icon: <Pause />,
-      onClick: () => {
-        client?.send(
-          JSON.stringify({
-            type: "message",
-            message: {
-              type: WSMessageType.PauseDiscovery,
-            },
-          })
-        );
-      },
-    },
-    Paused: {
-      label: "Continuar",
-      icon: <Play />,
-      onClick: () => {
-        client?.send(
-          JSON.stringify({
-            type: "message",
-            message: {
-              type: WSMessageType.ResumeDiscovery,
-            },
-          })
-        );
-      },
-      onCancel: () => {
-        client?.send(
-          JSON.stringify({
-            type: "message",
-            message: {
-              type: WSMessageType.StopDiscovery,
-            },
-          })
-        );
-      },
-    },
-    Stopped: {
-      label: "Localizar",
-      icon: <Play />,
-      onClick: () => {
-        if (hasDerectories()) return;
-        client?.send(
-          JSON.stringify({
-            type: "message",
-            message: {
-              type: WSMessageType.StartDiscovery,
-            },
-          })
-        );
-      },
-    },
-    Concluded: {
-      label: "Re-localizar",
-      icon: <Play />,
-      onClick: () => {
-        dispatch({ type: ActionType.ClearMessages });
-        if (hasDerectories()) return;
-        client?.send(
-          JSON.stringify({
-            type: "message",
-            message: {
-              type: WSMessageType.StartDiscovery,
-            },
-          })
-        );
-      },
-    },
-  };
 
   const hasDerectories = useCallback(() => {
     if (directories.length <= 0) {
@@ -167,6 +95,7 @@ export function Dashboard() {
       label: "Enviar",
       icon: <Play />,
       onClick: () => {
+        if (hasDerectories()) return;
         dispatch({ type: ActionType.ClearMessages });
         client?.send(
           JSON.stringify({
@@ -182,6 +111,7 @@ export function Dashboard() {
       label: "Re-enviar",
       icon: <Play />,
       onClick: () => {
+        if (hasDerectories()) return;
         client?.send(
           JSON.stringify({
             type: "message",
@@ -199,28 +129,16 @@ export function Dashboard() {
       <div className="flex gap-3">
         <Button
           className="flex gap-1"
-          onClick={
-            processTask === "discovery"
-              ? discovery[processamento.status].onClick
-              : send[processamento.status].onClick
-          }
+          onClick={send[processamento.status].onClick}
         >
-          {processTask === "discovery"
-            ? discovery[processamento.status].icon
-            : send[processamento.status].icon}
-          {processTask === "discovery"
-            ? discovery[processamento.status].label
-            : send[processamento.status].label}
+          {send[processamento.status].icon}
+          {send[processamento.status].label}
         </Button>
         {processamento.status === ProcessamentoStatus.Paused && (
           <Button
             className="flex gap-1"
             variant={"destructive"}
-            onClick={
-              processTask === "discovery"
-                ? discovery[processamento.status].onCancel
-                : send[processamento.status].onCancel
-            }
+            onClick={send[processamento.status].onCancel}
           >
             <StopIcon />
             Parar

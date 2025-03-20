@@ -19,7 +19,6 @@ import { IDbHistoric } from "@/interfaces/db-historic";
 
 interface SocketContextData {
   client: w3cwebsocket | undefined;
-  processTask: "discovery" | "send";
 }
 
 export const SocketContext = createContext<SocketContextData>(
@@ -29,9 +28,6 @@ export const SocketContext = createContext<SocketContextData>(
 const SocketProvider = ({ children }: React.PropsWithChildren) => {
   const { dispatch } = useAppState();
   const [client, setClient] = useState<w3cwebsocket>();
-  const [processTask, setProcessStatus] = useState<"discovery" | "send">(
-    "discovery"
-  );
   const [, setIsConnected] = useState(false);
 
   useEffect(() => {
@@ -40,18 +36,18 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
       if (typeof message.data === "string") {
         const response: WSMessage = JSON.parse(message.data);
         if (response.message.type === WSMessageType.Discovery) {
-          setProcessStatus("discovery");
-          const {
+          let {
             message: {
               data: { messages, progress, status, id },
             },
           }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
+          id ??= 0;
           if (ProcessamentoStatus.Concluded === status) {
             const request: WSMessageTyped<IProcessamento> = {
               type: "message",
               message: {
                 type: WSMessageType.StartProcess,
-                data: { id } as IProcessamento,
+                data: { id: id ?? undefined } as IProcessamento,
               },
             };
             client?.send(JSON.stringify(request));
@@ -66,7 +62,6 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
           });
         }
         if (response.message.type === WSMessageType.Process) {
-          setProcessStatus("send");
           const {
             message: {
               data: { messages, progress, status },
@@ -78,7 +73,6 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
               ProcessamentoStatus.Stopped,
             ].includes(status)
           ) {
-            setProcessStatus("discovery");
             window.ipcRenderer
               .invoke("get-historic")
               .then((historic: IDbHistoric[]) => {
@@ -130,12 +124,12 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
 
     cli.onopen = () => {
       setIsConnected(true);
-      console.log("Conectado ao WebSocket");
+      console.info("Conectado ao WebSocket");
     };
 
     cli.onclose = () => {
       setIsConnected(false);
-      console.log("Conexão perdida. Tentando reconectar...");
+      console.info("Conexão perdida. Tentando reconectar...");
       // Tenta reconectar após 3 segundos
       setTimeout(connectWebSocket, 3000);
     };
@@ -161,7 +155,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
   }, []);
 
   return (
-    <SocketContext.Provider value={{ client, processTask }}>
+    <SocketContext.Provider value={{ client }}>
       {children}
     </SocketContext.Provider>
   );

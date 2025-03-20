@@ -1,11 +1,10 @@
 import { Job, scheduleJob } from "node-schedule";
-import { startDiscovery } from "./discovery-service";
 import { wsConnection } from "../websocket";
 import { autoConfigureSieg, getConfiguration } from "./database";
 import { startSieg } from "./sieg-service";
 import { addMonths } from "date-fns";
 import { healthBrokerComunication } from "./health-broker-service";
-
+import { startProcess } from "./process-service";
 let jobDiscovery: Job | null = null;
 let jobSieg: Job | null = null;
 let jobHealth: Job | null = null;
@@ -23,7 +22,7 @@ export async function initializeJob() {
     const hour = timeForProcessing.slice(0, 2);
     const minute = timeForProcessing.slice(3, 5);
     jobDiscovery = scheduleJob(`${minute} ${hour} * * *`, () => {
-      startDiscovery(wsConnection);
+      startProcess(wsConnection);
     });
   } else {
     jobDiscovery?.cancel();

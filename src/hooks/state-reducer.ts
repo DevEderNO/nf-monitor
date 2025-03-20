@@ -88,10 +88,6 @@ export const StateReducer = (
     case ActionType.Historic:
       return { ...state, historic: action.payload };
     case ActionType.Config:
-      window.ipcRenderer.send("set-config", {
-        ...state.config,
-        ...action.payload,
-      });
       return { ...state, config: { ...state.config, ...action.payload } };
     case ActionType.Clear:
       window.ipcRenderer.send("remove-auth");

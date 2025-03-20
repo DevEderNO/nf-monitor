@@ -12,13 +12,6 @@ import {
   stopProcess,
 } from "./services/process-service";
 import {
-  pauseDiscovery,
-  resumeDiscovery,
-  startDiscovery,
-  stopDiscovery,
-} from "./services/discovery-service";
-import { IProcessamento } from "./interfaces/processamento";
-import {
   pauseSieg,
   resumeSieg,
   startSieg,
@@ -49,20 +42,8 @@ function createWebsocket() {
       if (message.type === "utf8") {
         const request: WSMessage = JSON.parse(message.utf8Data);
         switch (request.message.type) {
-          case WSMessageType.StartDiscovery:
-            startDiscovery(wsConnection);
-            break;
-          case WSMessageType.PauseDiscovery:
-            pauseDiscovery();
-            break;
-          case WSMessageType.ResumeDiscovery:
-            resumeDiscovery();
-            break;
-          case WSMessageType.StopDiscovery:
-            stopDiscovery();
-            break;
           case WSMessageType.StartProcess:
-            wsStartProcess(wsConnection, message);
+            wsStartProcess(wsConnection);
             break;
           case WSMessageType.PauseProcess:
             pauseProcess();
@@ -90,13 +71,8 @@ function createWebsocket() {
         }
       }
 
-      function wsStartProcess(connection: connection, message: IUtf8Message) {
-        const {
-          message: {
-            data: { id },
-          },
-        }: WSMessageTyped<IProcessamento> = JSON.parse(message.utf8Data);
-        startProcess(connection, id);
+      function wsStartProcess(connection: connection) {
+        startProcess(connection);
       }
 
       function wsStartSieg(connection: connection, message: IUtf8Message) {

@@ -16,8 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppState } from "@/hooks/state";
 import { ActionType } from "@/hooks/state-reducer";
-import { IDirectory } from "@/interfaces/directory";
-import { FolderIcon } from "lucide-react";
+import { FolderIcon, TrashIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 export function Configuration() {
@@ -31,35 +30,40 @@ export function Configuration() {
   }, [state?.config?.viewUploadedFiles, state?.historic]);
 
   const handleSelectDirectoryDownloadSieg = useCallback(async () => {
-    const filepaths: IDirectory | null = await window.ipcRenderer.invoke(
+    const config = await window.ipcRenderer.invoke(
       "select-directory-download-sieg"
     );
-    if (filepaths) {
+    if (config) {
       dispatch({
         type: ActionType.Config,
-        payload: {
-          ...state.config,
-          directoryDownloadSieg: filepaths.path,
-        },
+        payload: config,
       });
     }
   }, []);
 
   const handleTimeForProcessing = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const config = await window.ipcRenderer.invoke(
+        "change-time-for-processing",
+        e.target.value
+      );
       dispatch({
         type: ActionType.Config,
-        payload: { ...state.config, timeForProcessing: e.target.value },
+        payload: config,
       });
     },
     []
   );
 
   const handleTimeForConsultingSieg = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const config = await window.ipcRenderer.invoke(
+        "change-time-for-consulting-sieg",
+        e.target.value
+      );
       dispatch({
         type: ActionType.Config,
-        payload: { ...state.config, timeForConsultingSieg: e.target.value },
+        payload: config,
       });
     },
     []
@@ -70,10 +74,28 @@ export function Configuration() {
     dispatch({ type: ActionType.Historic, payload: [] });
   }, [dispatch]);
 
-  const changeViewUploadedFiles = useCallback(() => {
+  const handleCleanDirectoryDownloadSieg = useCallback(
+    async (clearFiles: boolean) => {
+      const config = await window.ipcRenderer.invoke(
+        "clear-directory-download-sieg",
+        clearFiles
+      );
+      dispatch({
+        type: ActionType.Config,
+        payload: config,
+      });
+    },
+    [dispatch]
+  );
+
+  const changeViewUploadedFiles = useCallback(async () => {
+    const config = await window.ipcRenderer.invoke(
+      "change-view-uploaded-files",
+      !viewUploadedFiles
+    );
     dispatch({
       type: ActionType.Config,
-      payload: { ...state.config, viewUploadedFiles: !viewUploadedFiles },
+      payload: config,
     });
   }, [dispatch, viewUploadedFiles]);
 
@@ -174,6 +196,45 @@ export function Configuration() {
                   value={state?.config?.directoryDownloadSieg ?? ""}
                   disabled
                 />
+                {state?.config?.directoryDownloadSieg && (
+                  <div className="flex items-center justify-between">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button className="text-primary">
+                          <TrashIcon className="w-5 h-4 text-foreground" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            🗑️ Quer remover os arquivos que já estão na pasta?
+                            🗂️
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Se fizer a limpeza ⚠️, esses arquivos não serão enviados para o Sittax.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() =>
+                              handleCleanDirectoryDownloadSieg(false)
+                            }
+                          >
+                            Quero manter
+                          </AlertDialogAction>
+                          <AlertDialogAction
+                            onClick={() =>
+                              handleCleanDirectoryDownloadSieg(true)
+                            }
+                          >
+                            Quero limpar
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                )}
               </div>
             </div>
           </div>

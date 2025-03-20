@@ -3,11 +3,12 @@ import {
   ProcessamentoStatus,
 } from "../interfaces/processamento";
 import {
+  isFileBlocked,
+  listarArquivos,
   unblockFile,
   validXmlAndPdf,
   validZip,
   validateDFileExists,
-  validateDiretoryFileExists,
 } from "../services/file-operation-service";
 import { connection } from "websocket";
 import { IFileInfo } from "../interfaces/file-info";
@@ -15,8 +16,10 @@ import { WSMessageType, WSMessageTyped } from "../interfaces/ws-message";
 import { signIn, upload } from "../lib/axios";
 import { IDbHistoric } from "../interfaces/db-historic";
 import {
+  addFiles,
   getAuth,
   getConfiguration,
+  getDirectories,
   getFiles,
   removeFiles,
   updateAuth,
@@ -69,21 +72,21 @@ export class ProcessTask {
     this.isCancelled = true;
   }
 
-  async run(connection: connection, id?: number) {
+  async run(connection: connection) {
     try {
-      await this.sendMessageClient([""]);
       this.initializeProperties(connection);
-      this.files = (await getFiles()).filter((x) => !x.wasSend);
-      this.filesSended = (await getFiles()).filter((x) => x.wasSend);
-      if (id) {
-        this.historic.id = id;
-      }
+      const directories = await getDirectories();
+      await this.sendMessageClient(["Realizando a descoberta dos arquivos"]);
+      await addFiles(await listarArquivos(directories.map((x) => x.path)));
+      this.files = (await getFiles()).filter((x) => !x.wasSend && x.isValid);
+      this.filesSended = (await getFiles()).filter(
+        (x) => x.wasSend || !x.isValid
+      );
       this.viewUploadedFiles =
         (await getConfiguration())?.viewUploadedFiles ?? false;
       if (this.viewUploadedFiles && this.filesSended.length > 0) {
         this.files.push(...this.filesSended);
       }
-      this.validateDiretoryFile();
       await this.sendMessageClient([
         "Iniciando o envio dos arquivos para o Sittax",
       ]);
@@ -153,6 +156,9 @@ export class ProcessTask {
                 currentProgress,
                 ProcessamentoStatus.Running
               );
+              await updateFile(element.filepath, {
+                isValid: false,
+              });
               continue;
             }
             await this.sendMessageClient(
@@ -171,7 +177,7 @@ export class ProcessTask {
               await removeFiles(element.filepath);
               continue;
             }
-            if (element.bloqued) {
+            if (isFileBlocked(element.filepath)) {
               await this.sendMessageClient(
                 [`🔓 desbloqueando o arquivo ${element.filepath}`],
                 currentProgress
@@ -206,6 +212,7 @@ export class ProcessTask {
       );
       await this.sendMessageClient([""], 100, ProcessamentoStatus.Concluded);
     } catch (error) {
+      console.log(error);
       this.sendMessageClient(
         ["❌ houve um problema ao enviar os arquivos para o Sittax"],
         0,
@@ -225,15 +232,15 @@ export class ProcessTask {
     this.connection = connection;
   }
 
-  private validateDiretoryFile() {
-    const validatedFiles: IFileInfo[] = [];
-    this.files.forEach((file) => {
-      if (validateDiretoryFileExists(file)) {
-        validatedFiles.push(file);
-      }
-    });
-    this.files = validatedFiles;
-  }
+  // private validateDiretoryFile() {
+  //   const validatedFiles: IFileInfo[] = [];
+  //   this.files.forEach((file) => {
+  //     if (validateDiretoryFileExists(file)) {
+  //       validatedFiles.push(file);
+  //     }
+  //   });
+  //   this.files = validatedFiles;
+  // }
 
   private async sendXmlAndPdfSittax(index: number, currentProgress: number) {
     const validFile = validXmlAndPdf(this.files[index]);
@@ -267,7 +274,9 @@ export class ProcessTask {
         currentProgress,
         ProcessamentoStatus.Running
       );
-      this.files[index].isValid = false;
+      await updateFile(this.files[index].filepath, {
+        isValid: false,
+      });
     }
   }
 

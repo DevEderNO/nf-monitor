@@ -52,7 +52,6 @@ export function getDirectoryData(path: string): IDirectory | null {
       totalFiles: 0,
     };
   } catch (error) {
-    console.log(`no such file or directory, stat ${path}`);
     return null;
   }
 }
@@ -207,9 +206,8 @@ function validatePdf(fileInfo: IFileInfo): boolean {
       (/Informações da Apuração\s+(\d+)/.exec(pdfText)?.[0]?.length ?? 0) > 0;
     return isDeclaracao || isExtrato;
   } catch (error) {
-    console.log("Erro ao ler o PDF: ", fileInfo.filepath);
+    return false;
   }
-  return false;
 }
 
 export function validateDiretoryFileExists(fileInfo: IFileInfo): boolean {
@@ -218,7 +216,6 @@ export function validateDiretoryFileExists(fileInfo: IFileInfo): boolean {
     const directoryExist = fs.existsSync(fileDirectory);
     return directoryExist;
   } catch (error) {
-    console.log("Erro ao desbloquear arquivos:", error);
     return false;
   }
 }
@@ -233,7 +230,6 @@ export function acceptStreamsEula() {
     const regCommand =
       'reg add "HKCU\\Software\\Sysinternals\\Streams" /v EulaAccepted /t REG_DWORD /d 1 /f';
     execSync(regCommand, { stdio: "ignore" });
-    console.log("Termos do streams.exe aceitos automaticamente.");
   } catch (error) {
     console.error("Erro ao aceitar os termos do streams.exe:", error);
   }
@@ -266,7 +262,6 @@ export function unblockFile(filePath: string) {
   );
   try {
     execSync(`"${streamsPath}" -d "${filePath}"`, { stdio: "ignore" });
-    console.log(`Arquivo ${path.basename(filePath)} desbloqueado com sucesso.`);
   } catch (error) {
     console.error("Erro ao desbloquear o arquivo:", error);
   }
@@ -301,14 +296,14 @@ export async function applyMigrations(): Promise<void> {
     );
     fs.writeFileSync(prismaSchema, prismaMigrateDeployString, "utf-8");
 
-    console.log("Aplicando migrations...");
+    console.info("Aplicando migrations...");
     const result = execSync(
       `"${nodePath}" "${prismaPath}" migrate deploy --schema "${prismaSchema}"`,
       {
         stdio: "pipe",
       }
     );
-    console.log(`Migrations aplicadas com sucesso. ${result}}`);
+    console.info(`Migrations aplicadas com sucesso. ${result}`);
   } catch (error) {
     console.error("Erro ao aplicar migrations:", error);
   }
@@ -322,7 +317,7 @@ export async function recicleDb() {
   const config: IConfig = {
     timeForProcessing: db.timeForProcessing ?? "00:00",
     timeForConsultingSieg: "00:00",
-    directoryDownloadSieg: "",
+    directoryDownloadSieg: null,
     viewUploadedFiles: false,
     apiKeySieg: "",
     emailSieg: "",
@@ -391,11 +386,11 @@ export function copyRecursive(srcDir: string, destDir: string) {
       } else {
         // Se for um arquivo, copia normalmente
         fs.copyFileSync(srcPath, destPath);
-        console.log(`Copiado: ${srcPath} -> ${destPath}`);
+        console.info(`Copiado: ${srcPath} -> ${destPath}`);
       }
     }
 
-    console.log("✅ Todos os arquivos e pastas foram copiados!");
+    console.info("✅ Todos os arquivos e pastas foram copiados!");
   } catch (error) {
     console.error("Erro ao copiar:", error);
   }
@@ -404,5 +399,49 @@ export function copyRecursive(srcDir: string, destDir: string) {
 export function createDirectoryFolder(directoryPath: string) {
   if (!fs.existsSync(directoryPath)) {
     fs.mkdirSync(path.resolve(directoryPath), { recursive: true });
+  }
+}
+
+export async function listarArquivos(
+  diretorios: string[]
+): Promise<IFileInfo[]> {
+  try {
+    const arquivos = await Promise.all(
+      diretorios.map(async (diretorio): Promise<IFileInfo[]> => {
+        const itens = await fs.promises.readdir(diretorio, {
+          withFileTypes: true,
+        });
+
+        const paths = await Promise.all(
+          itens.map(async (item): Promise<IFileInfo | IFileInfo[]> => {
+            const caminhoCompleto = path.join(diretorio, item.name);
+            const stats = await fs.promises.stat(caminhoCompleto);
+            const extension = path.extname(caminhoCompleto);
+            return item.isDirectory()
+              ? listarArquivos([caminhoCompleto]) // Chama recursivamente para subpastas
+              : {
+                  filepath: caminhoCompleto,
+                  filename: item.name,
+                  extension: extension,
+                  isDirectory: false,
+                  isFile: true,
+                  wasSend: false,
+                  dataSend: null,
+                  isValid: [".xml", ".pdf", ".zip"].includes(extension),
+                  bloqued: false,
+                  modifiedtime: stats.mtime,
+                  size: stats.size,
+                }; // Retorna o arquivo
+          })
+        );
+
+        return paths.flat(); // Achata o array de arquivos em um único nível
+      })
+    );
+
+    return arquivos.flat(); // Achata o resultado final
+  } catch (erro) {
+    console.error("Erro ao ler diretórios:", erro);
+    return [];
   }
 }

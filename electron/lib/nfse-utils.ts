@@ -4,20 +4,22 @@ import { toDate } from "./date-utils";
 export const emissaoSelectors = [
   "data_emissao",
   "DataEmissao",
+  "DataEmissaoNFe",
   "dtEmissao",
-  "Emissao",
   "data_nfse",
   "tsDatEms",
   "prestacao",
   "dEmi",
+  "dhProc",
   "DTDATA",
   "DtEmiNf",
   "DtHrGerNf",
   "DT_COMPETENCIA",
-  "data",
   "nfse:DataEmissao",
   "ns3:DataEmissao",
   "ns2:DataEmissao",
+  "Emissao",
+  "data",
 ];
 
 export function getDataEmissao(htmlString: string): Date | null {

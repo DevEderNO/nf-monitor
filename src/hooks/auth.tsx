@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext } from "react";
 import { useAppState } from "./state";
 import { ActionType } from "./state-reducer";
-import { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 
 interface SignInCredentials {
@@ -38,9 +37,6 @@ const AuthProvider = ({ children }: React.PropsWithChildren) => {
           },
         ]);
       } catch (error) {
-        if (typeof error === typeof AxiosError) {
-          console.log("signIn", error);
-        }
         throw error;
       } finally {
         dispatch({ type: ActionType.Loading, payload: false });

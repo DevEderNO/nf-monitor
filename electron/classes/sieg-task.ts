@@ -85,7 +85,6 @@ export class SiegTask {
           0,
           ProcessamentoStatus.Stopped
         );
-        console.log("Nenhuma empresa encontrada");
         return;
       }
 
@@ -94,7 +93,6 @@ export class SiegTask {
         0,
         ProcessamentoStatus.Running
       );
-      console.log("Iniciando contagem de notas");
 
       this.config = config;
       this.dateInitial = dateInitial;
@@ -107,14 +105,12 @@ export class SiegTask {
         0,
         ProcessamentoStatus.Running
       );
-      console.log(`Finalizado a contagem de notas`);
 
       await this.sendMessageClient(
         [`Iniciando o processo de download das notas fiscais`],
         0,
         ProcessamentoStatus.Running
       );
-      console.log(`Iniciando o processo de download das notas fiscais`);
 
       await this.downloadNotes(SiegXmlType.NFe);
       await this.downloadNotes(SiegXmlType.CTe);
@@ -127,7 +123,6 @@ export class SiegTask {
         0,
         ProcessamentoStatus.Concluded
       );
-      console.log(`Finalizado o processo de download das notas fiscais`);
       await this.sendMessageClient([""], 0, ProcessamentoStatus.Concluded);
     } catch (error) {
       throw error;
@@ -163,14 +158,6 @@ export class SiegTask {
           ],
           0,
           ProcessamentoStatus.Running
-        );
-        console.log(
-          `Realizando o download das ${
-            SiegXmlType[xmlType]
-          } - ${i} a ${Math.min(
-            i + 50,
-            countNotesXmlType
-          )} de ${countNotesXmlType}`
         );
         const downloadNFe = await downloadNotes(this.config?.apiKeySieg!, {
           ...{
@@ -251,7 +238,6 @@ export class SiegTask {
       0,
       ProcessamentoStatus.Running
     );
-    console.log(`Finalizado o download das ${SiegXmlType[xmlType]}`);
   }
 
   private async getDestination(
@@ -371,7 +357,6 @@ export class SiegTask {
           0,
           ProcessamentoStatus.Stopped
         );
-        console.log(this.cancelledMessage);
       }
       return true;
     }
@@ -387,7 +372,6 @@ export class SiegTask {
           0,
           ProcessamentoStatus.Paused
         );
-        console.log(this.pausedMessage);
       }
       return true;
     }
@@ -399,8 +383,6 @@ export class SiegTask {
       DataEmissaoInicio: format(this.dateInitial!, "yyyy-MM-dd"),
       DataEmissaoFim: format(this.dateEnd!, "yyyy-MM-dd"),
     });
-
-    console.log("countNotes", this.countNotes);
 
     const countedNotesDb = await getCountedNotes(
       this.dateInitial!,
@@ -421,9 +403,6 @@ export class SiegTask {
           ],
           0,
           ProcessamentoStatus.Running
-        );
-        console.log(
-          `Foram encontradas ${this.countNotes.NFe} NFe | ${this.countNotes.NFCe} NFCe | ${this.countNotes.CTe} CTe | ${this.countNotes.CFe} CFe | ${this.countNotes.NFSe} NFSe`
         );
         return;
       } else {
@@ -459,9 +438,6 @@ export class SiegTask {
       0,
       ProcessamentoStatus.Running
     );
-    console.log(
-      `Foram encontradas ${this.countNotes.NFe} NFe | ${this.countNotes.NFCe} NFCe | ${this.countNotes.CTe} CTe | ${this.countNotes.CFe} CFe | ${this.countNotes.NFSe} NFSe`
-    );
   }
 
   private initializeProperties(connection: connection) {
@@ -488,6 +464,7 @@ export class SiegTask {
     status = ProcessamentoStatus.Running
   ) {
     await timeout();
+    console.log("🔍 messages: ", messages);
     messages.forEach((x) => this.historic.log?.push(x));
     if (
       [ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(
@@ -505,7 +482,6 @@ export class SiegTask {
             messages,
             progress,
             status,
-            id: this.historic?.id,
           },
         },
       } as WSMessageTyped<IProcessamento>)

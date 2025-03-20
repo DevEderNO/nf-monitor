@@ -4,7 +4,10 @@ import { IDbHistoric } from "../interfaces/db-historic";
 import { IFileInfo } from "../interfaces/file-info";
 import { IDirectory } from "../interfaces/directory";
 import { IConfig } from "../interfaces/config";
-import { createDirectoryFolder, getDirectoryData } from "./file-operation-service";
+import {
+  createDirectoryFolder,
+  getDirectoryData,
+} from "./file-operation-service";
 import { ICountedNotes } from "../interfaces/count-notes";
 import { IAuth } from "../interfaces/auth";
 import prisma from "../lib/prisma";
@@ -94,6 +97,7 @@ export async function addAuth(data: {
       },
     });
     const config = await getConfiguration();
+    console.log("🔍 config: ", config);
     if (config) {
       await prisma.configuration.update({
         where: { id: config?.id },
@@ -315,6 +319,16 @@ export async function removeFiles(path: string): Promise<number> {
     (
       await prisma.file.deleteMany({
         where: { filepath: { contains: path } },
+      })
+    )?.count ?? 0
+  );
+}
+
+export async function removeFilesNotSended(path: string): Promise<number> {
+  return (
+    (
+      await prisma.file.deleteMany({
+        where: { filepath: { contains: path }, wasSend: false },
       })
     )?.count ?? 0
   );

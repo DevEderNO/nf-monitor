@@ -32,11 +32,9 @@ const apiHealthBroker = axios.create({
 
 export async function checkRoute(url: string) {
   try {
-    const response = await axios.head(url);
-    console.log(`A rota ${url} está disponível. Status: ${response.status}`);
+    await axios.head(url);
     return true;
   } catch (error) {
-    console.log(`A rota ${url} não está acessível.`);
     return false;
   }
 }
@@ -122,7 +120,7 @@ export async function retrySieg(
     return resp.data;
   } catch (e) {
     if (attempt >= maximumRetry) throw e;
-    console.log(
+    console.info(
       "Erro ao baixar notas numero de tentativas: ",
       attempt,
       "delay: ",

@@ -14,6 +14,7 @@ import {
   removeAuth,
   removeDirectory,
   removeFiles,
+  removeFilesNotSended,
   updateConfiguration,
 } from "./services/database";
 import { IConfig } from "./interfaces/config";
@@ -120,11 +121,65 @@ export async function registerListeners(win: BrowserWindow | null) {
 
   ipcMain.handle("select-directory-download-sieg", async () => {
     let directory = selectDirectories(win!, ["openDirectory"]);
+    const config = await getConfiguration();
     if (directory.length > 0) {
-      return directory.at(0);
+      return await updateConfiguration({
+        ...config,
+        directoryDownloadSieg: directory.at(0)?.path,
+      } as IConfig);
     }
-    return null;
+    return config;
   });
+
+  ipcMain.handle(
+    "clear-directory-download-sieg",
+    async (_, clearFiles: boolean) => {
+      const data = await getConfiguration();
+      if (clearFiles && data?.directoryDownloadSieg) {
+        await removeFilesNotSended(data.directoryDownloadSieg.replace(/\//g, "\\"));
+      }
+      const config = await updateConfiguration({
+        ...data,
+        directoryDownloadSieg: null,
+        timeForConsultingSieg: "00:00",
+      } as IConfig);
+      updateJobs();
+      return config;
+    }
+  );
+
+  ipcMain.handle(
+    "change-view-uploaded-files",
+    async (_, viewUploadedFiles: boolean) => {
+      const data = await getConfiguration();
+      return await updateConfiguration({
+        ...data,
+        viewUploadedFiles: viewUploadedFiles,
+      } as IConfig);
+    }
+  );
+
+  ipcMain.handle(
+    "change-time-for-processing",
+    async (_, timeForProcessing: string) => {
+      const data = await getConfiguration();
+      return await updateConfiguration({
+        ...data,
+        timeForProcessing: timeForProcessing,
+      } as IConfig);
+    }
+  );
+
+  ipcMain.handle(
+    "change-time-for-consulting-sieg",
+    async (_, timeForConsultingSieg: string) => {
+      const data = await getConfiguration();
+      return await updateConfiguration({
+        ...data,
+        timeForConsultingSieg: timeForConsultingSieg,
+      } as IConfig);
+    }
+  );
 
   ipcMain.handle("remove-directory", async (_, directory: string) => {
     await removeDirectory(directory);
@@ -135,11 +190,6 @@ export async function registerListeners(win: BrowserWindow | null) {
   ipcMain.handle("get-config", async () => {
     const configuration: IConfig | null = await getConfiguration();
     return configuration;
-  });
-
-  ipcMain.on("set-config", async (_, config) => {
-    await updateConfiguration(config);
-    updateJobs();
   });
 
   ipcMain.handle("get-historic", async () => {

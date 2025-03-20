@@ -3,7 +3,6 @@ export interface IProcessamento {
   progress: number;
   status: ProcessamentoStatus;
   replace: boolean;
-  id?: number;
 }
 
 export enum ProcessamentoStatus {
