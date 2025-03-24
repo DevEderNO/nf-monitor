@@ -150,12 +150,7 @@ export function Dashboard() {
           ref={textareaRef}
           className="flex flex-1 h-full cursor-default resize-none"
           readOnly
-          value={processamento?.messages
-            ?.slice(
-              processamento?.messages?.length - 1000,
-              processamento?.messages?.length - 1
-            )
-            ?.join("\n")}
+          value={processamento?.messages.map((message) => message).join("\n")}
         />
         <Progress value={processamento?.progress} />
       </div>

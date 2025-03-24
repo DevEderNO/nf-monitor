@@ -18,6 +18,7 @@ export const emissaoSelectors = [
   "nfse:DataEmissao",
   "ns3:DataEmissao",
   "ns2:DataEmissao",
+  "issweb:dataEmissao",
   "Emissao",
   "data",
 ];

@@ -68,65 +68,61 @@ export class SiegTask {
   }
 
   async run(connection: connection, dateInitial: Date, dateEnd: Date) {
-    try {
-      await this.sendMessageClient([]);
-      this.initializeProperties(connection);
-      const config = await getConfiguration();
-      if (!config || !config.apiKeySieg)
-        throw new Error("Configuração não encontrada");
+    await this.sendMessageClient(['']);
+    this.initializeProperties(connection);
+    const config = await getConfiguration();
+    if (!config || !config.apiKeySieg)
+      throw new Error("Configuração não encontrada");
 
-      if (this.empresas.length === 0) {
-        this.empresas = await getEmpresas();
-      }
-
-      if (this.empresas.length === 0) {
-        await this.sendMessageClient(
-          ["Nenhuma empresa encontrada"],
-          0,
-          ProcessamentoStatus.Stopped
-        );
-        return;
-      }
-
-      await this.sendMessageClient(
-        ["Iniciando contagem de notas"],
-        0,
-        ProcessamentoStatus.Running
-      );
-
-      this.config = config;
-      this.dateInitial = dateInitial;
-      this.dateEnd = dateEnd;
-
-      await this.countNotesPerCompany();
-
-      await this.sendMessageClient(
-        [`Finalizado a contagem de notas`],
-        0,
-        ProcessamentoStatus.Running
-      );
-
-      await this.sendMessageClient(
-        [`Iniciando o processo de download das notas fiscais`],
-        0,
-        ProcessamentoStatus.Running
-      );
-
-      await this.downloadNotes(SiegXmlType.NFe);
-      await this.downloadNotes(SiegXmlType.CTe);
-      await this.downloadNotes(SiegXmlType.NFSe);
-      await this.downloadNotes(SiegXmlType.NFCe);
-      await this.downloadNotes(SiegXmlType.CFe);
-
-      await this.sendMessageClient(
-        [`😁 Finalizado o processo de download das notas fiscais`],
-        0,
-        ProcessamentoStatus.Concluded
-      );
-      await this.sendMessageClient([""], 0, ProcessamentoStatus.Concluded);
-    } catch (error) {
-      throw error;
+    if (this.empresas.length === 0) {
+      this.empresas = await getEmpresas();
     }
+
+    if (this.empresas.length === 0) {
+      await this.sendMessageClient(
+        ["Nenhuma empresa encontrada"],
+        0,
+        ProcessamentoStatus.Stopped
+      );
+      return;
+    }
+
+    await this.sendMessageClient(
+      ["Iniciando contagem de notas"],
+      0,
+      ProcessamentoStatus.Running
+    );
+
+    this.config = config;
+    this.dateInitial = dateInitial;
+    this.dateEnd = dateEnd;
+
+    await this.countNotesPerCompany();
+
+    await this.sendMessageClient(
+      [`Finalizado a contagem de notas`],
+      0,
+      ProcessamentoStatus.Running
+    );
+
+    await this.sendMessageClient(
+      [`Iniciando o processo de download das notas fiscais`],
+      0,
+      ProcessamentoStatus.Running
+    );
+
+    await this.downloadNotes(SiegXmlType.NFe);
+    await this.downloadNotes(SiegXmlType.CTe);
+    await this.downloadNotes(SiegXmlType.NFSe);
+    await this.downloadNotes(SiegXmlType.NFCe);
+    await this.downloadNotes(SiegXmlType.CFe);
+
+    await this.sendMessageClient(
+      [`😁 Finalizado o processo de download das notas fiscais`],
+      0,
+      ProcessamentoStatus.Concluded
+    );
+    await this.sendMessageClient([""], 0, ProcessamentoStatus.Concluded);
   }
 
   async downloadNotes(xmlType: SiegXmlType) {
@@ -166,6 +162,7 @@ export class SiegTask {
             Skip: i,
             DataEmissaoInicio: format(this.dateInitial!, "yyyy-MM-dd"),
             DataEmissaoFim: format(this.dateEnd!, "yyyy-MM-dd"),
+            Downloadevent: true,
           },
         });
         for (let i = 0; i < downloadNFe.xmls.length; i++) {
@@ -382,6 +379,7 @@ export class SiegTask {
     this.countNotes = await getCountNotes(this.config?.apiKeySieg!, {
       DataEmissaoInicio: format(this.dateInitial!, "yyyy-MM-dd"),
       DataEmissaoFim: format(this.dateEnd!, "yyyy-MM-dd"),
+      Downloadevent: true,
     });
 
     const countedNotesDb = await getCountedNotes(

@@ -18,6 +18,7 @@ import {
 } from "./services/file-operation-service";
 import { logError } from "./services/error-service";
 import { ErrorType } from "@prisma/client";
+import { powerSaveBlocker } from 'electron';
 
 // The built directory structure
 //
@@ -41,6 +42,9 @@ const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 
 app.setAppUserModelId("Monitor");
 
+// Impede que o sistema entre em suspensão
+const id = powerSaveBlocker.start('prevent-app-suspension');
+
 function createWindow() {
   win = new BrowserWindow({
     height: 600,
@@ -52,6 +56,7 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       webSecurity: false,
+      backgroundThrottling: false,
     },
   });
 
@@ -120,6 +125,7 @@ function createWindow() {
 
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") {
+      powerSaveBlocker.stop(id);
       app.quit();
       win = null;
     }
@@ -181,6 +187,7 @@ function createWindow() {
   if (!VITE_DEV_SERVER_URL) {
     app.setLoginItemSettings({
       openAtLogin: true,
+      openAsHidden: true, // Mantém oculto no início
       path: app.getPath("exe"),
     });
   }

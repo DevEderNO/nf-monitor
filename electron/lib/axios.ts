@@ -94,7 +94,11 @@ export async function retry(
 
 export async function upload(token: string, filepath: string) {
   const form = new FormData();
-  form.append("arquivo", createReadStream(filepath));
+  const file = createReadStream(filepath);
+  file.on("end", () => {
+    file.close();
+  });
+  form.append("arquivo", file);
   await retry("upload/importar-arquivo", filepath, token, 5);
 }
 

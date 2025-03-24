@@ -92,30 +92,7 @@ export class ProcessTask {
       ]);
       const progressIncrement = 100 / this.files.length;
       let currentProgress = 0;
-      this.auth = await getAuth();
-      if (!this.auth?.id) return;
-      const resp = await signIn(
-        this.auth.username ?? "",
-        this.auth.password ?? "",
-        true
-      );
-      if (!resp.Token) {
-        this.hasError = true;
-        await this.sendMessageClient(
-          ["❌ Não foi possível autenticar no Sittax"],
-          0,
-          ProcessamentoStatus.Stopped
-        );
-        await timeout(500);
-        return;
-      }
-      this.auth.token = resp.Token;
-      await updateAuth({
-        id: this.auth.id,
-        token: this.auth.token ?? "",
-        username: this.auth.username ?? "",
-        password: this.auth.password ?? "",
-      });
+      if (!(await this.authenticate())) return;
       for (let index = 0; index < this.files.length; index++) {
         if (this.isCancelled) {
           if (this.cancelledMessage === null) {
@@ -198,9 +175,6 @@ export class ProcessTask {
           }
         }
       }
-      if (!this.viewUploadedFiles && this.filesSended.length > 0) {
-        this.files.push(...this.filesSended);
-      }
       await this.sendMessageClient(
         [
           this.hasError
@@ -212,13 +186,40 @@ export class ProcessTask {
       );
       await this.sendMessageClient([""], 100, ProcessamentoStatus.Concluded);
     } catch (error) {
-      console.log(error);
       this.sendMessageClient(
         ["❌ houve um problema ao enviar os arquivos para o Sittax"],
         0,
         ProcessamentoStatus.Stopped
       );
     }
+  }
+
+  async authenticate(): Promise<boolean> {
+    this.auth = await getAuth();
+    if (!this.auth?.id) return false;
+    const resp = await signIn(
+      this.auth.username ?? "",
+      this.auth.password ?? "",
+      true
+    );
+    if (!resp.Token) {
+      this.hasError = true;
+      await this.sendMessageClient(
+        ["❌ Não foi possível autenticar no Sittax"],
+        0,
+        ProcessamentoStatus.Stopped
+      );
+      await timeout(500);
+      return false;
+    }
+    this.auth.token = resp.Token;
+    await updateAuth({
+      id: this.auth.id,
+      token: this.auth.token ?? "",
+      username: this.auth.username ?? "",
+      password: this.auth.password ?? "",
+    });
+    return true;
   }
 
   private initializeProperties(connection: connection) {
@@ -230,6 +231,7 @@ export class ProcessTask {
     this.progress = 0;
     this.filesSended = [];
     this.connection = connection;
+    
   }
 
   // private validateDiretoryFile() {

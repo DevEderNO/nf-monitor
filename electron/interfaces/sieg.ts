@@ -2,6 +2,7 @@
 export interface ISiegCountNotesRequest {
   DataEmissaoInicio: string;
   DataEmissaoFim: string;
+  Downloadevent: boolean;
 }
 
 export enum SiegXmlType {
@@ -29,6 +30,7 @@ export interface ISiegDownloadNotesRequest {
   CnpjTom?: string;
   DataEmissaoInicio: string;
   DataEmissaoFim: string;
+  Downloadevent: boolean;
 }
 
 export interface ISiegDownloadNotesResponse {

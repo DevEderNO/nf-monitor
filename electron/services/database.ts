@@ -47,7 +47,7 @@ export async function addAuth(data: {
   user: IUser;
   username: string;
   password: string;
-  empresas: any[];
+  empresas: IEmpresa[];
   configuration: {
     apiKeySieg: string;
     emailSieg: string;
@@ -97,7 +97,6 @@ export async function addAuth(data: {
       },
     });
     const config = await getConfiguration();
-    console.log("🔍 config: ", config);
     if (config) {
       await prisma.configuration.update({
         where: { id: config?.id },
@@ -201,7 +200,7 @@ export async function getDirectories(): Promise<IDirectory[]> {
 }
 
 export async function getDirectory(path: string): Promise<IDirectory | null> {
-  let directory: IDirectory | null =
+  const directory: IDirectory | null =
     (await prisma.directory.findFirst({ where: { path } })) ??
     (await getDirectoriesDownloadSieg());
   return directory;
@@ -445,10 +444,19 @@ export async function getHistoric(): Promise<IDbHistoric[]> {
       orderBy: { startDate: "desc" },
     })) ?? [];
 
-  return historic.map((record: any) => ({
-    ...record,
-    log: JSON.parse(record.log),
-  }));
+  return historic.map(
+    (record: {
+      id: number;
+      log: string;
+      createdAt: Date;
+      updatedAt: Date;
+      startDate: Date;
+      endDate: Date | null;
+    }): IDbHistoric => ({
+      ...record,
+      log: JSON.parse(record.log),
+    })
+  );
 }
 
 export async function clearHistoric(): Promise<void> {
