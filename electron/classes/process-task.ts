@@ -76,7 +76,7 @@ export class ProcessTask {
     try {
       this.initializeProperties(connection);
       const directories = await getDirectories();
-      await this.sendMessageClient(["Realizando a descoberta dos arquivos"]);
+      await this.sendMessageClient(["🔎 Realizando a descoberta dos arquivos"]);
       await addFiles(await listarArquivos(directories.map((x) => x.path)));
       this.files = (await getFiles()).filter((x) => !x.wasSend && x.isValid);
       this.filesSended = (await getFiles()).filter(
@@ -87,104 +87,112 @@ export class ProcessTask {
       if (this.viewUploadedFiles && this.filesSended.length > 0) {
         this.files.push(...this.filesSended);
       }
-      await this.sendMessageClient([
-        "Iniciando o envio dos arquivos para o Sittax",
-      ]);
-      const progressIncrement = 100 / this.files.length;
-      let currentProgress = 0;
-      if (!(await this.authenticate())) return;
-      for (let index = 0; index < this.files.length; index++) {
-        if (this.isCancelled) {
-          if (this.cancelledMessage === null) {
-            this.cancelledMessage =
-              "Tarefa de envio de arquivo para o Sittax foi cancelada.";
-            await this.sendMessageClient(
-              [this.cancelledMessage],
-              currentProgress,
-              ProcessamentoStatus.Stopped
-            );
-          }
-          await this.sendMessageClient([], 0, ProcessamentoStatus.Stopped);
-          this.isCancelled = false;
-          this.isPaused = false;
-          this.hasError = false;
-          this.progress = 0;
-          return;
-        }
-        if (this.isPaused) {
-          if (this.pausedMessage === null) {
-            this.pausedMessage =
-              "Tarefa de envio de arquivo para o Sittax foi pausada.";
-            await this.sendMessageClient(
-              [this.pausedMessage],
-              currentProgress,
-              ProcessamentoStatus.Paused
-            );
-          }
-          await timeout(500);
-          index--;
-        } else {
-          currentProgress = this.progress + progressIncrement * (index + 1);
-          const element = this.files[index];
-          if (element.wasSend) {
-            if (!element.isValid) {
+      if (this.files.length > 0) {
+        await this.sendMessageClient([
+          "🚀 Iniciando o envio dos arquivos para o Sittax",
+        ]);
+        const progressIncrement = 100 / this.files.length;
+        let currentProgress = 0;
+        if (!(await this.authenticate())) return;
+        for (let index = 0; index < this.files.length; index++) {
+          if (this.isCancelled) {
+            if (this.cancelledMessage === null) {
+              this.cancelledMessage =
+                "Tarefa de envio de arquivo para o Sittax foi cancelada.";
               await this.sendMessageClient(
-                [`⚠️ Arquivo não e válido para o envio ${element.filepath}`],
+                [this.cancelledMessage],
                 currentProgress,
-                ProcessamentoStatus.Running
+                ProcessamentoStatus.Stopped
               );
-              await updateFile(element.filepath, {
-                isValid: false,
-              });
-              continue;
             }
-            await this.sendMessageClient(
-              [`☑️ Já foi enviando ${element.filepath}`],
-              currentProgress
-            );
+            await this.sendMessageClient([], 0, ProcessamentoStatus.Stopped);
+            this.isCancelled = false;
+            this.isPaused = false;
+            this.hasError = false;
+            this.progress = 0;
+            return;
+          }
+          if (this.isPaused) {
+            if (this.pausedMessage === null) {
+              this.pausedMessage =
+                "Tarefa de envio de arquivo para o Sittax foi pausada.";
+              await this.sendMessageClient(
+                [this.pausedMessage],
+                currentProgress,
+                ProcessamentoStatus.Paused
+              );
+            }
+            await timeout(500);
+            index--;
           } else {
-            if (!validateDFileExists(element)) {
+            currentProgress = this.progress + progressIncrement * (index + 1);
+            const element = this.files[index];
+            if (element.wasSend) {
+              if (!element.isValid) {
+                await this.sendMessageClient(
+                  [`⚠️ Arquivo não e válido para o envio ${element.filepath}`],
+                  currentProgress,
+                  ProcessamentoStatus.Running
+                );
+                await updateFile(element.filepath, {
+                  isValid: false,
+                });
+                continue;
+              }
               await this.sendMessageClient(
-                [
-                  `🗑️ O arquivo ${element.filepath} não existe, será removido da lista de arquivos`,
-                ],
-                currentProgress,
-                ProcessamentoStatus.Running
-              );
-              await removeFiles(element.filepath);
-              continue;
-            }
-            if (isFileBlocked(element.filepath)) {
-              await this.sendMessageClient(
-                [`🔓 desbloqueando o arquivo ${element.filepath}`],
+                [`☑️ Já foi enviando ${element.filepath}`],
                 currentProgress
               );
-              unblockFile(element.filepath);
-            }
-            switch (element.extension) {
-              case ".xml":
-              case ".pdf":
-                await this.sendXmlAndPdfSittax(index, currentProgress);
-                break;
-              case ".zip":
-                await this.sendZipSittax(index, currentProgress);
-                break;
-              default:
-                break;
+            } else {
+              if (!validateDFileExists(element)) {
+                await this.sendMessageClient(
+                  [
+                    `🗑️ O arquivo ${element.filepath} não existe, será removido da lista de arquivos`,
+                  ],
+                  currentProgress,
+                  ProcessamentoStatus.Running
+                );
+                await removeFiles(element.filepath);
+                continue;
+              }
+              if (isFileBlocked(element.filepath)) {
+                await this.sendMessageClient(
+                  [`🔓 desbloqueando o arquivo ${element.filepath}`],
+                  currentProgress
+                );
+                unblockFile(element.filepath);
+              }
+              switch (element.extension) {
+                case ".xml":
+                case ".pdf":
+                  await this.sendXmlAndPdfSittax(index, currentProgress);
+                  break;
+                case ".zip":
+                  await this.sendZipSittax(index, currentProgress);
+                  break;
+                default:
+                  break;
+              }
             }
           }
         }
+      } else {
+        await this.sendMessageClient(
+          ["🥲 Não foram encontrados novos arquivos para o envio"],
+          100,
+          ProcessamentoStatus.Concluded
+        );
       }
       await this.sendMessageClient(
         [
           this.hasError
             ? "😨 Tarefa concluída com erros."
             : "😁 Tarefa concluída.",
+          "",
         ],
         100,
         ProcessamentoStatus.Concluded
       );
-      await this.sendMessageClient([""], 100, ProcessamentoStatus.Concluded);
     } catch (error) {
       this.sendMessageClient(
         ["❌ houve um problema ao enviar os arquivos para o Sittax"],
