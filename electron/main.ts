@@ -80,7 +80,7 @@ function createWindow() {
       }
     };
 
-    globalShortcut.register("Shift+Ctrl+R", toggleMenu);
+    globalShortcut.register("Ctrl+Q", toggleMenu);
   }
 
   const icon = nativeImage.createFromPath(
