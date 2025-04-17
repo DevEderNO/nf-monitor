@@ -112,7 +112,7 @@ export async function registerListeners(win: BrowserWindow | null) {
   });
 
   ipcMain.handle("select-directories", async () => {
-    let directories = selectDirectories(win!);
+    const directories = selectDirectories(win!);
     if (directories.length > 0) {
       await addDirectories(directories);
     }
@@ -120,7 +120,7 @@ export async function registerListeners(win: BrowserWindow | null) {
   });
 
   ipcMain.handle("select-directory-download-sieg", async () => {
-    let directory = selectDirectories(win!, ["openDirectory"]);
+    const directory = selectDirectories(win!, ["openDirectory"]);
     const config = await getConfiguration();
     if (directory.length > 0) {
       return await updateConfiguration({
