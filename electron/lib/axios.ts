@@ -77,7 +77,7 @@ export async function retry(
         Origin: "http://app.sittax.com.br",
       },
     });
-
+    form.destroy();
     return data;
   } catch (e) {
     if (attempt >= maximumRetry) throw e;
@@ -93,12 +93,6 @@ export async function retry(
 }
 
 export async function upload(token: string, filepath: string) {
-  const form = new FormData();
-  const file = createReadStream(filepath);
-  file.on("end", () => {
-    file.close();
-  });
-  form.append("arquivo", file);
   await retry("upload/importar-arquivo", filepath, token, 5);
 }
 
