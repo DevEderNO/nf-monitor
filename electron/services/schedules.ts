@@ -41,7 +41,7 @@ export async function initializeJobSieg() {
     const dateEnd = newDate;
     const hour = timeForConsultingSieg.slice(0, 2);
     const minute = timeForConsultingSieg.slice(3, 5);
-    jobDiscovery = scheduleJob(`${minute} ${hour} * * *`, () => {
+    jobSieg = scheduleJob(`${minute} ${hour} * * *`, () => {
       startSieg(wsConnection, dateInitial, dateEnd);
     });
   } else {

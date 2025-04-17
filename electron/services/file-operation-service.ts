@@ -111,7 +111,7 @@ function validateNotaServico(data: string): {
 } {
   try {
     const newDate = new Date();
-    let date = getDataEmissao(data);
+    const date = getDataEmissao(data);
     if (!date) return { valid: false, isNotaFiscal: false };
     if (
       isBefore(
