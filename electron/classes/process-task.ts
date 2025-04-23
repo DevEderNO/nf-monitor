@@ -28,6 +28,8 @@ import {
 } from "../services/database";
 import { IAuth } from "../interfaces/auth";
 import { timeout } from "../lib/time-utils";
+import { XHealthType } from "../interfaces/health-message";
+import { healthBrokerComunication } from "../services/health-broker-service";
 
 export class ProcessTask {
   isPaused: boolean;
@@ -42,6 +44,7 @@ export class ProcessTask {
   historic: IDbHistoric;
   viewUploadedFiles: boolean = false;
   auth: IAuth | null = null;
+  max: number = 0;
   constructor() {
     this.isPaused = false;
     this.isCancelled = false;
@@ -57,6 +60,7 @@ export class ProcessTask {
     } as IDbHistoric;
     this.pausedMessage = null;
     this.cancelledMessage = null;
+    this.max = 0;
   }
 
   pause() {
@@ -77,6 +81,7 @@ export class ProcessTask {
       this.initializeProperties(connection);
       const directories = await getDirectories();
       await this.sendMessageClient(["🔎 Realizando a descoberta dos arquivos"]);
+      await healthBrokerComunication(XHealthType.Info, `Iniciado processo de envio de arquivos para o Sittax`);
       await addFiles(await listarArquivos(directories.map((x) => x.path)));
       this.files = (await getFiles()).filter((x) => !x.wasSend && x.isValid);
       this.filesSended = (await getFiles()).filter(
@@ -92,20 +97,21 @@ export class ProcessTask {
           "🚀 Iniciando o envio dos arquivos para o Sittax",
         ]);
         const progressIncrement = 100 / this.files.length;
+        this.max = this.files.length;
         let currentProgress = 0;
         if (!(await this.authenticate())) return;
         for (let index = 0; index < this.files.length; index++) {
           if (this.isCancelled) {
-            if (this.cancelledMessage === null) {
-              this.cancelledMessage =
-                "Tarefa de envio de arquivo para o Sittax foi cancelada.";
-              await this.sendMessageClient(
-                [this.cancelledMessage],
-                currentProgress,
-                ProcessamentoStatus.Stopped
-              );
-            }
-            await this.sendMessageClient([], 0, ProcessamentoStatus.Stopped);
+              this.cancelledMessage ??=
+                `Tarefa de envio de arquivo para o Sittax foi cancelada. Foram enviados ${this.files.reduce((acc, file) => acc + (file.wasSend ? 1 : 0), 0)} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`;
+            await this.sendMessageClient(
+              [this.cancelledMessage],
+              0,
+              index + 1,
+              this.max,
+              ProcessamentoStatus.Stopped
+            );
+            await healthBrokerComunication(XHealthType.Warning, this.cancelledMessage);
             this.isCancelled = false;
             this.isPaused = false;
             this.hasError = false;
@@ -119,6 +125,8 @@ export class ProcessTask {
               await this.sendMessageClient(
                 [this.pausedMessage],
                 currentProgress,
+                index + 1,
+                this.max,
                 ProcessamentoStatus.Paused
               );
             }
@@ -132,16 +140,22 @@ export class ProcessTask {
                 await this.sendMessageClient(
                   [`⚠️ Arquivo não e válido para o envio ${element.filepath}`],
                   currentProgress,
+                  index + 1,
+                  this.max,
                   ProcessamentoStatus.Running
                 );
                 await updateFile(element.filepath, {
                   isValid: false,
                 });
+                this.files[index].isValid = false;
                 continue;
               }
               await this.sendMessageClient(
                 [`☑️ Já foi enviando ${element.filepath}`],
-                currentProgress
+                currentProgress,
+                index + 1,
+                this.max,
+                ProcessamentoStatus.Running
               );
             } else {
               if (!validateDFileExists(element)) {
@@ -150,6 +164,8 @@ export class ProcessTask {
                     `🗑️ O arquivo ${element.filepath} não existe, será removido da lista de arquivos`,
                   ],
                   currentProgress,
+                  index + 1,
+                  this.max,
                   ProcessamentoStatus.Running
                 );
                 await removeFiles(element.filepath);
@@ -158,7 +174,10 @@ export class ProcessTask {
               if (isFileBlocked(element.filepath)) {
                 await this.sendMessageClient(
                   [`🔓 desbloqueando o arquivo ${element.filepath}`],
-                  currentProgress
+                  currentProgress,
+                  index + 1,
+                  this.max,
+                  ProcessamentoStatus.Running
                 );
                 unblockFile(element.filepath);
               }
@@ -180,25 +199,35 @@ export class ProcessTask {
         await this.sendMessageClient(
           ["🥲 Não foram encontrados novos arquivos para o envio"],
           100,
+          0,
+          this.max,
           ProcessamentoStatus.Concluded
         );
+        await healthBrokerComunication(XHealthType.Success, `Não foram encontrados novos arquivos para o envio`);
       }
+      const message = this.hasError
+        ? `😨 Tarefa concluída com erros. Foram enviados ${this.files.reduce((acc, file) => acc + (file.wasSend ? 1 : 0), 0)} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`
+        : `😁 Tarefa concluída. Foram enviados ${this.filesSended.length} arquivos.`;
       await this.sendMessageClient(
         [
-          this.hasError
-            ? "😨 Tarefa concluída com erros."
-            : "😁 Tarefa concluída.",
+          message,
           "",
         ],
         100,
+        this.max,
+        this.max,
         ProcessamentoStatus.Concluded
       );
+      await healthBrokerComunication(this.hasError ? XHealthType.Error : XHealthType.Success, message);
     } catch (error) {
       this.sendMessageClient(
         ["❌ houve um problema ao enviar os arquivos para o Sittax"],
         0,
+        0,
+        this.max,
         ProcessamentoStatus.Stopped
       );
+      await healthBrokerComunication(XHealthType.Error, `Houve um problema ao enviar os arquivos para o Sittax`);
     }
   }
 
@@ -215,8 +244,11 @@ export class ProcessTask {
       await this.sendMessageClient(
         ["❌ Não foi possível autenticar no Sittax"],
         0,
+        0,
+        this.max,
         ProcessamentoStatus.Stopped
       );
+      await healthBrokerComunication(XHealthType.Error, `Não foi possível autenticar no Sittax`);
       await timeout(500);
       return false;
     }
@@ -262,15 +294,23 @@ export class ProcessTask {
           wasSend: true,
           dataSend: new Date(),
         });
+        this.files[index].wasSend = true;
+        this.files[index].dataSend = new Date();
         await this.sendMessageClient(
           [`✅ Enviado com sucesso ${this.files[index].filepath}`],
-          currentProgress
+          currentProgress,
+          index + 1,
+          this.max,
+          ProcessamentoStatus.Running
         );
       } catch (error) {
         this.hasError = true;
         this.sendMessageClient(
           [`❌ Erro ao enviar ${this.files[index].filepath}`],
-          currentProgress
+          currentProgress,
+          index + 1,
+          this.max,
+          ProcessamentoStatus.Running
         );
         //throw error;
       }
@@ -282,11 +322,14 @@ export class ProcessTask {
             : `⚠️ Arquivo não e válido para o envio ${this.files[index].filepath}`,
         ],
         currentProgress,
+        index + 1,
+        this.max,
         ProcessamentoStatus.Running
       );
       await updateFile(this.files[index].filepath, {
         isValid: false,
       });
+      this.files[index].isValid = false;
     }
   }
 
@@ -296,13 +339,19 @@ export class ProcessTask {
       this.files[index].isValid = true;
       await this.sendMessageClient(
         [`🚀 Enviando ${this.files[index].filepath}`],
-        currentProgress
+        currentProgress,
+        index + 1,
+        this.max,
+        ProcessamentoStatus.Running
       );
       try {
         await upload(this.auth?.token ?? "", this.files[index].filepath);
         await this.sendMessageClient(
           [`✅ Enviado com sucesso ${this.files[index].filepath}`],
-          currentProgress
+          currentProgress,
+          index + 1,
+          this.max,
+          ProcessamentoStatus.Running
         );
         updateFile(this.files[index].filepath, {
           wasSend: true,
@@ -312,7 +361,10 @@ export class ProcessTask {
         this.hasError = true;
         await this.sendMessageClient(
           [`❌ Erro ao enviar ${this.files[index].filepath}`],
-          currentProgress
+          currentProgress,
+          index + 1,
+          this.max,
+          ProcessamentoStatus.Running
         );
       }
     } else {
@@ -323,8 +375,13 @@ export class ProcessTask {
             : `⚠️ Arquivo não é válido para o envio ${this.files[index].filepath}`,
         ],
         currentProgress,
+        index + 1,
+        this.max,
         ProcessamentoStatus.Running
       );
+      await updateFile(this.files[index].filepath, {
+        isValid: false,
+      });
       this.files[index].isValid = false;
     }
   }
@@ -332,6 +389,8 @@ export class ProcessTask {
   private async sendMessageClient(
     messages: string[],
     progress = 0,
+    value = 0,
+    max = 0,
     status = ProcessamentoStatus.Running,
     replace = false
   ) {
@@ -355,6 +414,8 @@ export class ProcessTask {
           data: {
             messages,
             progress,
+            value,
+            max,
             status,
             replace,
             id: this.historic?.id,

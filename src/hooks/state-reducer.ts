@@ -28,12 +28,16 @@ export const initialState: IState = {
   processamento: {
     messages: [],
     progress: 0,
+    value: 0,
+    max: 0,
     replace: false,
     status: ProcessamentoStatus.Stopped,
   },
   processamentoSieg: {
     messages: [],
     progress: 0,
+    value: 0,
+    max: 0,
     replace: false,
     status: ProcessamentoStatus.Stopped,
   },
@@ -119,6 +123,8 @@ export const StateReducer = (
       processamento: {
         messages,
         progress: action.payload.progress,
+        value: action.payload.value,
+        max: action.payload.max,
         status: action.payload.status,
         replace: action.payload.replace,
       },
@@ -138,6 +144,8 @@ export const StateReducer = (
       processamentoSieg: {
         messages,
         progress: action.payload.progress,
+        value: action.payload.value,
+        max: action.payload.max,
         status: action.payload.status,
         replace: action.payload.replace,
       },

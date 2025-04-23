@@ -153,6 +153,9 @@ export function Dashboard() {
           value={processamento?.messages.map((message) => message).join("\n")}
         />
         <Progress value={processamento?.progress} />
+        <span className="text-xs text-muted-foreground text-right">
+          {processamento?.value} / {processamento?.max}
+        </span>
       </div>
     </div>
   );

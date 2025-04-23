@@ -1,6 +1,6 @@
 import { app } from "electron";
 import { NFMoniotorHealth, XHealthType } from "../interfaces/health-message";
-import { countFilesSendedToDay, getUser } from "./database";
+import { getUser } from "./database";
 import {
   getDiskInfo,
   getNetworkInterfaces,
@@ -9,14 +9,13 @@ import {
 import { healthBrokerSetHealf } from "../lib/axios";
 import os from "node:os";
 
-export async function healthBrokerComunication() {
+export async function healthBrokerComunication(type: XHealthType, descriptionMessage: string) {
   const user = await getUser();
   if (!user?.userId) return;
-  const filesSendedToDay = await countFilesSendedToDay();
   const message: NFMoniotorHealth = {
     $type: "NFMoniotorHealth",
     source: 1,
-    type: XHealthType.Info,
+    type: type,
     data: new Date(),
     childrens: [
       {
@@ -37,7 +36,7 @@ export async function healthBrokerComunication() {
     escritorio: "",
     usuario: user?.userId ?? "",
     maquina: os.hostname(),
-    message: `Arquivos enviados hoje ${filesSendedToDay}`,
+    message: descriptionMessage,
   };
   await healthBrokerSetHealf(message);
 }

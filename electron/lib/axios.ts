@@ -87,7 +87,7 @@ export async function retry(
       token,
       maximumRetry,
       attempt + 1,
-      (delay || 1000) * 2
+      (delay || 500) * 2
     );
   }
 }
@@ -152,7 +152,12 @@ export async function downloadNotes(
 }
 
 export async function healthBrokerSetHealf(message: NFMoniotorHealth) {
-  await apiHealthBroker.post("set-health", message);
+  try {
+    console.info("Enviando mensagem para o Health Broker", message);
+    await apiHealthBroker.post("set-health", message);
+  } catch (error) {
+    console.error("Erro ao enviar mensagem para o Health Broker", error);
+  }
 }
 
 api.interceptors.request.use((config) => {

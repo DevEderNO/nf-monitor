@@ -1,10 +1,11 @@
 import { Job, scheduleJob } from "node-schedule";
 import { wsConnection } from "../websocket";
-import { autoConfigureSieg, getConfiguration } from "./database";
+import { autoConfigureSieg, countFilesSendedToDay, getConfiguration } from "./database";
 import { startSieg } from "./sieg-service";
 import { addMonths } from "date-fns";
 import { healthBrokerComunication } from "./health-broker-service";
 import { startProcess } from "./process-service";
+import { XHealthType } from "../interfaces/health-message";
 let jobDiscovery: Job | null = null;
 let jobSieg: Job | null = null;
 let jobHealth: Job | null = null;
@@ -13,7 +14,7 @@ export function updateJobs() {
   initializeJobAutoConfigureSieg();
   initializeJob();
   initializeJobSieg();
-  initializeJobHealth();
+  // initializeJobHealth();
 }
 
 export async function initializeJob() {
@@ -51,8 +52,12 @@ export async function initializeJobSieg() {
 
 export async function initializeJobHealth() {
   if (jobHealth !== null) return;
-  jobHealth = scheduleJob(`0 * * * *`, () => {
-    healthBrokerComunication();
+  jobHealth = scheduleJob(`*/1 * * * *`, async () => {
+    const filesSendedToDay = await countFilesSendedToDay();
+    healthBrokerComunication(
+      XHealthType.Info,
+      `Arquivos enviados hoje ${filesSendedToDay}`
+    );
   });
 }
 

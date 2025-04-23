@@ -36,12 +36,11 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
       if (typeof message.data === "string") {
         const response: WSMessage = JSON.parse(message.data);
         if (response.message.type === WSMessageType.Discovery) {
-          let {
+          const {
             message: {
-              data: { messages, progress, status, id },
+              data: { messages, progress, value, max, status, id },
             },
           }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
-          id ??= 0;
           if (ProcessamentoStatus.Concluded === status) {
             const request: WSMessageTyped<IProcessamento> = {
               type: "message",
@@ -57,6 +56,8 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
             payload: {
               messages,
               progress,
+              value,
+              max,
               status,
             },
           });
@@ -64,9 +65,10 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
         if (response.message.type === WSMessageType.Process) {
           const {
             message: {
-              data: { messages, progress, status },
+              data: { messages, progress, value, max, status },
             },
           }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
+          console.log("Process", message.data);
           if (
             [
               ProcessamentoStatus.Concluded,
@@ -96,6 +98,8 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
             payload: {
               messages,
               progress,
+              value,
+              max,
               status,
             },
           });
@@ -103,7 +107,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
         if (response.message.type === WSMessageType.Sieg) {
           const {
             message: {
-              data: { messages, progress, status },
+              data: { messages, progress, value, max, status },
             },
           }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
           dispatch({
@@ -111,6 +115,8 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
             payload: {
               messages,
               progress,
+              value,
+              max,
               status,
             },
           });
