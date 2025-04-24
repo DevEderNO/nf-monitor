@@ -115,15 +115,7 @@ export async function retrySieg(
         Origin: "http://app.sittax.com.br",
       },
     });
-    if (resp.data) {
-       BrowserWindow.getAllWindows().forEach((window) => {
-      window.webContents.send(
-        "main-process-message",
-        `Resposta da API: ${JSON.stringify(resp.data)}`
-      );
-    });
-      return resp.data;
-    }
+    if (resp.data) return resp.data;
     throw new Error("Nenhuma resposta da API");
   } catch (e) {
     if (attempt >= maximumRetry) throw e;
