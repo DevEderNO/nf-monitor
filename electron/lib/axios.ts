@@ -78,7 +78,8 @@ export async function retry(
       },
     });
     form.destroy();
-    return data;
+    if (data) return data;
+    throw new Error("Nenhuma resposta da API");
   } catch (e) {
     if (attempt >= maximumRetry) throw e;
     return retry(
@@ -99,7 +100,7 @@ export async function upload(token: string, filepath: string) {
 export async function retrySieg(
   url: string,
   apiKey: string,
-  data: ISiegCountNotesRequest,
+  data: ISiegCountNotesRequest | ISiegDownloadNotesRequest,
   maximumRetry = 0,
   attempt = 0,
   delay = 0
@@ -114,8 +115,16 @@ export async function retrySieg(
         Origin: "http://app.sittax.com.br",
       },
     });
-
-    return resp.data;
+    if (resp.data) {
+       BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.send(
+        "main-process-message",
+        `Resposta da API: ${JSON.stringify(resp.data)}`
+      );
+    });
+      return resp.data;
+    }
+    throw new Error("Nenhuma resposta da API");
   } catch (e) {
     if (attempt >= maximumRetry) throw e;
     console.info(
@@ -139,16 +148,14 @@ export async function getCountNotes(
   apiKey: string,
   data: ISiegCountNotesRequest
 ) {
-  const response = await retrySieg(`/ContarXmls`, apiKey, data, 5);
-  return response;
+  return await retrySieg(`/ContarXmls`, apiKey, data, 5);
 }
 
 export async function downloadNotes(
   apiKey: string,
   data: ISiegDownloadNotesRequest
 ): Promise<ISiegDownloadNotesResponse> {
-  const response = await retrySieg(`/BaixarXmlsV2`, apiKey, data, 10);
-  return response;
+  return await retrySieg(`/BaixarXmlsV2`, apiKey, data, 10);
 }
 
 export async function healthBrokerSetHealf(message: NFMoniotorHealth) {
@@ -189,6 +196,21 @@ api.interceptors.response.use(
 apiAuth.interceptors.response.use(
   (response) => {
     // Any status code within the range of 2xx triggers this function
+    return response;
+  },
+  (error) => {
+    BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.send(
+        "main-process-message",
+        `error: ${JSON.stringify(error)}`
+      );
+    });
+    return Promise.reject(error);
+  }
+);
+
+apiSieg.interceptors.response.use(
+  (response) => {
     return response;
   },
   (error) => {

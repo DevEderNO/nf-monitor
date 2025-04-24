@@ -155,14 +155,13 @@ export class SiegTask {
           0,
           ProcessamentoStatus.Running
         );
-        const downloadNFe = await downloadNotes(this.config?.apiKeySieg!, {
+        const downloadNFe = await downloadNotes(this.config!.apiKeySieg!, {
           ...{
             XmlType: xmlType,
             Take: 50,
             Skip: i,
             DataEmissaoInicio: format(this.dateInitial!, "yyyy-MM-dd"),
             DataEmissaoFim: format(this.dateEnd!, "yyyy-MM-dd"),
-            Downloadevent: true,
           },
         });
         for (let i = 0; i < downloadNFe.xmls.length; i++) {
@@ -376,7 +375,7 @@ export class SiegTask {
   }
 
   private async countNotesPerCompany() {
-    this.countNotes = await getCountNotes(this.config?.apiKeySieg!, {
+    this.countNotes = await getCountNotes(this.config!.apiKeySieg!, {
       DataEmissaoInicio: format(this.dateInitial!, "yyyy-MM-dd"),
       DataEmissaoFim: format(this.dateEnd!, "yyyy-MM-dd"),
       Downloadevent: true,

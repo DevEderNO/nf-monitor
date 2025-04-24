@@ -30,7 +30,7 @@ export interface ISiegDownloadNotesRequest {
   CnpjTom?: string;
   DataEmissaoInicio: string;
   DataEmissaoFim: string;
-  Downloadevent: boolean;
+  Downloadevent?: boolean;
 }
 
 export interface ISiegDownloadNotesResponse {
