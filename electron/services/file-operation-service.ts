@@ -20,7 +20,7 @@ export function selectDirectories(
   properties: OpenDialogOptions["properties"] = [
     "openDirectory",
     "multiSelections",
-  ]
+  ],
 ): IDirectory[] {
   const result = dialog.showOpenDialogSync(win, {
     properties,
@@ -92,12 +92,12 @@ function validateNotaFiscal(data: string): {
       new Date(
         2000 + Number(chaveAcesso.slice(2, 4)),
         Number(chaveAcesso.slice(4, 6)),
-        1
+        1,
       ),
       addMonths(
         new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-        -3
-      )
+        -3,
+      ),
     )
   ) {
     return { valid: false, isNotaFiscal: true };
@@ -116,7 +116,7 @@ function validateNotaServico(data: string): {
     if (
       isBefore(
         date,
-        addMonths(new Date(newDate.getFullYear(), newDate.getMonth(), 1), -3)
+        addMonths(new Date(newDate.getFullYear(), newDate.getMonth(), 1), -3),
       )
     )
       return { valid: false, isNotaFiscal: true };
@@ -224,49 +224,6 @@ export function validateDFileExists(fileInfo: IFileInfo): boolean {
   return fs.existsSync(fileInfo.filepath);
 }
 
-export function acceptStreamsEula() {
-  try {
-    // Comando para adicionar a entrada no registro
-    const regCommand =
-      'reg add "HKCU\\Software\\Sysinternals\\Streams" /v EulaAccepted /t REG_DWORD /d 1 /f';
-    execSync(regCommand, { stdio: "ignore" });
-  } catch (error) {
-    console.error("Erro ao aceitar os termos do streams.exe:", error);
-  }
-}
-
-export function isFileBlocked(filePath: string): boolean {
-  const streamsPath = path.join(
-    process.env["VITE_DEV_SERVER_URL"]
-      ? __dirname
-      : path.dirname(app.getPath("exe")),
-    "streams.exe"
-  );
-  try {
-    const output = execSync(`"${streamsPath}" "${filePath}"`, {
-      stdio: "pipe",
-    }).toString();
-    return output.includes("Zone.Identifier");
-  } catch (error) {
-    console.error("Erro ao verificar o arquivo:", error);
-    return false;
-  }
-}
-
-export function unblockFile(filePath: string) {
-  const streamsPath = path.join(
-    process.env["VITE_DEV_SERVER_URL"]
-      ? __dirname
-      : path.dirname(app.getPath("exe")),
-    "streams.exe"
-  );
-  try {
-    execSync(`"${streamsPath}" -d "${filePath}"`, { stdio: "ignore" });
-  } catch (error) {
-    console.error("Erro ao desbloquear o arquivo:", error);
-  }
-}
-
 export async function copyMigrations(): Promise<void> {
   try {
     if (!app.isPackaged) return;
@@ -286,13 +243,13 @@ export async function applyMigrations(): Promise<void> {
       "node_modules",
       "prisma",
       "build",
-      "index.js"
+      "index.js",
     );
     const prismaSchema = path.join(app.getPath("userData"), "schema.prisma");
     let prismaMigrateDeployString = fs.readFileSync(prismaSchema, "utf-8");
     prismaMigrateDeployString = prismaMigrateDeployString.replace(
       "file:./dev.db",
-      "file:./nfmonitor.db"
+      "file:./nfmonitor.db",
     );
     fs.writeFileSync(prismaSchema, prismaMigrateDeployString, "utf-8");
 
@@ -301,7 +258,7 @@ export async function applyMigrations(): Promise<void> {
       `"${nodePath}" "${prismaPath}" migrate deploy --schema "${prismaSchema}"`,
       {
         stdio: "pipe",
-      }
+      },
     );
     console.info(`Migrations aplicadas com sucesso. ${result}`);
   } catch (error) {
@@ -362,7 +319,6 @@ export async function recicleDb() {
   await signInSittax(
     db.auth?.credentials?.user ?? "",
     db.auth?.credentials?.password ?? "",
-    true
   );
   const newDbPath = dbPath.replace("db.json", "oldDb.json");
   fs.renameSync(dbPath, newDbPath);
@@ -403,7 +359,7 @@ export function createDirectoryFolder(directoryPath: string) {
 }
 
 export async function listarArquivos(
-  diretorios: string[]
+  diretorios: string[],
 ): Promise<IFileInfo[]> {
   try {
     const arquivos = await Promise.all(
@@ -432,11 +388,11 @@ export async function listarArquivos(
                   modifiedtime: stats.mtime,
                   size: stats.size,
                 }; // Retorna o arquivo
-          })
+          }),
         );
 
         return paths.flat(); // Achata o array de arquivos em um único nível
-      })
+      }),
     );
 
     return arquivos.flat(); // Achata o resultado final

@@ -1,7 +1,6 @@
 import { BrowserWindow, ipcMain, Notification } from "electron";
 import { selectDirectories } from "./services/file-operation-service";
 import { updateJobs } from "./services/schedules";
-import { encrypt } from "./lib/cryptography";
 import { signIn } from "./lib/axios";
 import {
   addAuth,
@@ -21,12 +20,8 @@ import { IConfig } from "./interfaces/config";
 import { IDirectory } from "./interfaces/directory";
 import { IUser } from "./interfaces/user";
 
-export async function signInSittax(
-  user: string,
-  password: string,
-  encripted: boolean
-) {
-  const data = await signIn(user, password, encripted);
+export async function signInSittax(user: string, password: string) {
+  const data = await signIn(user, password);
   const {
     Token,
     Escritorio: { Usuarios, Empresas, ApiKeySieg, EmailSieg, SenhaSieg },
@@ -50,13 +45,11 @@ export async function signInSittax(
     Nivel,
   } = Usuarios[0];
 
-  const passwordHash = encrypt(password);
-
   const auth = {
     token: Token,
     username: user,
     name: Nome,
-    password: passwordHash,
+    password: password,
     user: {
       userId: Id.toString(),
       nome: Nome,
@@ -98,8 +91,8 @@ export async function registerListeners(win: BrowserWindow | null) {
   ipcMain.handle(
     "signIn",
     async (_, { user, password }: { user: string; password: string }) => {
-      return await signInSittax(user, password, false);
-    }
+      return await signInSittax(user, password);
+    },
   );
 
   ipcMain.on("remove-auth", async () => {
@@ -136,7 +129,9 @@ export async function registerListeners(win: BrowserWindow | null) {
     async (_, clearFiles: boolean) => {
       const data = await getConfiguration();
       if (clearFiles && data?.directoryDownloadSieg) {
-        await removeFilesNotSended(data.directoryDownloadSieg.replace(/\//g, "\\"));
+        await removeFilesNotSended(
+          data.directoryDownloadSieg.replace(/\//g, "\\"),
+        );
       }
       const config = await updateConfiguration({
         ...data,
@@ -145,7 +140,7 @@ export async function registerListeners(win: BrowserWindow | null) {
       } as IConfig);
       updateJobs();
       return config;
-    }
+    },
   );
 
   ipcMain.handle(
@@ -156,7 +151,7 @@ export async function registerListeners(win: BrowserWindow | null) {
         ...data,
         viewUploadedFiles: viewUploadedFiles,
       } as IConfig);
-    }
+    },
   );
 
   ipcMain.handle(
@@ -167,7 +162,7 @@ export async function registerListeners(win: BrowserWindow | null) {
         ...data,
         timeForProcessing: timeForProcessing,
       } as IConfig);
-    }
+    },
   );
 
   ipcMain.handle(
@@ -178,7 +173,7 @@ export async function registerListeners(win: BrowserWindow | null) {
         ...data,
         timeForConsultingSieg: timeForConsultingSieg,
       } as IConfig);
-    }
+    },
   );
 
   ipcMain.handle("remove-directory", async (_, directory: string) => {

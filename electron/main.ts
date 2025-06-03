@@ -11,24 +11,14 @@ import { registerListeners } from "./listeners";
 import { createWebsocket } from "./websocket";
 import { autoUpdater } from "electron-updater";
 import {
-  acceptStreamsEula,
   applyMigrations,
   copyMigrations,
   recicleDb,
 } from "./services/file-operation-service";
 import { logError } from "./services/error-service";
 import { ErrorType } from "@prisma/client";
-import { powerSaveBlocker } from 'electron';
+import { powerSaveBlocker } from "electron";
 
-// The built directory structure
-//
-// ├─┬─┬ dist
-// │ │ └── index.html
-// │ │
-// │ ├─┬ dist-electron
-// │ │ ├── main.js
-// │ │ └── preload.js
-// │
 process.env.DIST = path.join(__dirname, "../dist");
 const envVitePublic = app.isPackaged
   ? process.env.DIST
@@ -37,13 +27,47 @@ process.env.VITE_PUBLIC = envVitePublic;
 
 let win: BrowserWindow | null;
 let tray: Tray;
-// 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
+
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 
 app.setAppUserModelId("Monitor");
 
-// Impede que o sistema entre em suspensão
-const id = powerSaveBlocker.start('prevent-app-suspension');
+const id = powerSaveBlocker.start("prevent-app-suspension");
+let triedAzure = false;
+let triedGitHub = false;
+let updateCheckInProgress = false;
+
+function resetUpdateFlags() {
+  triedAzure = false;
+  triedGitHub = false;
+  updateCheckInProgress = false;
+}
+
+function checkForUpdatesWithFallback() {
+  if (updateCheckInProgress) return;
+
+  updateCheckInProgress = true;
+
+  if (!triedAzure) {
+    triedAzure = true;
+    autoUpdater.setFeedURL({
+      provider: "generic",
+      url: "https://dev.azure.com/Sittax/Sittax/nf-monitor/releases:latest",
+    });
+    autoUpdater.checkForUpdatesAndNotify();
+  } else if (!triedGitHub) {
+    triedGitHub = true;
+    autoUpdater.setFeedURL({
+      provider: "github",
+      owner: "DevEderNO",
+      repo: "nf-monitor",
+      releaseType: "release",
+    });
+    autoUpdater.checkForUpdatesAndNotify();
+  } else {
+    updateCheckInProgress = false;
+  }
+}
 
 function createWindow() {
   win = new BrowserWindow({
@@ -84,7 +108,7 @@ function createWindow() {
   }
 
   const icon = nativeImage.createFromPath(
-    path.join(envVitePublic, "sittax.png")
+    path.join(envVitePublic, "sittax.png"),
   );
 
   tray = new Tray(icon);
@@ -139,7 +163,6 @@ function createWindow() {
     }
   });
 
-  // Intercepta erros não tratados
   process.on("uncaughtException", async (error) => {
     await logError(error, ErrorType.UncaughtException);
     BrowserWindow.getAllWindows().forEach((window) => {
@@ -147,7 +170,6 @@ function createWindow() {
     });
   });
 
-  // Intercepta promessas rejeitadas não tratadas
   process.on("unhandledRejection", async (reason) => {
     if (reason instanceof Error) {
       await logError(reason, ErrorType.UnhandledRejection);
@@ -162,22 +184,20 @@ function createWindow() {
     }
   });
 
-  // Intercepta erros de renderização
   app.on("render-process-gone", async (_event, _webContents, details) => {
     await logError(
       new Error(`Render process gone: ${details.reason}`),
-      ErrorType.RenderProcessGone
+      ErrorType.RenderProcessGone,
     );
     BrowserWindow.getAllWindows().forEach((window) => {
       window.webContents.send("main-process-message", details.reason);
     });
   });
 
-  // Intercepta erros de GPU
   app.on("child-process-gone", async (_event, details) => {
     await logError(
       new Error(`GPU process gone: ${details.type}`),
-      ErrorType.GPUProcessGone
+      ErrorType.GPUProcessGone,
     );
     BrowserWindow.getAllWindows().forEach((window) => {
       window.webContents.send("main-process-message", details.type);
@@ -187,11 +207,77 @@ function createWindow() {
   if (!VITE_DEV_SERVER_URL) {
     app.setLoginItemSettings({
       openAtLogin: true,
-      openAsHidden: true, // Mantém oculto no início
+      openAsHidden: true,
       path: app.getPath("exe"),
     });
   }
 }
+
+autoUpdater.on("checking-for-update", () => {
+  win?.webContents.send("update-checking", "🔍 Verificando atualizações...");
+});
+
+autoUpdater.on("update-available", () => {
+  updateCheckInProgress = false;
+  win?.webContents.send("update-available", "⚙️ Identificada uma nova versão.");
+});
+
+autoUpdater.on("update-not-available", (info) => {
+  console.log("Update not available:", info);
+  updateCheckInProgress = false;
+  win?.webContents.send(
+    "update-not-available",
+    "✅ Aplicação está atualizada.",
+  );
+});
+
+autoUpdater.on("error", () => {
+  if (!triedGitHub) {
+    setTimeout(() => {
+      checkForUpdatesWithFallback();
+    }, 1000);
+  } else {
+    updateCheckInProgress = false;
+    win?.webContents.send(
+      "update-error",
+      "❌ Falha ao buscar atualizações em ambos os servidores.",
+    );
+  }
+});
+
+autoUpdater.on("download-progress", (progressObj) => {
+  let log_message = "Download speed: " + progressObj.bytesPerSecond;
+  log_message = log_message + " - Downloaded " + progressObj.percent + "%";
+  log_message =
+    log_message +
+    " (" +
+    progressObj.transferred +
+    "/" +
+    progressObj.total +
+    ")";
+  console.log(log_message);
+
+  win?.webContents.send("update-download-progress", {
+    percent: Math.round(progressObj.percent),
+    transferred: progressObj.transferred,
+    total: progressObj.total,
+    bytesPerSecond: progressObj.bytesPerSecond,
+  });
+});
+
+autoUpdater.on("update-downloaded", (info) => {
+  console.log("Update downloaded:", info);
+  updateCheckInProgress = false;
+
+  win?.webContents.send(
+    "update-downloaded",
+    "🚀 Atualização baixada! Reiniciando em 5 segundos...",
+  );
+
+  setTimeout(() => {
+    autoUpdater.quitAndInstall();
+  }, 5000);
+});
 
 app.on("ready", async () => {
   const isSecondInstance = app.requestSingleInstanceLock();
@@ -199,36 +285,28 @@ app.on("ready", async () => {
     await copyMigrations();
     await applyMigrations();
     await recicleDb();
-    acceptStreamsEula();
     createWebsocket();
     createWindow();
     registerListeners(win);
-    autoUpdater.checkForUpdatesAndNotify();
+
+    setTimeout(() => {
+      checkForUpdatesWithFallback();
+    }, 3000);
   } else {
     app.quit();
   }
 });
 
-autoUpdater.setFeedURL({
-  provider: "github",
-  owner: "DevEderNO",
-  repo: "nf-monitor",
-  releaseType: "release",
-});
-
 setInterval(() => {
-  autoUpdater.checkForUpdatesAndNotify();
+  resetUpdateFlags();
+  checkForUpdatesWithFallback();
 }, 60000);
 
-autoUpdater.on("update-available", () => {
-  win?.webContents.send("update-available", "⚙️ Identificada uma nova versão.");
-});
-
-autoUpdater.on("update-downloaded", () => {
-  win?.webContents.send(
-    "update-downloaded",
-    "🚀 Atualização começará em 5 segundos"
-  );
-  setInterval(() => {}, 5000);
-  autoUpdater.quitAndInstall();
+app.on("web-contents-created", (_, webContents) => {
+  webContents.on("ipc-message", (_, channel) => {
+    if (channel === "check-for-updates") {
+      resetUpdateFlags();
+      checkForUpdatesWithFallback();
+    }
+  });
 });

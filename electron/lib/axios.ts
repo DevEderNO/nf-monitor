@@ -1,5 +1,4 @@
 import axios from "axios";
-import { decrypt } from "./cryptography";
 import { createReadStream } from "fs";
 import FormData from "form-data";
 import { ISignIn } from "../interfaces/signin";
@@ -11,22 +10,24 @@ import {
 import { BrowserWindow } from "electron";
 import { NFMoniotorHealth } from "../interfaces/health-message";
 
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 const apiAuth = axios.create({
-  baseURL: import.meta.env.VITE_API_AUTH_URL,
+  baseURL: process.env.VITE_API_AUTH_URL,
 });
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_UPLOAD_URL,
+  baseURL: process.env.VITE_API_UPLOAD_URL,
   timeout: 20000,
 });
 
 const apiSieg = axios.create({
-  baseURL: import.meta.env.VITE_API_SIEG_URL,
+  baseURL: process.env.VITE_API_SIEG_URL,
   timeout: 50000,
 });
 
 const apiHealthBroker = axios.create({
-  baseURL: import.meta.env.VITE_API_HEALTH_BROKER_URL,
+  baseURL: process.env.VITE_API_HEALTH_BROKER_URL,
   timeout: 20000,
 });
 
@@ -42,13 +43,11 @@ export async function checkRoute(url: string) {
 export async function signIn(
   username: string,
   password: string,
-  useCryptography?: boolean
 ): Promise<ISignIn> {
-  const currentPassword = useCryptography ? decrypt(password) : password;
   const resp = await apiAuth.get<ISignIn>(`auth/logar-nfe-monitor`, {
     params: {
       usuario: username,
-      senha: currentPassword,
+      senha: password,
     },
     headers: {
       Origin: "https://app.sittax.com.br",
@@ -65,7 +64,7 @@ export async function retry(
   token: string,
   maximumRetry = 0,
   attempt = 0,
-  delay = 0
+  delay = 0,
 ) {
   try {
     await sleep(delay);
@@ -88,7 +87,7 @@ export async function retry(
       token,
       maximumRetry,
       attempt + 1,
-      (delay || 500) * 2
+      (delay || 500) * 2,
     );
   }
 }
@@ -103,7 +102,7 @@ export async function retrySieg(
   data: ISiegCountNotesRequest | ISiegDownloadNotesRequest,
   maximumRetry = 0,
   attempt = 0,
-  delay = 0
+  delay = 0,
 ) {
   try {
     await sleep(delay);
@@ -123,7 +122,7 @@ export async function retrySieg(
       "Erro ao baixar notas numero de tentativas: ",
       attempt,
       "delay: ",
-      delay
+      delay,
     );
     return retrySieg(
       url,
@@ -131,21 +130,21 @@ export async function retrySieg(
       data,
       maximumRetry,
       attempt + 1,
-      (delay > 0 ? delay : 1000) * 2
+      (delay > 0 ? delay : 1000) * 2,
     );
   }
 }
 
 export async function getCountNotes(
   apiKey: string,
-  data: ISiegCountNotesRequest
+  data: ISiegCountNotesRequest,
 ) {
   return await retrySieg(`/ContarXmls`, apiKey, data, 5);
 }
 
 export async function downloadNotes(
   apiKey: string,
-  data: ISiegDownloadNotesRequest
+  data: ISiegDownloadNotesRequest,
 ): Promise<ISiegDownloadNotesResponse> {
   return await retrySieg(`/BaixarXmlsV2`, apiKey, data, 10);
 }
@@ -177,11 +176,11 @@ api.interceptors.response.use(
     BrowserWindow.getAllWindows().forEach((window) => {
       window.webContents.send(
         "main-process-message",
-        `error: ${JSON.stringify(error)}`
+        `error: ${JSON.stringify(error)}`,
       );
     });
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor
@@ -194,11 +193,11 @@ apiAuth.interceptors.response.use(
     BrowserWindow.getAllWindows().forEach((window) => {
       window.webContents.send(
         "main-process-message",
-        `error: ${JSON.stringify(error)}`
+        `error: ${JSON.stringify(error)}`,
       );
     });
     return Promise.reject(error);
-  }
+  },
 );
 
 apiSieg.interceptors.response.use(
@@ -209,9 +208,9 @@ apiSieg.interceptors.response.use(
     BrowserWindow.getAllWindows().forEach((window) => {
       window.webContents.send(
         "main-process-message",
-        `error: ${JSON.stringify(error)}`
+        `error: ${JSON.stringify(error)}`,
       );
     });
     return Promise.reject(error);
-  }
+  },
 );

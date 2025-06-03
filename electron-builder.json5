@@ -52,6 +52,10 @@
       repo: "nf-monitor",
       releaseType: "release",
     },
+    {
+      provider: "generic",
+      url: "https://dev.azure.com/Sittax/Sittax/nf-monitor/releases:latest"
+    }
   ],
   mac: {
     target: ["dmg"],
