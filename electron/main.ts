@@ -18,7 +18,7 @@ import {
 } from "./services/file-operation-service";
 import { logError } from "./services/error-service";
 import { ErrorType } from "@prisma/client";
-import { powerSaveBlocker } from 'electron';
+import { powerSaveBlocker } from "electron";
 
 // The built directory structure
 //
@@ -43,7 +43,7 @@ const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 app.setAppUserModelId("Monitor");
 
 // Impede que o sistema entre em suspensão
-const id = powerSaveBlocker.start('prevent-app-suspension');
+const id = powerSaveBlocker.start("prevent-app-suspension");
 
 function createWindow() {
   win = new BrowserWindow({
@@ -84,7 +84,7 @@ function createWindow() {
   }
 
   const icon = nativeImage.createFromPath(
-    path.join(envVitePublic, "sittax.png")
+    path.join(envVitePublic, "sittax.png"),
   );
 
   tray = new Tray(icon);
@@ -166,7 +166,7 @@ function createWindow() {
   app.on("render-process-gone", async (_event, _webContents, details) => {
     await logError(
       new Error(`Render process gone: ${details.reason}`),
-      ErrorType.RenderProcessGone
+      ErrorType.RenderProcessGone,
     );
     BrowserWindow.getAllWindows().forEach((window) => {
       window.webContents.send("main-process-message", details.reason);
@@ -177,7 +177,7 @@ function createWindow() {
   app.on("child-process-gone", async (_event, details) => {
     await logError(
       new Error(`GPU process gone: ${details.type}`),
-      ErrorType.GPUProcessGone
+      ErrorType.GPUProcessGone,
     );
     BrowserWindow.getAllWindows().forEach((window) => {
       window.webContents.send("main-process-message", details.type);
@@ -199,7 +199,11 @@ app.on("ready", async () => {
     await copyMigrations();
     await applyMigrations();
     await recicleDb();
-    acceptStreamsEula();
+
+    if (process.platform === "win32") {
+      acceptStreamsEula();
+    }
+
     createWebsocket();
     createWindow();
     registerListeners(win);
@@ -227,7 +231,7 @@ autoUpdater.on("update-available", () => {
 autoUpdater.on("update-downloaded", () => {
   win?.webContents.send(
     "update-downloaded",
-    "🚀 Atualização começará em 5 segundos"
+    "🚀 Atualização começará em 5 segundos",
   );
   setInterval(() => {}, 5000);
   autoUpdater.quitAndInstall();
