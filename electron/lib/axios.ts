@@ -11,7 +11,7 @@ import {
 import { BrowserWindow } from "electron";
 import { NFMoniotorHealth } from "../interfaces/health-message";
 
-// process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 const apiAuth = axios.create({
   baseURL: import.meta.env.VITE_API_AUTH_URL,
