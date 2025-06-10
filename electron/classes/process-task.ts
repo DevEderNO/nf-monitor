@@ -211,11 +211,11 @@ export class ProcessTask {
         `Houve um problema ao enviar os arquivos para o Sittax. Continuando do arquivo ${lastProcessedIndex + 1}`
       );
 
-      await this.continueFromIndex(connection, lastProcessedIndex);
+      await this.continueFromIndex(lastProcessedIndex);
     }
   }
 
-  async continueFromIndex(connection: connection, startIndex: number) {
+  async continueFromIndex(startIndex: number) {
     try {
       await this.sendMessageClient([`🔄 Continuando o processo do arquivo ${startIndex + 1}`]);
 
