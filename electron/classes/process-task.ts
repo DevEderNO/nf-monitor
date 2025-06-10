@@ -27,6 +27,10 @@ import { IAuth } from '../interfaces/auth';
 import { timeout } from '../lib/time-utils';
 import { XHealthType } from '../interfaces/health-message';
 import { healthBrokerComunication } from '../services/health-broker-service';
+import * as path from 'path';
+import * as fs from 'fs';
+
+const AdmZip = require('adm-zip');
 
 export class ProcessTask {
   isPaused: boolean;
@@ -264,7 +268,7 @@ export class ProcessTask {
             success = await this.sendXmlAndPdfSittax(index, currentProgress);
             break;
           case '.zip':
-            success = await this.sendZipSittax(index, currentProgress);
+            success = await this.extractAndProcessZip(index, currentProgress);
             break;
           default:
             success = true;
@@ -359,6 +363,14 @@ export class ProcessTask {
     if (validFile.valid) {
       this.files[index].isValid = true;
       try {
+        await this.sendMessageClient(
+          [`🚀 Enviando ${this.files[index].filepath}`],
+          currentProgress,
+          index + 1,
+          this.max,
+          ProcessamentoStatus.Running
+        );
+
         await upload(this.auth?.token ?? '', this.files[index].filepath);
         await updateFile(this.files[index].filepath, {
           wasSend: true,
@@ -374,15 +386,19 @@ export class ProcessTask {
           ProcessamentoStatus.Running
         );
         return true;
-      } catch (error) {
+      } catch (error: any) {
         this.hasError = true;
-        await this.sendMessageClient(
-          [`❌ Erro ao enviar ${this.files[index].filepath}`],
-          currentProgress,
-          index + 1,
-          this.max,
-          ProcessamentoStatus.Running
-        );
+        let errorMessage = `❌ Erro ao enviar ${this.files[index].filepath}`;
+
+        if (error.code === 'ERR_BAD_RESPONSE') {
+          if (error.config?.headers?.['Content-Length']) {
+            const sizeInMB = (parseInt(error.config.headers['Content-Length']) / (1024 * 1024)).toFixed(2);
+            errorMessage = `❌ Arquivo muito grande (${sizeInMB}MB): ${this.files[index].filepath}`;
+          } else if (error.response?.status === 400) {
+            errorMessage = `❌ Servidor rejeitou o arquivo: ${this.files[index].filepath}`;
+          }
+        }
+        await this.sendMessageClient([errorMessage], currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
         throw error;
       }
     } else {
@@ -405,45 +421,9 @@ export class ProcessTask {
     }
   }
 
-  private async sendZipSittax(index: number, currentProgress: number): Promise<boolean> {
+  private async extractAndProcessZip(index: number, currentProgress: number): Promise<boolean> {
     const validFile = validZip(this.files[index]);
-    if (validFile.valid) {
-      this.files[index].isValid = true;
-      await this.sendMessageClient(
-        [`🚀 Enviando ${this.files[index].filepath}`],
-        currentProgress,
-        index + 1,
-        this.max,
-        ProcessamentoStatus.Running
-      );
-      try {
-        await upload(this.auth?.token ?? '', this.files[index].filepath);
-        await this.sendMessageClient(
-          [`✅ Enviado com sucesso ${this.files[index].filepath}`],
-          currentProgress,
-          index + 1,
-          this.max,
-          ProcessamentoStatus.Running
-        );
-        await updateFile(this.files[index].filepath, {
-          wasSend: true,
-          dataSend: new Date(),
-        });
-        this.files[index].wasSend = true;
-        this.files[index].dataSend = new Date();
-        return true;
-      } catch (error) {
-        this.hasError = true;
-        await this.sendMessageClient(
-          [`❌ Erro ao enviar ${this.files[index].filepath}`],
-          currentProgress,
-          index + 1,
-          this.max,
-          ProcessamentoStatus.Running
-        );
-        throw error;
-      }
-    } else {
+    if (!validFile.valid) {
       await this.sendMessageClient(
         [
           validFile.isNotaFiscal
@@ -460,6 +440,236 @@ export class ProcessTask {
       });
       this.files[index].isValid = false;
       return true;
+    }
+
+    this.files[index].isValid = true;
+
+    try {
+      await this.sendMessageClient(
+        [`📦 Extraindo arquivo ZIP ${this.files[index].filepath}`],
+        currentProgress,
+        index + 1,
+        this.max,
+        ProcessamentoStatus.Running
+      );
+
+      const zip = new AdmZip(this.files[index].filepath);
+      const extractPath = path.join(
+        path.dirname(this.files[index].filepath),
+        'extracted_' + Date.now() + '_' + path.basename(this.files[index].filepath, '.zip')
+      );
+
+      if (!fs.existsSync(extractPath)) {
+        fs.mkdirSync(extractPath, { recursive: true });
+      }
+
+      zip.extractAllTo(extractPath, true);
+
+      await this.sendMessageClient(
+        [`✅ Arquivo ZIP extraído para ${extractPath}`],
+        currentProgress,
+        index + 1,
+        this.max,
+        ProcessamentoStatus.Running
+      );
+
+      const extractedFiles = this.getExtractedFiles(extractPath);
+
+      if (extractedFiles.length > 0) {
+        await this.sendMessageClient(
+          [`📁 Encontrados ${extractedFiles.length} arquivos para envio`],
+          currentProgress,
+          index + 1,
+          this.max,
+          ProcessamentoStatus.Running
+        );
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const extractedFile of extractedFiles) {
+          try {
+            if (this.isCancelled || this.isPaused) break;
+
+            await this.sendMessageClient(
+              [`🚀 Enviando arquivo extraído: ${extractedFile.filename}`],
+              currentProgress,
+              index + 1,
+              this.max,
+              ProcessamentoStatus.Running
+            );
+
+            const validExtractedFile = validXmlAndPdf(extractedFile);
+            if (validExtractedFile.valid) {
+              await upload(this.auth?.token ?? '', extractedFile.filepath);
+              successCount++;
+
+              await this.sendMessageClient(
+                [`✅ Arquivo extraído enviado com sucesso: ${extractedFile.filename}`],
+                currentProgress,
+                index + 1,
+                this.max,
+                ProcessamentoStatus.Running
+              );
+            } else {
+              errorCount++;
+              await this.sendMessageClient(
+                [`⚠️ Arquivo extraído não é válido: ${extractedFile.filename}`],
+                currentProgress,
+                index + 1,
+                this.max,
+                ProcessamentoStatus.Running
+              );
+            }
+          } catch (error: any) {
+            errorCount++;
+            this.hasError = true;
+            let errorMessage = `❌ Erro ao enviar arquivo extraído ${extractedFile.filename}`;
+
+            if (error.code === 'ERR_BAD_RESPONSE') {
+              if (error.config?.headers?.['Content-Length']) {
+                const sizeInMB = (parseInt(error.config.headers['Content-Length']) / (1024 * 1024)).toFixed(2);
+                errorMessage = `❌ Arquivo extraído muito grande (${sizeInMB}MB): ${extractedFile.filename}`;
+              } else if (error.response?.status === 400) {
+                errorMessage = `❌ Servidor rejeitou o arquivo extraído: ${extractedFile.filename}`;
+              }
+            }
+
+            await this.sendMessageClient(
+              [errorMessage],
+              currentProgress,
+              index + 1,
+              this.max,
+              ProcessamentoStatus.Running
+            );
+          }
+        }
+
+        try {
+          this.removeDirectory(extractPath);
+          await this.sendMessageClient(
+            [`🧹 Diretório temporário removido: ${extractPath}`],
+            currentProgress,
+            index + 1,
+            this.max,
+            ProcessamentoStatus.Running
+          );
+        } catch (cleanupError) {
+          await this.sendMessageClient(
+            [`⚠️ Não foi possível remover diretório temporário: ${extractPath}`],
+            currentProgress,
+            index + 1,
+            this.max,
+            ProcessamentoStatus.Running
+          );
+        }
+
+        await updateFile(this.files[index].filepath, {
+          wasSend: true,
+          dataSend: new Date(),
+        });
+        this.files[index].wasSend = true;
+        this.files[index].dataSend = new Date();
+
+        await this.sendMessageClient(
+          [`📊 Processamento do ZIP concluído: ${successCount} enviados, ${errorCount} com erro`],
+          currentProgress,
+          index + 1,
+          this.max,
+          ProcessamentoStatus.Running
+        );
+
+        return true;
+      } else {
+        await this.sendMessageClient(
+          [`⚠️ Nenhum arquivo válido encontrado no ZIP ${this.files[index].filepath}`],
+          currentProgress,
+          index + 1,
+          this.max,
+          ProcessamentoStatus.Running
+        );
+
+        try {
+          this.removeDirectory(extractPath);
+        } catch (cleanupError) {
+        }
+
+        await updateFile(this.files[index].filepath, {
+          wasSend: true,
+          dataSend: new Date(),
+        });
+        this.files[index].wasSend = true;
+        this.files[index].dataSend = new Date();
+
+        return true;
+      }
+    } catch (error: any) {
+      this.hasError = true;
+      const errorMessage = `❌ Erro ao processar ZIP ${this.files[index].filepath}: ${error.message}`;
+      await this.sendMessageClient([errorMessage], currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
+      throw error;
+    }
+  }
+
+  private getExtractedFiles(extractPath: string): IFileInfo[] {
+    const files: IFileInfo[] = [];
+
+    const scanDirectory = (dirPath: string) => {
+      try {
+        const items = fs.readdirSync(dirPath);
+
+        items.forEach(item => {
+          const fullPath = path.join(dirPath, item);
+          try {
+            const stat = fs.statSync(fullPath);
+
+            if (stat.isDirectory()) {
+              scanDirectory(fullPath);
+            } else {
+              const ext = path.extname(item).toLowerCase();
+              if (['.xml', '.pdf'].includes(ext)) {
+                files.push({
+                  filepath: fullPath,
+                  filename: item,
+                  extension: ext,
+                  size: stat.size,
+                  dateCreated: stat.birthtime,
+                  dateModified: stat.mtime,
+                  wasSend: false,
+                  isValid: true,
+                  dataSend: null,
+                } as any);
+              }
+            }
+          } catch (statError) {
+            console.warn(`Não foi possível acessar: ${fullPath}`, statError);
+          }
+        });
+      } catch (readError) {
+        console.warn(`Não foi possível ler diretório: ${dirPath}`, readError);
+      }
+    };
+
+    scanDirectory(extractPath);
+    return files;
+  }
+
+  private removeDirectory(dirPath: string) {
+    if (fs.existsSync(dirPath)) {
+      const files = fs.readdirSync(dirPath);
+
+      files.forEach(file => {
+        const filePath = path.join(dirPath, file);
+        const stat = fs.statSync(filePath);
+
+        if (stat.isDirectory()) {
+          this.removeDirectory(filePath);
+        } else {
+          fs.unlinkSync(filePath);
+        }
+      });
+
+      fs.rmdirSync(dirPath);
     }
   }
 
