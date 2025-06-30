@@ -24,7 +24,7 @@ import {
   updateHistoric,
 } from '../services/database';
 import { IAuth } from '../interfaces/auth';
-import { timeout } from '../lib/time-utils';
+import { getTimestamp, timeout } from '../lib/time-utils';
 import { XHealthType } from '../interfaces/health-message';
 import { healthBrokerComunication } from '../services/health-broker-service';
 import * as path from 'path';
@@ -282,7 +282,7 @@ export class ProcessTask {
             currentProgress,
             index + 1,
             this.max,
-            ProcessamentoStatus.Running
+            ProcessamentoStatus.Stopped
           );
         }
       }
@@ -388,7 +388,7 @@ export class ProcessTask {
         return true;
       } catch (error: any) {
         this.hasError = true;
-        let errorMessage = `❌ Erro ao enviar ${this.files[index].filepath}`;
+        let errorMessage = `❌ Erro ao enviar ${this.files[index].filepath} \n Erro: ${error}`;
 
         if (error.code === 'ERR_BAD_RESPONSE') {
           if (error.config?.headers?.['Content-Length']) {
@@ -591,8 +591,7 @@ export class ProcessTask {
 
         try {
           this.removeDirectory(extractPath);
-        } catch (cleanupError) {
-        }
+        } catch (cleanupError) {}
 
         await updateFile(this.files[index].filepath, {
           wasSend: true,
@@ -682,20 +681,27 @@ export class ProcessTask {
     replace = false
   ) {
     await timeout();
-    messages.forEach(x => this.historic.log?.push(x));
+
+    const timestampedMessages = messages.map(message => {
+      return `${getTimestamp()} - ${message}`;
+    });
+
+    timestampedMessages.forEach(x => this.historic.log?.push(x));
+
     if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
       this.historic.endDate = new Date();
       if (this.historic.id) {
         await updateHistoric(this.historic);
       }
     }
+
     this.connection?.sendUTF(
       JSON.stringify({
         type: 'message',
         message: {
           type: WSMessageType.Process,
           data: {
-            messages,
+            messages: timestampedMessages,
             progress,
             value,
             max,
@@ -706,6 +712,7 @@ export class ProcessTask {
         },
       } as WSMessageTyped<IProcessamento>)
     );
+
     await timeout();
   }
 }
