@@ -524,7 +524,7 @@ export class ProcessTask {
           } catch (error: any) {
             errorCount++;
             this.hasError = true;
-            let errorMessage = `❌ Erro ao enviar arquivo extraído ${extractedFile.filename}`;
+            let errorMessage = `❌ Erro ao enviar arquivo extraído ${extractedFile.filename} \n Erro: ${error}`;
 
             if (error.code === 'ERR_BAD_RESPONSE') {
               if (error.config?.headers?.['Content-Length']) {
