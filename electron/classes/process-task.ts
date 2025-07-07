@@ -3,7 +3,7 @@ import {
   isFileBlocked,
   listarArquivos,
   unblockFile,
-  validXmlAndPdf,
+  validFile,
   validZip,
   validateDFileExists,
 } from '../services/file-operation-service';
@@ -200,7 +200,9 @@ export class ProcessTask {
       const message = this.hasError
         ? `😨 Tarefa concluída com erros. Foram enviados ${this.files.reduce((acc, file) => acc + (file.wasSend ? 1 : 0), 0)} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`
         : `😁 Tarefa concluída. Foram enviados ${this.filesSended.length} arquivos.`;
-      await this.sendMessageClient([message, ''], 100, this.max, this.max, ProcessamentoStatus.Concluded);
+
+      await this.sendMessageClient([message], 100, this.max, this.max, ProcessamentoStatus.Concluded);
+
       await healthBrokerComunication(this.hasError ? XHealthType.Error : XHealthType.Success, message);
     } catch (error) {
       await this.sendMessageClient(
@@ -265,7 +267,8 @@ export class ProcessTask {
         switch (element.extension) {
           case '.xml':
           case '.pdf':
-            success = await this.sendXmlAndPdfSittax(index, currentProgress);
+          case '.txt':
+            success = await this.sendFileToSittax(index, currentProgress);
             break;
           case '.zip':
             success = await this.extractAndProcessZip(index, currentProgress);
@@ -358,9 +361,10 @@ export class ProcessTask {
     this.connection = connection;
   }
 
-  private async sendXmlAndPdfSittax(index: number, currentProgress: number): Promise<boolean> {
-    const validFile = validXmlAndPdf(this.files[index]);
-    if (validFile.valid) {
+  private async sendFileToSittax(index: number, currentProgress: number): Promise<boolean> {
+    const file = validFile(this.files[index]);
+
+    if (file.valid) {
       this.files[index].isValid = true;
       try {
         await this.sendMessageClient(
@@ -404,7 +408,7 @@ export class ProcessTask {
     } else {
       await this.sendMessageClient(
         [
-          validFile.isNotaFiscal
+          file.isNotaFiscal
             ? `⚠️ Arquivo não é válido por que a data de emissão e anterior 3️⃣ messes ${this.files[index].filepath}`
             : `⚠️ Arquivo não e válido para o envio ${this.files[index].filepath}`,
         ],
@@ -422,11 +426,11 @@ export class ProcessTask {
   }
 
   private async extractAndProcessZip(index: number, currentProgress: number): Promise<boolean> {
-    const validFile = validZip(this.files[index]);
-    if (!validFile.valid) {
+    const file = validZip(this.files[index]);
+    if (!file.valid) {
       await this.sendMessageClient(
         [
-          validFile.isNotaFiscal
+          file.isNotaFiscal
             ? `⚠️ Arquivo não é válido por que a data de emissão e anterior 3️⃣ messes ${this.files[index].filepath}`
             : `⚠️ Arquivo não é válido para o envio ${this.files[index].filepath}`,
         ],
@@ -499,7 +503,7 @@ export class ProcessTask {
               ProcessamentoStatus.Running
             );
 
-            const validExtractedFile = validXmlAndPdf(extractedFile);
+            const validExtractedFile = validFile(extractedFile);
             if (validExtractedFile.valid) {
               await upload(this.auth?.token ?? '', extractedFile.filepath);
               successCount++;
@@ -626,7 +630,7 @@ export class ProcessTask {
               scanDirectory(fullPath);
             } else {
               const ext = path.extname(item).toLowerCase();
-              if (['.xml', '.pdf'].includes(ext)) {
+              if (['.xml', '.pdf', '.txt'].includes(ext)) {
                 files.push({
                   filepath: fullPath,
                   filename: item,

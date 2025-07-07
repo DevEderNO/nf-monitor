@@ -16,7 +16,7 @@ import { IConfig } from '../interfaces/config';
 import { signInSittax } from '../listeners';
 import prisma from '../lib/prisma';
 
-const VALID_EXTENSIONS = new Set(['.xml', '.pdf', '.zip']);
+const VALID_EXTENSIONS = new Set(['.xml', '.pdf', '.zip', '.txt']);
 
 const CHAVE_ACESSO_PATTERNS = [
   /<chNFe>[0-9]{44}/gi,
@@ -68,6 +68,7 @@ export function getDirectoryData(dirPath: string): IDirectory | null {
       xmls: 0,
       pdfs: 0,
       zips: 0,
+      txts: 0,
       totalFiles: 0,
     };
 
@@ -78,7 +79,7 @@ export function getDirectoryData(dirPath: string): IDirectory | null {
   }
 }
 
-export function validXmlAndPdf(fileInfo: IFileInfo): { valid: boolean; isNotaFiscal: boolean } {
+export function validFile(fileInfo: IFileInfo): { valid: boolean; isNotaFiscal: boolean } {
   const cacheKey = `${fileInfo.filepath}:${fileInfo.extension}`;
 
   if (validationCache.has(cacheKey)) return validationCache.get(cacheKey)!;
@@ -104,6 +105,12 @@ export function validXmlAndPdf(fileInfo: IFileInfo): { valid: boolean; isNotaFis
         return validate;
       case '.pdf':
         if (validatePdf(fileInfo)) {
+          validate = { valid: true, isNotaFiscal: false };
+        }
+        validationCache.set(cacheKey, validate);
+        return validate;
+      case '.txt':
+        if (validateTxt(fileInfo)) {
           validate = { valid: true, isNotaFiscal: false };
         }
         validationCache.set(cacheKey, validate);
@@ -193,6 +200,15 @@ export function validZip(fileInfo: IFileInfo): { valid: boolean; isNotaFiscal: b
             return;
           }
           break;
+        case '.txt':
+          if (validateTxt(fileInfo)) {
+            validate = {
+              valid: true,
+              isNotaFiscal: false,
+            };
+            return;
+          }
+          break;
       }
     });
 
@@ -205,12 +221,18 @@ export function validZip(fileInfo: IFileInfo): { valid: boolean; isNotaFiscal: b
 }
 
 export function getFileXmlAndPdf(fileInfo: IFileInfo): IFile | null {
-  if (['.xml', '.pdf'].includes(fileInfo.extension)) {
+  const extensionMap: Record<string, 'xml' | 'pdf' | 'txt'> = {
+    '.xml': 'xml',
+    '.pdf': 'pdf',
+    '.txt': 'txt',
+  };
+
+  if (extensionMap[fileInfo.extension]) {
     try {
       const data = fsSync.readFileSync(fileInfo.filepath, 'binary');
       return {
         name: fileInfo.filename,
-        type: fileInfo.extension === '.xml' ? 'xml' : 'pdf',
+        type: extensionMap[fileInfo.extension],
         data: data,
         path: fileInfo.filepath,
       };
@@ -362,6 +384,7 @@ export async function recicleDb() {
       directories: 0,
       xmls: 0,
       pdfs: 0,
+      txts: 0,
       zips: 0,
       totalFiles: 0,
     })) ?? [];
@@ -371,6 +394,7 @@ export async function recicleDb() {
       directories: 0,
       xmls: 0,
       pdfs: 0,
+      txts: 0,
       zips: 0,
       totalFiles: 0,
     })) ?? [];
@@ -539,4 +563,26 @@ export function getCacheStats(): {
     validationCache: validationCache.size,
     fileStatsCache: fileStatsCache.size,
   };
+}
+
+function validateTxt(fileInfo: IFileInfo): boolean {
+  try {
+    if (!fsSync.existsSync(fileInfo.filepath)) {
+      console.log('Arquivo não encontrado:', fileInfo.filepath);
+      return false;
+    }
+
+    const fileContent = fsSync.readFileSync(fileInfo.filepath, 'utf8');
+
+    if (fileContent.length < 28) {
+      console.log('Arquivo muito pequeno. Tamanho:', fileContent.length);
+      return false;
+    }
+
+    const first28Chars = fileContent.substring(0, 28);
+
+    return /^\d{28}$/.test(first28Chars);
+  } catch (error) {
+    return false;
+  }
 }
