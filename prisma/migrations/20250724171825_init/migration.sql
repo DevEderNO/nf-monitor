@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "Auth" (
+CREATE TABLE IF NOT EXISTS "Auth" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "token" TEXT,
     "userId" INTEGER,
@@ -11,7 +11,7 @@ CREATE TABLE "Auth" (
 );
 
 -- CreateTable
-CREATE TABLE "User" (
+CREATE TABLE IF NOT EXISTS "User" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "userId" TEXT NOT NULL,
     "nome" TEXT NOT NULL,
@@ -33,7 +33,7 @@ CREATE TABLE "User" (
 );
 
 -- CreateTable
-CREATE TABLE "Empresa" (
+CREATE TABLE IF NOT EXISTS "Empresa" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "empresaId" TEXT NOT NULL,
     "nome" TEXT NOT NULL,
@@ -44,27 +44,39 @@ CREATE TABLE "Empresa" (
 );
 
 -- CreateTable
-CREATE TABLE "Directory" (
+CREATE TABLE IF NOT EXISTS "Directory" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "path" TEXT NOT NULL,
     "modifiedtime" DATETIME NOT NULL,
     "size" INTEGER NOT NULL,
+    "directories" INTEGER NOT NULL,
+    "xmls" INTEGER NOT NULL,
+    "pdfs" INTEGER NOT NULL,
+    "txts" INTEGER NOT NULL,
+    "zips" INTEGER NOT NULL,
+    "totalFiles" INTEGER NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
-CREATE TABLE "DirectoryDiscovery" (
+CREATE TABLE IF NOT EXISTS "DirectoryDiscovery" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "path" TEXT NOT NULL,
     "modifiedtime" DATETIME NOT NULL,
     "size" INTEGER NOT NULL,
+    "directories" INTEGER NOT NULL,
+    "xmls" INTEGER NOT NULL,
+    "pdfs" INTEGER NOT NULL,
+    "txts" INTEGER NOT NULL,
+    "zips" INTEGER NOT NULL,
+    "totalFiles" INTEGER NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
-CREATE TABLE "File" (
+CREATE TABLE IF NOT EXISTS "File" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "filepath" TEXT NOT NULL,
     "filename" TEXT NOT NULL,
@@ -82,7 +94,7 @@ CREATE TABLE "File" (
 );
 
 -- CreateTable
-CREATE TABLE "Configuration" (
+CREATE TABLE IF NOT EXISTS "Configuration" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "timeForProcessing" TEXT NOT NULL DEFAULT '00:00',
     "timeForConsultingSieg" TEXT NOT NULL DEFAULT '00:00',
@@ -96,7 +108,7 @@ CREATE TABLE "Configuration" (
 );
 
 -- CreateTable
-CREATE TABLE "Historic" (
+CREATE TABLE IF NOT EXISTS "Historic" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "startDate" DATETIME NOT NULL,
     "endDate" DATETIME,
@@ -106,7 +118,7 @@ CREATE TABLE "Historic" (
 );
 
 -- CreateTable
-CREATE TABLE "Error" (
+CREATE TABLE IF NOT EXISTS "Error" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "message" TEXT NOT NULL,
     "stack" TEXT NOT NULL,
@@ -115,7 +127,7 @@ CREATE TABLE "Error" (
 );
 
 -- CreateTable
-CREATE TABLE "CountedNotes" (
+CREATE TABLE IF NOT EXISTS "CountedNotes" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "dataInicio" DATETIME NOT NULL,
     "dataFim" DATETIME NOT NULL,
