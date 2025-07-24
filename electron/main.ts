@@ -63,8 +63,8 @@ function createWindow() {
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL);
   } else {
-    win.loadFile(path.join(process.env.DIST ?? "", "index.html"));
-    Menu.setApplicationMenu(null);
+    // win.loadFile(path.join(process.env.DIST ?? "", "index.html"));
+    // Menu.setApplicationMenu(null);
     const toggleMenu = () => {
       if (Menu.getApplicationMenu()) {
         Menu.setApplicationMenu(null);

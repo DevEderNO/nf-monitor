@@ -104,7 +104,7 @@ export async function registerListeners(win: BrowserWindow | null) {
     return directories;
   });
 
-  ipcMain.handle('select-directories', async () => {
+  ipcMain.handle('select-directories-upload-invoices', async () => {
     const directories = selectDirectories(win!);
     if (directories.length > 0) {
       await addDirectories(directories);
@@ -119,6 +119,18 @@ export async function registerListeners(win: BrowserWindow | null) {
       return await updateConfiguration({
         ...config,
         directoryDownloadSieg: directory.at(0)?.path,
+      } as IConfig);
+    }
+    return config;
+  });
+
+  ipcMain.handle('select-directory-upload-certificates', async () => {
+    const directory = selectDirectories(win!, ['openDirectory']);
+    const config = await getConfiguration();
+    if (directory.length > 0) {
+      return await updateConfiguration({
+        ...config,
+        directoryUploadCertificates: directory.at(0)?.path,
       } as IConfig);
     }
     return config;

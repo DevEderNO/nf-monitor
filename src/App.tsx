@@ -1,12 +1,12 @@
-import { Route, Routes } from "react-router-dom";
-import { Signin } from "@pages/Signin";
-import { Dashboard } from "@pages/Dashboard";
-import { Layout } from "@components/Layout";
-import { AppProvider } from "@hooks/index";
-import { Directories } from "@pages/Directories";
-import { RequireAuth } from "@components/auth/RequireAuth";
-import { Configuration } from "./pages/Configuration";
-import { Sieg } from "@pages/Sieg";
+import { Route, Routes } from 'react-router-dom';
+import { Signin } from '@pages/Signin';
+import { Layout } from '@components/Layout';
+import { AppProvider } from '@hooks/index';
+import { RequireAuth } from '@components/auth/RequireAuth';
+import { Configuration } from '@pages/Configuration';
+import { UploadCertificates } from './pages/UploadCertificates';
+import { DownloadInvoicesSieg } from './pages/DownloadInvoicesSieg';
+import { UploadInvoices } from './pages/UploadInvoices';
 
 export default function App() {
   return (
@@ -15,18 +15,10 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/*" element={<Signin />} />
           <Route
-            path="/dashboard"
+            path="/upload-invoices"
             element={
               <RequireAuth>
-                <Dashboard />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/directories"
-            element={
-              <RequireAuth>
-                <Directories />
+                <UploadInvoices />
               </RequireAuth>
             }
           />
@@ -39,10 +31,18 @@ export default function App() {
             }
           />
           <Route
-            path="/sieg"
+            path="/download-invoices-sieg"
             element={
               <RequireAuth>
-                <Sieg />
+                <DownloadInvoicesSieg />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/upload-certificates"
+            element={
+              <RequireAuth>
+                <UploadCertificates />
               </RequireAuth>
             }
           />
