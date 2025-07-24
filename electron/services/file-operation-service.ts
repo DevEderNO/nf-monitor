@@ -69,6 +69,8 @@ export function getDirectoryData(dirPath: string): IDirectory | null {
       pdfs: 0,
       zips: 0,
       txts: 0,
+      pfx: 0,
+      type: 'invoices',
       totalFiles: 0,
     };
 
@@ -387,7 +389,9 @@ export async function recicleDb() {
       txts: 0,
       zips: 0,
       totalFiles: 0,
+      pfx: 0,
     })) ?? [];
+
   const discoredDirecories: IDirectory[] =
     db.directoriesAndSubDirectories?.map(x => ({
       ...x,
@@ -396,8 +400,10 @@ export async function recicleDb() {
       pdfs: 0,
       txts: 0,
       zips: 0,
+      pfx: 0,
       totalFiles: 0,
     })) ?? [];
+
   const files: IFileInfo[] =
     db.files?.map(x => ({
       filepath: x.filepath,

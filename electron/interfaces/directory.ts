@@ -6,8 +6,10 @@ export interface IDirectory {
   directories: number;
   xmls: number;
   pdfs: number;
-  txts: number;
   zips: number;
+  txts: number;
+  pfx: number;
+  type: 'invoices' | 'certificates';
   totalFiles: number;
   createdAt?: Date;
   updatedAt?: Date;

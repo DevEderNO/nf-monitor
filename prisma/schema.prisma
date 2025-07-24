@@ -49,6 +49,11 @@ model Empresa {
   updatedAt DateTime @updatedAt
 }
 
+enum DirectoryType {
+  invoices
+  certificates
+}
+
 model Directory {
   id           Int      @id @default(autoincrement())
   path         String
@@ -59,6 +64,8 @@ model Directory {
   pdfs         Int
   txts         Int
   zips         Int
+  pfx          Int
+  type         DirectoryType @default(invoices)
   totalFiles   Int
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -74,6 +81,8 @@ model DirectoryDiscovery {
   pdfs         Int
   txts         Int
   zips         Int
+  pfx          Int
+  type         DirectoryType
   totalFiles   Int
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

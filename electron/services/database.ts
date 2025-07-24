@@ -10,8 +10,8 @@ import { IAuth } from '../interfaces/auth';
 import prisma from '../lib/prisma';
 import { BrowserWindow } from 'electron';
 import { endOfDay, startOfDay } from 'date-fns';
-import { IEmpresa } from 'electron/interfaces/empresa';
 import path from 'node:path';
+import { IEmpresa } from '../interfaces/empresa';
 
 export async function getConfiguration(): Promise<IConfig | null> {
   return (await prisma.configuration.findFirst()) ?? null;
@@ -174,14 +174,33 @@ export async function removeAuth(): Promise<void> {
 export async function getDirectories(): Promise<IDirectory[]> {
   try {
     const result: IDirectory[] = [];
-    const directories = (await prisma.directory.findMany()) ?? [];
+
+    const directories = await prisma.directory.findMany({
+      where: {
+        type: 'invoices',
+      },
+    });
+
+    const directoryCertificates = await prisma.directory.findMany({
+      where: {
+        type: 'certificates',
+      },
+    });
+
     const directorySieg = await getDirectoriesDownloadSieg();
+
     if (directories?.length > 0) {
       result.push(...directories);
     }
+
+    if (directoryCertificates?.length > 0) {
+      result.push(...directoryCertificates);
+    }
+
     if (directorySieg) {
       result.push(directorySieg);
     }
+
     return result;
   } catch (error) {
     return [];

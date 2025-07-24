@@ -1,14 +1,14 @@
-import React, { useMemo } from "react";
-import { Button } from "../ui/button";
-import { useLocation, useNavigate } from "react-router-dom";
-import { SunDim, Moon, LogOut } from "lucide-react";
-import { Separator } from "@components/ui/separator";
-import { useTheme } from "@hooks/theme";
-import { useAuth } from "@hooks/auth";
-import logoMonitor from "@images/logo-monitor.png";
-import grafismo from "@images/grafismo.png";
-import packageJson from "../../../package.json";
-import { useAppState } from "@/hooks/state";
+import React, { useMemo } from 'react';
+import { Button } from '../ui/button';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { SunDim, Moon, LogOut } from 'lucide-react';
+import { Separator } from '@components/ui/separator';
+import { useTheme } from '@hooks/theme';
+import { useAuth } from '@hooks/auth';
+import logoMonitor from '@images/logo-monitor.png';
+import grafismo from '@images/grafismo.png';
+import packageJson from '../../../package.json';
+import { useAppState } from '@/hooks/state';
 
 const Menu: React.FC = () => {
   const { theme, setTheme } = useTheme();
@@ -20,10 +20,10 @@ const Menu: React.FC = () => {
   const menuItems = useMemo(
     () => [
       {
-        label: "Principal",
-        selected: location.pathname === "/dashboard",
+        label: 'Principal',
+        selected: location.pathname === '/dashboard',
         onClick: () => {
-          navigate("/dashboard", {
+          navigate('/dashboard', {
             replace: true,
             state: { from: location },
           });
@@ -31,10 +31,10 @@ const Menu: React.FC = () => {
         visible: true,
       },
       {
-        label: "Diretórios",
-        selected: location.pathname === "/directories",
+        label: 'Certificados',
+        selected: location.pathname === '/certificates',
         onClick: () => {
-          navigate("/directories", {
+          navigate('/certificates', {
             replace: true,
             state: { from: location },
           });
@@ -42,10 +42,21 @@ const Menu: React.FC = () => {
         visible: true,
       },
       {
-        label: "SIEG",
-        selected: location.pathname === "/sieg",
+        label: 'Diretórios',
+        selected: location.pathname === '/directories',
         onClick: () => {
-          navigate("/sieg", {
+          navigate('/directories', {
+            replace: true,
+            state: { from: location },
+          });
+        },
+        visible: true,
+      },
+      {
+        label: 'SIEG',
+        selected: location.pathname === '/sieg',
+        onClick: () => {
+          navigate('/sieg', {
             replace: true,
             state: { from: location },
           });
@@ -53,10 +64,10 @@ const Menu: React.FC = () => {
         visible: state.config.apiKeySieg && state.config.apiKeySieg.length > 0,
       },
       {
-        label: "Configuração",
-        selected: location.pathname === "/configuration",
+        label: 'Configuração',
+        selected: location.pathname === '/configuration',
         onClick: () => {
-          navigate("/configuration", {
+          navigate('/configuration', {
             replace: true,
             state: { from: location },
           });
@@ -70,32 +81,18 @@ const Menu: React.FC = () => {
   return (
     <div className="flex p-3 w-full justify-between h-fit">
       <div className="flex gap-3.5 items-baseline mb-3">
-        <img
-          src={logoMonitor}
-          alt="logo"
-          className="rounded-md object-cover h-7"
-        />
+        <img src={logoMonitor} alt="logo" className="rounded-md object-cover h-7" />
         <Separator orientation="vertical" className="h-7" />
         <div className="flex items-center h-7">
-          {menuItems
-            .filter((x) => x.visible)
-            .map((item, index) => menuItemRender(item, index))}
+          {menuItems.filter(x => x.visible).map((item, index) => menuItemRender(item, index))}
         </div>
       </div>
       <div className="flex gap-2 items-center">
-        <span className="text-sm text-muted-foreground font-semibold">
-          v{packageJson.version}
-        </span>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() =>
-            theme === "dark" ? setTheme("light") : setTheme("dark")
-          }
-        >
-          {theme === "dark" ? <SunDim /> : <Moon />}
+        <span className="text-sm text-muted-foreground font-semibold">v{packageJson.version}</span>
+        <Button variant="outline" size="icon" onClick={() => (theme === 'dark' ? setTheme('light') : setTheme('dark'))}>
+          {theme === 'dark' ? <SunDim /> : <Moon />}
         </Button>
-        <Button size="icon" variant={"secondary"} onClick={signOut}>
+        <Button size="icon" variant={'secondary'} onClick={signOut}>
           <LogOut />
         </Button>
       </div>
@@ -116,28 +113,15 @@ function menuItemRender(
   key: string | number
 ) {
   return (
-    <Button
-      key={key}
-      variant={"link"}
-      className="flex gap-1 items-center px-2"
-      onClick={onClick}
-    >
+    <Button key={key} variant={'link'} className="flex gap-1 items-center px-2" onClick={onClick}>
       {selected ? (
-        <img
-          src={grafismo}
-          alt="logo"
-          className="rounded-md object-cover h-5 rotate-180"
-        />
+        <img src={grafismo} alt="logo" className="rounded-md object-cover h-5 rotate-180" />
       ) : (
         <div className="h-5 w-2"></div>
       )}
       {label}
       {selected ? (
-        <img
-          src={grafismo}
-          alt="logo"
-          className="rounded-md object-cover h-5"
-        />
+        <img src={grafismo} alt="logo" className="rounded-md object-cover h-5" />
       ) : (
         <div className="h-5 w-2"></div>
       )}
