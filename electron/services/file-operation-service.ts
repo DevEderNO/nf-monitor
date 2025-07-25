@@ -81,7 +81,7 @@ export function getDirectoryData(dirPath: string): IDirectory | null {
   }
 }
 
-export function validFile(fileInfo: IFileInfo): { valid: boolean; isNotaFiscal: boolean } {
+export function validFile(fileInfo: IFileInfo, certificate: boolean): { valid: boolean; isNotaFiscal: boolean } {
   const cacheKey = `${fileInfo.filepath}:${fileInfo.extension}`;
 
   if (validationCache.has(cacheKey)) return validationCache.get(cacheKey)!;
@@ -106,7 +106,7 @@ export function validFile(fileInfo: IFileInfo): { valid: boolean; isNotaFiscal: 
         validationCache.set(cacheKey, validate);
         return validate;
       case '.pdf':
-        if (validatePdf(fileInfo)) {
+        if (validatePdf(fileInfo, certificate)) {
           validate = { valid: true, isNotaFiscal: false };
         }
         validationCache.set(cacheKey, validate);
@@ -200,7 +200,7 @@ export function validZip(fileInfo: IFileInfo): { valid: boolean; isNotaFiscal: b
           }
           break;
         case '.pdf':
-          if (validatePdf(fileInfo)) {
+          if (validatePdf(fileInfo, false)) {
             validate = {
               valid: true,
               isNotaFiscal: false,
@@ -271,12 +271,14 @@ export function getFilesZip(fileInfo: IFileInfo): IFile[] {
   return [];
 }
 
-function validatePdf(fileInfo: IFileInfo): boolean {
+function validatePdf(fileInfo: IFileInfo, certificate: boolean): boolean {
   try {
     const buf = fsSync.readFileSync(fileInfo.filepath);
     const documentParser = createDocumentParser(new Uint8Array(buf));
     const pdfText = documentParser?.contents?.text;
     if (!pdfText) return false;
+
+    if (certificate) return true;
 
     PDF_PATTERNS.declaracao.lastIndex = 0;
     PDF_PATTERNS.extrato.lastIndex = 0;

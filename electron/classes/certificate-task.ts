@@ -355,7 +355,7 @@ export class CertificateTask {
   }
 
   private async sendCertificatesToSittax(index: number, currentProgress: number): Promise<boolean> {
-    const file = validFile(this.files[index]);
+    const file = validFile(this.files[index], true);
 
     if (file.valid) {
       this.files[index].isValid = true;

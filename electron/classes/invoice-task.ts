@@ -268,7 +268,6 @@ export class InvoiceTask {
           case '.xml':
           case '.pdf':
           case '.txt':
-          case '.pfx':
             success = await this.sendInvoicesFileToSittax(index, currentProgress);
             break;
           case '.zip':
@@ -363,7 +362,7 @@ export class InvoiceTask {
   }
 
   private async sendInvoicesFileToSittax(index: number, currentProgress: number): Promise<boolean> {
-    const file = validFile(this.files[index]);
+    const file = validFile(this.files[index], false);
 
     if (file.valid) {
       this.files[index].isValid = true;
@@ -504,7 +503,7 @@ export class InvoiceTask {
               ProcessamentoStatus.Running
             );
 
-            const validExtractedFile = validFile(extractedFile);
+            const validExtractedFile = validFile(extractedFile, false);
             if (validExtractedFile.valid) {
               await upload(this.auth?.token ?? '', extractedFile.filepath, true);
               successCount++;
