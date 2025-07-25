@@ -45,7 +45,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
             const request: WSMessageTyped<IProcessamento> = {
               type: "message",
               message: {
-                type: WSMessageType.StartProcess,
+                type: WSMessageType.StartUploadInvoices,
                 data: { id: id ?? undefined } as IProcessamento,
               },
             };
