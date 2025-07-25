@@ -1,5 +1,5 @@
 export interface WSMessage {
-  type: "message";
+  type: 'message';
   message: {
     type: WSMessageType;
   };
@@ -16,14 +16,22 @@ export enum WSMessageType {
   PauseDiscovery,
   ResumeDiscovery,
   StopDiscovery,
-  StartProcess,
-  PauseProcess,
-  ResumeProcess,
-  StopProcess,
+
+  StartUploadInvoices,
+  PauseUploadInvoices,
+  ResumeUploadInvoices,
+  StopUploadInvoices,
+
+  StartUploadCertificates,
+  PauseUploadCertificates,
+  ResumeUploadCertificates,
+  StopUploadCertificates,
+
   StartSieg,
   PauseSieg,
   ResumeSieg,
   StopSieg,
+
   Discovery,
   Process,
   Sieg,

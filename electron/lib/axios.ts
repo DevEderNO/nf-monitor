@@ -75,8 +75,9 @@ export async function retry(url: string, filepath: string, token: string, maximu
   }
 }
 
-export async function upload(token: string, filepath: string) {
-  await retry('upload/importar-arquivo', filepath, token, 5);
+export async function upload(token: string, filepath: string, invoices: boolean) {
+  if (invoices) await retry('upload/importar-arquivo', filepath, token, 5);
+  else await retry('v2/nova-implantacao/importar-arquivo', filepath, token, 5);
 }
 
 export async function retrySieg(

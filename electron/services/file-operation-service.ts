@@ -16,7 +16,7 @@ import { IConfig } from '../interfaces/config';
 import { signInSittax } from '../listeners';
 import prisma from '../lib/prisma';
 
-const VALID_EXTENSIONS = new Set(['.xml', '.pdf', '.zip', '.txt']);
+const VALID_EXTENSIONS = new Set(['.xml', '.pdf', '.zip', '.txt', '.pfx']);
 
 const CHAVE_ACESSO_PATTERNS = [
   /<chNFe>[0-9]{44}/gi,
@@ -113,6 +113,12 @@ export function validFile(fileInfo: IFileInfo): { valid: boolean; isNotaFiscal: 
         return validate;
       case '.txt':
         if (validateTxt(fileInfo)) {
+          validate = { valid: true, isNotaFiscal: false };
+        }
+        validationCache.set(cacheKey, validate);
+        return validate;
+      case '.pfx':
+        if (validatePfx(fileInfo)) {
           validate = { valid: true, isNotaFiscal: false };
         }
         validationCache.set(cacheKey, validate);
@@ -588,6 +594,19 @@ function validateTxt(fileInfo: IFileInfo): boolean {
     const first28Chars = fileContent.substring(0, 28);
 
     return /^\d{28}$/.test(first28Chars);
+  } catch (error) {
+    return false;
+  }
+}
+
+function validatePfx(fileInfo: IFileInfo): boolean {
+  try {
+    if (!fsSync.existsSync(fileInfo.filepath)) {
+      console.log('Arquivo não encontrado:', fileInfo.filepath);
+      return false;
+    }
+
+    return true;
   } catch (error) {
     return false;
   }
