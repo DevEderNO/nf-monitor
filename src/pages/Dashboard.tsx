@@ -1,15 +1,15 @@
-import { Button } from "@components/ui/button";
-import { useCallback, useEffect, useRef } from "react";
-import { Textarea } from "@components/ui/textarea";
-import { Progress } from "@components/ui/progress";
-import { Play, Pause } from "lucide-react";
-import { useSocket } from "@hooks/socket";
-import { useAppState } from "@hooks/state";
-import { WSMessageType } from "../interfaces/ws-message";
-import { ProcessamentoStatus } from "@/interfaces/processamento";
-import { StopIcon } from "@radix-ui/react-icons";
-import { ActionType } from "@/hooks/state-reducer";
-import { useToast } from "@/components/ui/use-toast";
+import { Button } from '@components/ui/button';
+import { useCallback, useEffect, useRef } from 'react';
+import { Textarea } from '@components/ui/textarea';
+import { Progress } from '@components/ui/progress';
+import { Play, Pause } from 'lucide-react';
+import { useSocket } from '@hooks/socket';
+import { useAppState } from '@hooks/state';
+import { WSMessageType } from '../interfaces/ws-message';
+import { ProcessamentoStatus } from '@/interfaces/processamento';
+import { StopIcon } from '@radix-ui/react-icons';
+import { ActionType } from '@/hooks/state-reducer';
+import { useToast } from '@/components/ui/use-toast';
 
 interface IStepProcess {
   [key: string]: {
@@ -38,14 +38,14 @@ export function Dashboard() {
   const hasDerectories = useCallback(() => {
     if (directories.length <= 0) {
       const messages = [
-        "😊 Beleza! Só precisa selecionar onde estão os arquivos, tudo certo?",
-        "🤔 Poxa, precisamos que você escolha o diretório onde estão os arquivos que precisamos encontrar.",
-        "😌🔍 Vamos nessa! Escolha o diretório onde estão os arquivos que precisamos achar.",
+        '😊 Beleza! Só precisa selecionar onde estão os arquivos, tudo certo?',
+        '🤔 Poxa, precisamos que você escolha o diretório onde estão os arquivos que precisamos encontrar.',
+        '😌🔍 Vamos nessa! Escolha o diretório onde estão os arquivos que precisamos achar.',
       ];
       toast({
         title: messages[Math.floor(Math.random() * 3)],
-        description: "",
-        type: "foreground",
+        description: '',
+        type: 'foreground',
       });
       return true;
     }
@@ -54,28 +54,28 @@ export function Dashboard() {
 
   const send: IStepProcess = {
     Running: {
-      label: "Enviando...",
+      label: 'Enviando...',
       icon: <Pause />,
       onClick: () => {
         client?.send(
           JSON.stringify({
-            type: "message",
+            type: 'message',
             message: {
-              type: WSMessageType.PauseProcess,
+              type: WSMessageType.PauseUploadInvoices,
             },
           })
         );
       },
     },
     Paused: {
-      label: "Continuar",
+      label: 'Continuar',
       icon: <Play />,
       onClick: () => {
         client?.send(
           JSON.stringify({
-            type: "message",
+            type: 'message',
             message: {
-              type: WSMessageType.ResumeProcess,
+              type: WSMessageType.ResumeUploadInvoices,
             },
           })
         );
@@ -83,40 +83,40 @@ export function Dashboard() {
       onCancel: () => {
         client?.send(
           JSON.stringify({
-            type: "message",
+            type: 'message',
             message: {
-              type: WSMessageType.StopProcess,
+              type: WSMessageType.StopUploadInvoices,
             },
           })
         );
       },
     },
     Stopped: {
-      label: "Enviar",
+      label: 'Enviar Notas',
       icon: <Play />,
       onClick: () => {
         if (hasDerectories()) return;
         dispatch({ type: ActionType.ClearMessages });
         client?.send(
           JSON.stringify({
-            type: "message",
+            type: 'message',
             message: {
-              type: WSMessageType.StartProcess,
+              type: WSMessageType.StartUploadInvoices,
             },
           })
         );
       },
     },
     Concluded: {
-      label: "Re-enviar",
+      label: 'Re-enviar',
       icon: <Play />,
       onClick: () => {
         if (hasDerectories()) return;
         client?.send(
           JSON.stringify({
-            type: "message",
+            type: 'message',
             message: {
-              type: WSMessageType.StartProcess,
+              type: WSMessageType.StartUploadInvoices,
             },
           })
         );
@@ -127,19 +127,12 @@ export function Dashboard() {
   return (
     <div className="p-4 m-4 flex flex-col gap-4 border rounded-md flex-1">
       <div className="flex gap-3">
-        <Button
-          className="flex gap-1"
-          onClick={send[processamento.status].onClick}
-        >
+        <Button className="flex gap-1" onClick={send[processamento.status].onClick}>
           {send[processamento.status].icon}
           {send[processamento.status].label}
         </Button>
         {processamento.status === ProcessamentoStatus.Paused && (
-          <Button
-            className="flex gap-1"
-            variant={"destructive"}
-            onClick={send[processamento.status].onCancel}
-          >
+          <Button className="flex gap-1" variant={'destructive'} onClick={send[processamento.status].onCancel}>
             <StopIcon />
             Parar
           </Button>
@@ -150,7 +143,7 @@ export function Dashboard() {
           ref={textareaRef}
           className="flex flex-1 h-full cursor-default resize-none"
           readOnly
-          value={processamento?.messages.map((message) => message).join("\n")}
+          value={processamento?.messages.map(message => message).join('\n')}
         />
         <Progress value={processamento?.progress} />
         <span className="text-xs text-muted-foreground text-right">

@@ -61,7 +61,7 @@ export function Certificates() {
           JSON.stringify({
             type: 'message',
             message: {
-              type: WSMessageType.PauseProcess,
+              type: WSMessageType.PauseUploadCertificates,
             },
           })
         );
@@ -75,7 +75,7 @@ export function Certificates() {
           JSON.stringify({
             type: 'message',
             message: {
-              type: WSMessageType.ResumeProcess,
+              type: WSMessageType.ResumeUploadCertificates,
             },
           })
         );
@@ -85,14 +85,14 @@ export function Certificates() {
           JSON.stringify({
             type: 'message',
             message: {
-              type: WSMessageType.StopProcess,
+              type: WSMessageType.StopUploadCertificates,
             },
           })
         );
       },
     },
     Stopped: {
-      label: 'Enviar',
+      label: 'Enviar Certificados',
       icon: <Play />,
       onClick: () => {
         if (hasDerectories()) return;
@@ -101,7 +101,7 @@ export function Certificates() {
           JSON.stringify({
             type: 'message',
             message: {
-              type: WSMessageType.StartProcess,
+              type: WSMessageType.StartUploadCertificates,
             },
           })
         );
@@ -116,7 +116,7 @@ export function Certificates() {
           JSON.stringify({
             type: 'message',
             message: {
-              type: WSMessageType.StartProcess,
+              type: WSMessageType.StartUploadCertificates,
             },
           })
         );
