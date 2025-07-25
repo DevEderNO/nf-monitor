@@ -20,6 +20,13 @@ const api = axios.create({
   maxBodyLength: 1000 * 1024 * 1024, // 1GB
 });
 
+const webApi = axios.create({
+  baseURL: import.meta.env.VITE_WEB_API_URL,
+  timeout: 300000, // 5 minutos
+  maxContentLength: 1000 * 1024 * 1024, // 1GB
+  maxBodyLength: 1000 * 1024 * 1024, // 1GB
+});
+
 const apiSieg = axios.create({
   baseURL: import.meta.env.VITE_API_SIEG_URL,
   timeout: 50000,
@@ -75,9 +82,36 @@ export async function retry(url: string, filepath: string, token: string, maximu
   }
 }
 
+export async function retryCertificate(
+  url: string,
+  filepath: string,
+  token: string,
+  maximumRetry = 0,
+  attempt = 0,
+  delay = 0
+) {
+  try {
+    await sleep(delay);
+    const form = new FormData();
+    form.append('arquivo', createReadStream(filepath));
+    const { data } = await webApi.post(url, form, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Origin: 'http://app.sittax.com.br',
+      },
+    });
+    form.destroy();
+    if (data) return data;
+    throw new Error('Nenhuma resposta da API');
+  } catch (e) {
+    if (attempt >= maximumRetry) throw e;
+    return retry(url, filepath, token, maximumRetry, attempt + 1, (delay || 500) * 2);
+  }
+}
+
 export async function upload(token: string, filepath: string, invoices: boolean) {
   if (invoices) await retry('upload/importar-arquivo', filepath, token, 5);
-  else await retry('v2/nova-implantacao/importar-arquivo', filepath, token, 5);
+  else await retryCertificate('v2/nova-implantacao/importar-arquivo', filepath, token, 5);
 }
 
 export async function retrySieg(
