@@ -21,9 +21,9 @@ const Menu: React.FC = () => {
     () => [
       {
         label: 'Envio de Notas',
-        selected: location.pathname === '/dashboard',
+        selected: location.pathname === '/invoices',
         onClick: () => {
-          navigate('/dashboard', {
+          navigate('/invoices', {
             replace: true,
             state: { from: location },
           });
