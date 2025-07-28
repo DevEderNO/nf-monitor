@@ -33,10 +33,10 @@ const id = powerSaveBlocker.start('prevent-app-suspension');
 
 function createWindow() {
   win = new BrowserWindow({
-    height: 600,
-    width: 800,
-    minHeight: 600,
-    minWidth: 800,
+    width: 1280,
+    height: 720,
+    minWidth: 1280,
+    minHeight: 720,
     icon: path.join(process.env.VITE_PUBLIC ?? '', 'sittax.png'),
     show: !VITE_DEV_SERVER_URL ? false : true,
     webPreferences: {
