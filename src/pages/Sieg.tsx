@@ -1,25 +1,21 @@
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
-import { useSocket } from "@/hooks/socket";
-import { useAppState } from "@/hooks/state";
-import { ActionType } from "@/hooks/state-reducer";
-import { ProcessamentoStatus } from "@/interfaces/processamento";
-import { WSMessageType } from "@/interfaces/ws-message";
-import { cn } from "@/lib/utils";
-import { StopIcon } from "@radix-ui/react-icons";
-import { addMonths, format } from "date-fns";
-import { CalendarIcon, Pause, Play } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { DateRange } from "react-day-picker";
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
+import { useSocket } from '@/hooks/socket';
+import { useAppState } from '@/hooks/state';
+import { ActionType } from '@/hooks/state-reducer';
+import { ProcessamentoStatus } from '@/interfaces/processamento';
+import { WSMessageType } from '@/interfaces/ws-message';
+import { cn } from '@/lib/utils';
+import { StopIcon } from '@radix-ui/react-icons';
+import { addMonths, format } from 'date-fns';
+import { CalendarIcon, Pause, Play } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { DateRange } from 'react-day-picker';
 
 interface IStepProcess {
   [key: string]: {
@@ -33,7 +29,7 @@ interface IStepProcess {
 
 export function Sieg() {
   const {
-    state: { config, processamentoSieg, auth },
+    state: { config, siegLog, auth },
     dispatch,
   } = useAppState();
   const { client } = useSocket();
@@ -49,38 +45,32 @@ export function Sieg() {
     if (textareaRef.current) {
       textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
     }
-  }, [processamentoSieg]);
+  }, [siegLog]);
 
   const hasDerectories = useCallback(() => {
-    if (
-      config.directoryDownloadSieg &&
-      config.directoryDownloadSieg?.length <= 0
-    ) {
+    if (config.directoryDownloadSieg && config.directoryDownloadSieg?.length <= 0) {
       const messages = [
-        "😊 Beleza! Só precisa selecionar onde estão os arquivos. O diretório de download das notas do SIEG pode ser configurado nas configurações, tudo certo?",
-        "🤔 Poxa, precisamos que você escolha o diretório onde estão os arquivos que precisamos encontrar. Lembre-se, o diretório de download das notas do SIEG pode ser configurado nas configurações.",
-        "😌🔍 Vamos nessa! Escolha o diretório onde estão os arquivos que precisamos achar. O diretório de download das notas do SIEG pode ser configurado nas configurações.",
+        '😊 Beleza! Só precisa selecionar onde estão os arquivos. O diretório de download das notas do SIEG pode ser configurado nas configurações, tudo certo?',
+        '🤔 Poxa, precisamos que você escolha o diretório onde estão os arquivos que precisamos encontrar. Lembre-se, o diretório de download das notas do SIEG pode ser configurado nas configurações.',
+        '😌🔍 Vamos nessa! Escolha o diretório onde estão os arquivos que precisamos achar. O diretório de download das notas do SIEG pode ser configurado nas configurações.',
       ];
       toast({
         title: messages[Math.floor(Math.random() * 3)],
-        description: "",
-        type: "foreground",
+        description: '',
+        type: 'foreground',
       });
       return true;
     }
     return false;
-  }, [
-    config.directoryDownloadSieg && config.directoryDownloadSieg?.length,
-    toast,
-  ]);
+  }, [config.directoryDownloadSieg && config.directoryDownloadSieg?.length, toast]);
 
   const stepStart = useCallback(
     (dateInitial: Date | undefined, dateEnd: Date | undefined) => {
-      dispatch({ type: ActionType.ClearMessagesSieg });
+      dispatch({ type: ActionType.ClearSiegLog });
       if (hasDerectories()) return;
       client?.send(
         JSON.stringify({
-          type: "message",
+          type: 'message',
           message: {
             type: WSMessageType.StartSieg,
             data: {
@@ -96,12 +86,12 @@ export function Sieg() {
 
   const siegProcess: IStepProcess = {
     Running: {
-      label: "Consultando...",
+      label: 'Consultando...',
       icon: <Pause />,
       onClick: () => {
         client?.send(
           JSON.stringify({
-            type: "message",
+            type: 'message',
             message: {
               type: WSMessageType.PauseSieg,
             },
@@ -110,12 +100,12 @@ export function Sieg() {
       },
     },
     Paused: {
-      label: "Continuar",
+      label: 'Continuar',
       icon: <Play />,
       onClick: () => {
         client?.send(
           JSON.stringify({
-            type: "message",
+            type: 'message',
             message: {
               type: WSMessageType.ResumeSieg,
             },
@@ -125,7 +115,7 @@ export function Sieg() {
       onCancel: () => {
         client?.send(
           JSON.stringify({
-            type: "message",
+            type: 'message',
             message: {
               type: WSMessageType.StopSieg,
             },
@@ -134,13 +124,13 @@ export function Sieg() {
       },
     },
     Stopped: {
-      label: "Baixar Notas",
+      label: 'Baixar Notas',
       icon: <Play />,
       onClick: () => stepStart(date?.from, date?.to),
       disabled: !config.directoryDownloadSieg,
     },
     Concluded: {
-      label: "Baixar Notas",
+      label: 'Baixar Notas',
       icon: <Play />,
       onClick: () => stepStart(date?.from, date?.to),
       disabled: !config.directoryDownloadSieg,
@@ -152,13 +142,7 @@ export function Sieg() {
       {auth?.user?.nivel && auth?.user?.nivel > 3 ? (
         <div className="flex flex-col gap-2">
           <Label>API Key do SIEG</Label>
-          <Input
-            placeholder=""
-            type="text"
-            className=""
-            value={config?.apiKeySieg ?? ""}
-            disabled
-          />
+          <Input placeholder="" type="text" className="" value={config?.apiKeySieg ?? ''} disabled />
         </div>
       ) : (
         <></>
@@ -169,21 +153,17 @@ export function Sieg() {
             <PopoverTrigger asChild>
               <Button
                 id="date"
-                variant={"outline"}
-                className={cn(
-                  "w-[300px] justify-start text-left font-normal",
-                  !date && "text-muted-foreground"
-                )}
+                variant={'outline'}
+                className={cn('w-[300px] justify-start text-left font-normal', !date && 'text-muted-foreground')}
               >
                 <CalendarIcon />
                 {date?.from ? (
                   date.to ? (
                     <>
-                      {format(date.from, "LLL dd, y")} -{" "}
-                      {format(date.to, "LLL dd, y")}
+                      {format(date.from, 'LLL dd, y')} - {format(date.to, 'LLL dd, y')}
                     </>
                   ) : (
-                    format(date.from, "LLL dd, y")
+                    format(date.from, 'LLL dd, y')
                   )
                 ) : (
                   <span>Pick a date</span>
@@ -204,20 +184,16 @@ export function Sieg() {
         </div>
         <div className="row-auto flex gap-2">
           <Button
-            key={siegProcess[processamentoSieg.status].label}
+            key={siegProcess[siegLog.status].label}
             className=""
-            onClick={siegProcess[processamentoSieg.status].onClick}
+            onClick={siegProcess[siegLog.status].onClick}
             disabled={!date?.from || !date?.to || !config.directoryDownloadSieg}
           >
-            {siegProcess[processamentoSieg.status].icon}
-            {siegProcess[processamentoSieg.status].label}
+            {siegProcess[siegLog.status].icon}
+            {siegProcess[siegLog.status].label}
           </Button>
-          {processamentoSieg.status === ProcessamentoStatus.Paused && (
-            <Button
-              className="flex gap-1"
-              variant={"destructive"}
-              onClick={siegProcess[processamentoSieg.status].onCancel}
-            >
+          {siegLog.status === ProcessamentoStatus.Paused && (
+            <Button className="flex gap-1" variant={'destructive'} onClick={siegProcess[siegLog.status].onCancel}>
               <StopIcon />
               Parar
             </Button>
@@ -229,12 +205,7 @@ export function Sieg() {
           ref={textareaRef}
           className="flex flex-1 h-full cursor-default resize-none"
           readOnly
-          value={processamentoSieg?.messages
-            ?.slice(
-              processamentoSieg?.messages?.length - 1000,
-              processamentoSieg?.messages?.length - 1
-            )
-            ?.join("\n")}
+          value={siegLog?.messages?.slice(siegLog?.messages?.length - 1000, siegLog?.messages?.length - 1)?.join('\n')}
         />
       </div>
     </div>

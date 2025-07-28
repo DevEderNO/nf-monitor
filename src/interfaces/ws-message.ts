@@ -17,22 +17,25 @@ export enum WSMessageType {
   ResumeDiscovery,
   StopDiscovery,
 
+  Invoice,
   StartUploadInvoices,
   PauseUploadInvoices,
   ResumeUploadInvoices,
   StopUploadInvoices,
 
+  Certificates,
   StartUploadCertificates,
   PauseUploadCertificates,
   ResumeUploadCertificates,
   StopUploadCertificates,
 
+
+  Sieg,
   StartSieg,
   PauseSieg,
   ResumeSieg,
   StopSieg,
 
   Discovery,
-  Process,
-  Sieg,
+
 }

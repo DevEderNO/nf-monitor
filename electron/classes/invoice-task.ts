@@ -249,8 +249,10 @@ export class InvoiceTask {
     let attempts = 0;
     let success = false;
 
-    while (attempts < this.maxRetries && !success && !this.isCancelled) {
+    while (attempts < this.maxRetries && !success && !this.isCancelled && !this.isPaused) {
       try {
+
+        if (this.isPaused || this.isCancelled) break;
         attempts++;
 
         if (attempts > 1) {
@@ -703,7 +705,7 @@ export class InvoiceTask {
       JSON.stringify({
         type: 'message',
         message: {
-          type: WSMessageType.Process,
+          type: WSMessageType.Invoice,
           data: {
             messages: timestampedMessages,
             progress,

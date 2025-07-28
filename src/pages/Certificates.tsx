@@ -23,7 +23,7 @@ interface IStepProcess {
 export function Certificates() {
   const { client } = useSocket();
   const {
-    state: { processamento, directories },
+    state: { certificatesLog, directories },
     dispatch,
   } = useAppState();
   const { toast } = useToast();
@@ -33,7 +33,7 @@ export function Certificates() {
     if (textareaRef.current) {
       textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
     }
-  }, [processamento]);
+  }, [certificatesLog]);
 
   const hasDerectories = useCallback(() => {
     if (directories.length <= 0) {
@@ -96,7 +96,7 @@ export function Certificates() {
       icon: <Play />,
       onClick: () => {
         if (hasDerectories()) return;
-        dispatch({ type: ActionType.ClearMessages });
+        dispatch({ type: ActionType.ClearCertificatesLog });
         client?.send(
           JSON.stringify({
             type: 'message',
@@ -127,12 +127,12 @@ export function Certificates() {
   return (
     <div className="p-4 m-4 flex flex-col gap-4 border rounded-md flex-1">
       <div className="flex gap-3">
-        <Button className="flex gap-1" onClick={send[processamento.status].onClick}>
-          {send[processamento.status].icon}
-          {send[processamento.status].label}
+        <Button className="flex gap-1" onClick={send[certificatesLog.status].onClick}>
+          {send[certificatesLog.status].icon}
+          {send[certificatesLog.status].label}
         </Button>
-        {processamento.status === ProcessamentoStatus.Paused && (
-          <Button className="flex gap-1" variant={'destructive'} onClick={send[processamento.status].onCancel}>
+        {certificatesLog.status === ProcessamentoStatus.Paused && (
+          <Button className="flex gap-1" variant={'destructive'} onClick={send[certificatesLog.status].onCancel}>
             <StopIcon />
             Parar
           </Button>
@@ -143,11 +143,11 @@ export function Certificates() {
           ref={textareaRef}
           className="flex flex-1 h-full cursor-default resize-none"
           readOnly
-          value={processamento?.messages.map(message => message).join('\n')}
+          value={certificatesLog?.messages.map(message => message).join('\n')}
         />
-        <Progress value={processamento?.progress} />
+        <Progress value={certificatesLog?.progress} />
         <span className="text-xs text-muted-foreground text-right">
-          {processamento?.value} / {processamento?.max}
+          {certificatesLog?.value} / {certificatesLog?.max}
         </span>
       </div>
     </div>
