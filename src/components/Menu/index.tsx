@@ -20,7 +20,7 @@ const Menu: React.FC = () => {
   const menuItems = useMemo(
     () => [
       {
-        label: 'Principal',
+        label: 'Envio de Notas',
         selected: location.pathname === '/dashboard',
         onClick: () => {
           navigate('/dashboard', {
@@ -31,7 +31,7 @@ const Menu: React.FC = () => {
         visible: true,
       },
       {
-        label: 'Certificados',
+        label: 'Envio de Certificados',
         selected: location.pathname === '/certificates',
         onClick: () => {
           navigate('/certificates', {
@@ -42,7 +42,7 @@ const Menu: React.FC = () => {
         visible: true,
       },
       {
-        label: 'Diretórios',
+        label: 'Selecionar Diretórios',
         selected: location.pathname === '/directories',
         onClick: () => {
           navigate('/directories', {
@@ -64,7 +64,7 @@ const Menu: React.FC = () => {
         visible: state.config.apiKeySieg && state.config.apiKeySieg.length > 0,
       },
       {
-        label: 'Configuração',
+        label: 'Configurações',
         selected: location.pathname === '/configuration',
         onClick: () => {
           navigate('/configuration', {
