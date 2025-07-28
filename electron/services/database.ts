@@ -223,12 +223,15 @@ export async function getDirectoriesDownloadSieg(): Promise<IDirectory | null> {
 }
 
 export async function addDirectories(data: IDirectory[]): Promise<number> {
-  const existingPaths =
+  const existingDirectories =
     (await prisma.directory.findMany({
-      select: { path: true },
+      select: { path: true, type: true },
     })) ?? [];
-  const existingPathSet = new Set(existingPaths.map(d => d.path));
-  const newDirectories = data.filter(d => !existingPathSet.has(d.path));
+
+  const existingPathTypeSet = new Set(existingDirectories.map(d => `${d.path}|${d.type}`));
+
+  const newDirectories = data.filter(d => !existingPathTypeSet.has(`${d.path}|${d.type}`));
+
   return (
     (
       await prisma.directory.createMany({
@@ -245,7 +248,7 @@ export async function updateDirectoryByPath(path: string, data: Partial<IDirecto
   });
 }
 
-export async function removeDirectory(path: string): Promise<number> {
+export async function removeDirectory(path: string, type: 'invoices' | 'certificates'): Promise<number> {
   return (
     (
       await prisma.directory.deleteMany({
@@ -253,6 +256,7 @@ export async function removeDirectory(path: string): Promise<number> {
           path: {
             equals: path,
           },
+          type: type,
         },
       })
     )?.count ?? 0
