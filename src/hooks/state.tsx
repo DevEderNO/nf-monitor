@@ -1,17 +1,11 @@
-import React, { createContext, useContext, useEffect, useReducer } from "react";
-import {
-  ActionType,
-  IAction,
-  IState,
-  StateReducer,
-  initialState,
-} from "./state-reducer";
-import { useNavigate } from "react-router-dom";
-import { IDirectory } from "@/interfaces/directory";
-import { IAuth } from "@/interfaces/auth";
-import { IDbHistoric } from "@/interfaces/db-historic";
-import { format } from "date-fns";
-import { IConfig } from "@/interfaces/config";
+import React, { createContext, useContext, useEffect, useReducer } from 'react';
+import { ActionType, IAction, IState, StateReducer, initialState } from './state-reducer';
+import { useNavigate } from 'react-router-dom';
+import { IDirectory } from '@/interfaces/directory';
+import { IAuth } from '@/interfaces/auth';
+import { IDbHistoric } from '@/interfaces/db-historic';
+import { format } from 'date-fns';
+import { IConfig } from '@/interfaces/config';
 
 interface StateContextData {
   state: IState;
@@ -27,15 +21,11 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
   async function loadStoragedData() {
     dispatch({ type: ActionType.Loading, payload: true });
 
-    const auth: IAuth = await window.ipcRenderer.invoke("get-auth");
-    const config: IConfig = await window.ipcRenderer.invoke("get-config");
-    const directories: IDirectory[] = await window.ipcRenderer.invoke(
-      "get-directories"
-    );
-    window.ipcRenderer.send("initialize-job");
-    const historic: IDbHistoric[] = await window.ipcRenderer.invoke(
-      "get-historic"
-    );
+    const auth: IAuth = await window.ipcRenderer.invoke('get-auth');
+    const config: IConfig = await window.ipcRenderer.invoke('get-config');
+    const directories: IDirectory[] = await window.ipcRenderer.invoke('get-directories');
+    window.ipcRenderer.send('initialize-job');
+    const historic: IDbHistoric[] = await window.ipcRenderer.invoke('get-historic');
 
     dispatch([
       {
@@ -57,17 +47,15 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
       {
         type: ActionType.Historic,
         payload: historic.map(
-          (x) =>
-            `${format(x.startDate, "dd/MM/yyyy HH:mm:ss")}${
-              x.endDate
-                ? format(x.endDate, " - dd/MM/yyyy HH:mm:ss")
-                : " - Não finalizado ou interrompido"
+          x =>
+            `${format(x.startDate, 'dd/MM/yyyy HH:mm:ss')}${
+              x.endDate ? format(x.endDate, ' - dd/MM/yyyy HH:mm:ss') : ' - Não finalizado ou interrompido'
             }`
         ),
       },
     ]);
     if (auth?.token && auth?.user) {
-      navigate("/dashboard");
+      navigate('/invoices');
     }
   }
 
@@ -79,11 +67,7 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
     if (state.auth?.token?.length > 0) loadStoragedData();
   }, [state.auth?.token?.length]);
 
-  return (
-    <StateContext.Provider value={{ state, dispatch }}>
-      {children}
-    </StateContext.Provider>
-  );
+  return <StateContext.Provider value={{ state, dispatch }}>{children}</StateContext.Provider>;
 };
 
 function useAppState() {
