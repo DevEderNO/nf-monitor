@@ -1,6 +1,6 @@
 import { Route, Routes } from 'react-router-dom';
 import { Signin } from '@pages/Signin';
-import { Dashboard } from '@pages/Dashboard';
+import { Invoices } from '@pages/Invoices';
 import { Layout } from '@components/Layout';
 import { AppProvider } from '@hooks/index';
 import { Directories } from '@pages/Directories';
@@ -16,10 +16,10 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/*" element={<Signin />} />
           <Route
-            path="/dashboard"
+            path="/invoices"
             element={
               <RequireAuth>
-                <Dashboard />
+                <Invoices />
               </RequireAuth>
             }
           />
