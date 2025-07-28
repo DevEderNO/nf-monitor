@@ -176,8 +176,8 @@ export async function registerListeners(win: BrowserWindow | null) {
     } as IConfig);
   });
 
-  ipcMain.handle('remove-directory', async (_, directory: string) => {
-    await removeDirectory(directory);
+  ipcMain.handle('remove-directory', async (_, directory: string, type: 'invoices' | 'certificates') => {
+    await removeDirectory(directory, type);
     await removeFiles(directory);
     return await getDirectories();
   });

@@ -48,8 +48,16 @@ export function Directories() {
     }
   }, []);
 
-  const handleRemoveDirectory = useCallback(async (item: string) => {
-    const directories = await window.ipcRenderer.invoke('remove-directory', item);
+  const handleRemoveInvoicesDirectory = useCallback(async (item: string) => {
+    const directories = await window.ipcRenderer.invoke('remove-directory', item, 'invoices');
+    dispatch({
+      type: ActionType.Directories,
+      payload: directories,
+    });
+  }, []);
+
+  const handleRemoveCertificatesDirectory = useCallback(async (item: string) => {
+    const directories = await window.ipcRenderer.invoke('remove-directory', item, 'certificates');
     dispatch({
       type: ActionType.Directories,
       payload: directories,
@@ -84,7 +92,7 @@ export function Directories() {
                         variant={'destructive'}
                         size={'sm'}
                         className="px-1 py-0.5"
-                        onClick={() => handleRemoveDirectory(item.path)}
+                        onClick={() => handleRemoveInvoicesDirectory(item.path)}
                       >
                         <TrashIcon className="w-5 h-4" />
                       </Button>
@@ -122,7 +130,7 @@ export function Directories() {
                         variant={'destructive'}
                         size={'sm'}
                         className="px-1 py-0.5"
-                        onClick={() => handleRemoveDirectory(item.path)}
+                        onClick={() => handleRemoveCertificatesDirectory(item.path)}
                       >
                         <TrashIcon className="w-5 h-4" />
                       </Button>
