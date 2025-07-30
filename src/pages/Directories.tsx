@@ -104,12 +104,12 @@ export function Directories() {
       </div>
       <div className="flex">
         <Button onClick={handleCertificatesSelectDirectories}>
-          Selecionar diretórios para envio de certificados e declarações
+          Selecionar diretórios para envio de documentos de cadastro 
         </Button>
       </div>
       <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 190px)' }}>
         <Table className="overflow-auto">
-          <TableCaption>Lista dos diretórios para envio de certificados e declarações</TableCaption>
+          <TableCaption>Lista dos diretórios para envio de documentos de cadastro</TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead>Diretório</TableHead>
