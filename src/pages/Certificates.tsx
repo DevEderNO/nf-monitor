@@ -92,7 +92,7 @@ export function Certificates() {
       },
     },
     Stopped: {
-      label: 'Enviar Certificados',
+      label: 'Enviar Documentos',
       icon: <Play />,
       onClick: () => {
         if (hasDerectories()) return;

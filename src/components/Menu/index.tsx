@@ -31,7 +31,7 @@ const Menu: React.FC = () => {
         visible: true,
       },
       {
-        label: 'Envio de Certificados',
+        label: 'Envio de Documentos',
         selected: location.pathname === '/certificates',
         onClick: () => {
           navigate('/certificates', {
