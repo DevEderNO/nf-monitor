@@ -43,7 +43,7 @@ export function Signin() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       await signIn(values);
-      navigate("/dashboard", { replace: true });
+      navigate("/invoices", { replace: true });
     } catch (error) {
       toast({
         title: "Algo deu errado 😯 verifique suas credências",

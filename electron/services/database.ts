@@ -10,8 +10,8 @@ import { IAuth } from '../interfaces/auth';
 import prisma from '../lib/prisma';
 import { BrowserWindow } from 'electron';
 import { endOfDay, startOfDay } from 'date-fns';
-import { IEmpresa } from 'electron/interfaces/empresa';
 import path from 'node:path';
+import { IEmpresa } from '../interfaces/empresa';
 
 export async function getConfiguration(): Promise<IConfig | null> {
   return (await prisma.configuration.findFirst()) ?? null;
@@ -174,14 +174,33 @@ export async function removeAuth(): Promise<void> {
 export async function getDirectories(): Promise<IDirectory[]> {
   try {
     const result: IDirectory[] = [];
-    const directories = (await prisma.directory.findMany()) ?? [];
+
+    const directories = await prisma.directory.findMany({
+      where: {
+        type: 'invoices',
+      },
+    });
+
+    const directoryCertificates = await prisma.directory.findMany({
+      where: {
+        type: 'certificates',
+      },
+    });
+
     const directorySieg = await getDirectoriesDownloadSieg();
+
     if (directories?.length > 0) {
       result.push(...directories);
     }
+
+    if (directoryCertificates?.length > 0) {
+      result.push(...directoryCertificates);
+    }
+
     if (directorySieg) {
       result.push(directorySieg);
     }
+
     return result;
   } catch (error) {
     return [];
@@ -204,12 +223,15 @@ export async function getDirectoriesDownloadSieg(): Promise<IDirectory | null> {
 }
 
 export async function addDirectories(data: IDirectory[]): Promise<number> {
-  const existingPaths =
+  const existingDirectories =
     (await prisma.directory.findMany({
-      select: { path: true },
+      select: { path: true, type: true },
     })) ?? [];
-  const existingPathSet = new Set(existingPaths.map(d => d.path));
-  const newDirectories = data.filter(d => !existingPathSet.has(d.path));
+
+  const existingPathTypeSet = new Set(existingDirectories.map(d => `${d.path}|${d.type}`));
+
+  const newDirectories = data.filter(d => !existingPathTypeSet.has(`${d.path}|${d.type}`));
+
   return (
     (
       await prisma.directory.createMany({
@@ -226,7 +248,7 @@ export async function updateDirectoryByPath(path: string, data: Partial<IDirecto
   });
 }
 
-export async function removeDirectory(path: string): Promise<number> {
+export async function removeDirectory(path: string, type: 'invoices' | 'certificates'): Promise<number> {
   return (
     (
       await prisma.directory.deleteMany({
@@ -234,6 +256,7 @@ export async function removeDirectory(path: string): Promise<number> {
           path: {
             equals: path,
           },
+          type: type,
         },
       })
     )?.count ?? 0

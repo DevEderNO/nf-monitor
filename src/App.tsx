@@ -1,12 +1,13 @@
-import { Route, Routes } from "react-router-dom";
-import { Signin } from "@pages/Signin";
-import { Dashboard } from "@pages/Dashboard";
-import { Layout } from "@components/Layout";
-import { AppProvider } from "@hooks/index";
-import { Directories } from "@pages/Directories";
-import { RequireAuth } from "@components/auth/RequireAuth";
-import { Configuration } from "./pages/Configuration";
-import { Sieg } from "@pages/Sieg";
+import { Route, Routes } from 'react-router-dom';
+import { Signin } from '@pages/Signin';
+import { Invoices } from '@pages/Invoices';
+import { Layout } from '@components/Layout';
+import { AppProvider } from '@hooks/index';
+import { Directories } from '@pages/Directories';
+import { Certificates } from '@pages/Certificates';
+import { RequireAuth } from '@components/auth/RequireAuth';
+import { Configuration } from './pages/Configuration';
+import { Sieg } from '@pages/Sieg';
 
 export default function App() {
   return (
@@ -15,10 +16,18 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/*" element={<Signin />} />
           <Route
-            path="/dashboard"
+            path="/invoices"
             element={
               <RequireAuth>
-                <Dashboard />
+                <Invoices />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/certificates"
+            element={
+              <RequireAuth>
+                <Certificates />
               </RequireAuth>
             }
           />

@@ -32,7 +32,7 @@ import * as fs from 'fs';
 
 const AdmZip = require('adm-zip');
 
-export class ProcessTask {
+export class InvoiceTask {
   isPaused: boolean;
   pausedMessage: string | null;
   isCancelled: boolean;
@@ -249,8 +249,10 @@ export class ProcessTask {
     let attempts = 0;
     let success = false;
 
-    while (attempts < this.maxRetries && !success && !this.isCancelled) {
+    while (attempts < this.maxRetries && !success && !this.isCancelled && !this.isPaused) {
       try {
+
+        if (this.isPaused || this.isCancelled) break;
         attempts++;
 
         if (attempts > 1) {
@@ -268,7 +270,7 @@ export class ProcessTask {
           case '.xml':
           case '.pdf':
           case '.txt':
-            success = await this.sendFileToSittax(index, currentProgress);
+            success = await this.sendInvoicesFileToSittax(index, currentProgress);
             break;
           case '.zip':
             success = await this.extractAndProcessZip(index, currentProgress);
@@ -361,8 +363,8 @@ export class ProcessTask {
     this.connection = connection;
   }
 
-  private async sendFileToSittax(index: number, currentProgress: number): Promise<boolean> {
-    const file = validFile(this.files[index]);
+  private async sendInvoicesFileToSittax(index: number, currentProgress: number): Promise<boolean> {
+    const file = validFile(this.files[index], false);
 
     if (file.valid) {
       this.files[index].isValid = true;
@@ -375,7 +377,7 @@ export class ProcessTask {
           ProcessamentoStatus.Running
         );
 
-        await upload(this.auth?.token ?? '', this.files[index].filepath);
+        await upload(this.auth?.token ?? '', this.files[index].filepath, true);
         await updateFile(this.files[index].filepath, {
           wasSend: true,
           dataSend: new Date(),
@@ -503,9 +505,9 @@ export class ProcessTask {
               ProcessamentoStatus.Running
             );
 
-            const validExtractedFile = validFile(extractedFile);
+            const validExtractedFile = validFile(extractedFile, false);
             if (validExtractedFile.valid) {
-              await upload(this.auth?.token ?? '', extractedFile.filepath);
+              await upload(this.auth?.token ?? '', extractedFile.filepath, true);
               successCount++;
 
               await this.sendMessageClient(
@@ -703,7 +705,7 @@ export class ProcessTask {
       JSON.stringify({
         type: 'message',
         message: {
-          type: WSMessageType.Process,
+          type: WSMessageType.Invoice,
           data: {
             messages: timestampedMessages,
             progress,

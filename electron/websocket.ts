@@ -1,23 +1,20 @@
+import { WSMessage, WSMessageType, WSMessageTyped } from './interfaces/ws-message';
+import * as http from 'http';
+import { IUtf8Message, server as WebsocketServer, connection } from 'websocket';
 import {
-  WSMessage,
-  WSMessageType,
-  WSMessageTyped,
-} from "./interfaces/ws-message";
-import * as http from "http";
-import { IUtf8Message, server as WebsocketServer, connection } from "websocket";
+  pauseInvoiceProcess,
+  resumeInvoiceProcess,
+  startInvoiceProcess,
+  stopInvoiceProcess,
+} from './services/invoice-service';
+import { pauseSieg, resumeSieg, startSieg, stopSieg } from './services/sieg-service';
+import { parseISO } from 'date-fns';
 import {
-  pauseProcess,
-  resumeProcess,
-  startProcess,
-  stopProcess,
-} from "./services/process-service";
-import {
-  pauseSieg,
-  resumeSieg,
-  startSieg,
-  stopSieg,
-} from "./services/sieg-service";
-import { parseISO } from "date-fns";
+  pauseCertificateProcess,
+  resumeCertificateProcess,
+  startCertificateProcess,
+  stopCertificateProcess,
+} from './services/certificate-service';
 
 let wsConnection: connection;
 
@@ -29,31 +26,28 @@ function createWebsocket() {
   });
   const wss = new WebsocketServer({ httpServer: server });
 
-  wss.on("request", (request) => {
-    console.log(
-      new Date()
-        .toLocaleDateString()
-        .concat(" Received a new connection from origin ", request.origin, ".")
-    );
+  wss.on('request', request => {
+    console.log(new Date().toLocaleDateString().concat(' Received a new connection from origin ', request.origin, '.'));
 
     wsConnection = request.accept(null, request.origin);
 
-    wsConnection.on("message", (message) => {
-      if (message.type === "utf8") {
+    wsConnection.on('message', message => {
+      if (message.type === 'utf8') {
         const request: WSMessage = JSON.parse(message.utf8Data);
         switch (request.message.type) {
-          case WSMessageType.StartProcess:
-            wsStartProcess(wsConnection);
+          case WSMessageType.StartUploadInvoices:
+            wsStartUploadInvoices(wsConnection);
             break;
-          case WSMessageType.PauseProcess:
-            pauseProcess();
+          case WSMessageType.PauseUploadInvoices:
+            pauseInvoiceProcess();
             break;
-          case WSMessageType.ResumeProcess:
-            resumeProcess();
+          case WSMessageType.ResumeUploadInvoices:
+            resumeInvoiceProcess();
             break;
-          case WSMessageType.StopProcess:
-            stopProcess();
+          case WSMessageType.StopUploadInvoices:
+            stopInvoiceProcess();
             break;
+
           case WSMessageType.StartSieg:
             wsStartSieg(wsConnection, message);
             break;
@@ -66,13 +60,30 @@ function createWebsocket() {
           case WSMessageType.StopSieg:
             stopSieg();
             break;
+
+          case WSMessageType.StartUploadCertificates:
+            wsStartUploadCertificates(wsConnection);
+            break;
+          case WSMessageType.PauseUploadCertificates:
+            pauseCertificateProcess();
+            break;
+          case WSMessageType.ResumeUploadCertificates:
+            resumeCertificateProcess();
+            break;
+          case WSMessageType.StopUploadCertificates:
+            stopCertificateProcess();
+            break;
           default:
             break;
         }
       }
 
-      function wsStartProcess(connection: connection) {
-        startProcess(connection);
+      function wsStartUploadInvoices(connection: connection) {
+        startInvoiceProcess(connection);
+      }
+
+      function wsStartUploadCertificates(connection: connection) {
+        startCertificateProcess(connection);
       }
 
       function wsStartSieg(connection: connection, message: IUtf8Message) {
@@ -80,8 +91,7 @@ function createWebsocket() {
           message: {
             data: { dateInitial, dateEnd },
           },
-        }: WSMessageTyped<{ dateInitial: string; dateEnd: string }> =
-          JSON.parse(message.utf8Data);
+        }: WSMessageTyped<{ dateInitial: string; dateEnd: string }> = JSON.parse(message.utf8Data);
         startSieg(connection, parseISO(dateInitial), parseISO(dateEnd));
       }
     });

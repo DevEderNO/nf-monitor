@@ -6,11 +6,13 @@ export interface IDb {
     path: string;
     modifiedtime: Date;
     size: number;
+    type: 'invoices' | 'certificates';
   }[];
   directoriesAndSubDirectories: {
     path: string;
     modifiedtime: Date;
     size: number;
+    type: 'invoices' | 'certificates';
   }[];
   files: {
     name: string;

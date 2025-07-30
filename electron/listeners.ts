@@ -104,9 +104,23 @@ export async function registerListeners(win: BrowserWindow | null) {
     return directories;
   });
 
-  ipcMain.handle('select-directories', async () => {
+  ipcMain.handle('select-directories-invoices', async () => {
     const directories = selectDirectories(win!);
     if (directories.length > 0) {
+      directories.forEach(directory => {
+        directory.type = 'invoices';
+      });
+      await addDirectories(directories);
+    }
+    return await getDirectories();
+  });
+
+  ipcMain.handle('select-directories-certificates', async () => {
+    const directories = selectDirectories(win!);
+    if (directories.length > 0) {
+      directories.forEach(directory => {
+        directory.type = 'certificates';
+      });
       await addDirectories(directories);
     }
     return await getDirectories();
@@ -162,8 +176,8 @@ export async function registerListeners(win: BrowserWindow | null) {
     } as IConfig);
   });
 
-  ipcMain.handle('remove-directory', async (_, directory: string) => {
-    await removeDirectory(directory);
+  ipcMain.handle('remove-directory', async (_, directory: string, type: 'invoices' | 'certificates') => {
+    await removeDirectory(directory, type);
     await removeFiles(directory);
     return await getDirectories();
   });

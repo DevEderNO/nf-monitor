@@ -1,8 +1,9 @@
 /*
   Warnings:
 
-  - Added the required column `txts` to the `Directory` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `txts` to the `DirectoryDiscovery` table without a default value. This is not possible if the table is not empty.
+  - Added the required column `pfx` to the `Directory` table without a default value. This is not possible if the table is not empty.
+  - Added the required column `pfx` to the `DirectoryDiscovery` table without a default value. This is not possible if the table is not empty.
+  - Added the required column `type` to the `DirectoryDiscovery` table without a default value. This is not possible if the table is not empty.
 
 */
 -- RedefineTables
@@ -18,11 +19,13 @@ CREATE TABLE "new_Directory" (
     "pdfs" INTEGER NOT NULL,
     "txts" INTEGER NOT NULL,
     "zips" INTEGER NOT NULL,
+    "pfx" INTEGER NOT NULL,
+    "type" TEXT NOT NULL DEFAULT 'invoices',
     "totalFiles" INTEGER NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
-INSERT INTO "new_Directory" ("createdAt", "directories", "id", "modifiedtime", "path", "pdfs", "size", "totalFiles", "updatedAt", "xmls", "zips") SELECT "createdAt", "directories", "id", "modifiedtime", "path", "pdfs", "size", "totalFiles", "updatedAt", "xmls", "zips" FROM "Directory";
+INSERT INTO "new_Directory" ("createdAt", "directories", "id", "modifiedtime", "path", "pdfs", "size", "totalFiles", "txts", "updatedAt", "xmls", "zips") SELECT "createdAt", "directories", "id", "modifiedtime", "path", "pdfs", "size", "totalFiles", "txts", "updatedAt", "xmls", "zips" FROM "Directory";
 DROP TABLE "Directory";
 ALTER TABLE "new_Directory" RENAME TO "Directory";
 CREATE TABLE "new_DirectoryDiscovery" (
@@ -35,11 +38,13 @@ CREATE TABLE "new_DirectoryDiscovery" (
     "pdfs" INTEGER NOT NULL,
     "txts" INTEGER NOT NULL,
     "zips" INTEGER NOT NULL,
+    "pfx" INTEGER NOT NULL,
+    "type" TEXT NOT NULL,
     "totalFiles" INTEGER NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
-INSERT INTO "new_DirectoryDiscovery" ("createdAt", "directories", "id", "modifiedtime", "path", "pdfs", "size", "totalFiles", "updatedAt", "xmls", "zips") SELECT "createdAt", "directories", "id", "modifiedtime", "path", "pdfs", "size", "totalFiles", "updatedAt", "xmls", "zips" FROM "DirectoryDiscovery";
+INSERT INTO "new_DirectoryDiscovery" ("createdAt", "directories", "id", "modifiedtime", "path", "pdfs", "size", "totalFiles", "txts", "updatedAt", "xmls", "zips") SELECT "createdAt", "directories", "id", "modifiedtime", "path", "pdfs", "size", "totalFiles", "txts", "updatedAt", "xmls", "zips" FROM "DirectoryDiscovery";
 DROP TABLE "DirectoryDiscovery";
 ALTER TABLE "new_DirectoryDiscovery" RENAME TO "DirectoryDiscovery";
 PRAGMA foreign_keys=ON;

@@ -16,7 +16,7 @@ import { IConfig } from '../interfaces/config';
 import { signInSittax } from '../listeners';
 import prisma from '../lib/prisma';
 
-const VALID_EXTENSIONS = new Set(['.xml', '.pdf', '.zip', '.txt']);
+const VALID_EXTENSIONS = new Set(['.xml', '.pdf', '.zip', '.txt', '.pfx']);
 
 const CHAVE_ACESSO_PATTERNS = [
   /<chNFe>[0-9]{44}/gi,
@@ -69,6 +69,8 @@ export function getDirectoryData(dirPath: string): IDirectory | null {
       pdfs: 0,
       zips: 0,
       txts: 0,
+      pfx: 0,
+      type: 'invoices',
       totalFiles: 0,
     };
 
@@ -79,7 +81,7 @@ export function getDirectoryData(dirPath: string): IDirectory | null {
   }
 }
 
-export function validFile(fileInfo: IFileInfo): { valid: boolean; isNotaFiscal: boolean } {
+export function validFile(fileInfo: IFileInfo, certificate: boolean): { valid: boolean; isNotaFiscal: boolean } {
   const cacheKey = `${fileInfo.filepath}:${fileInfo.extension}`;
 
   if (validationCache.has(cacheKey)) return validationCache.get(cacheKey)!;
@@ -104,13 +106,19 @@ export function validFile(fileInfo: IFileInfo): { valid: boolean; isNotaFiscal: 
         validationCache.set(cacheKey, validate);
         return validate;
       case '.pdf':
-        if (validatePdf(fileInfo)) {
+        if (validatePdf(fileInfo, certificate)) {
           validate = { valid: true, isNotaFiscal: false };
         }
         validationCache.set(cacheKey, validate);
         return validate;
       case '.txt':
         if (validateTxt(fileInfo)) {
+          validate = { valid: true, isNotaFiscal: false };
+        }
+        validationCache.set(cacheKey, validate);
+        return validate;
+      case '.pfx':
+        if (validatePfx(fileInfo)) {
           validate = { valid: true, isNotaFiscal: false };
         }
         validationCache.set(cacheKey, validate);
@@ -192,7 +200,7 @@ export function validZip(fileInfo: IFileInfo): { valid: boolean; isNotaFiscal: b
           }
           break;
         case '.pdf':
-          if (validatePdf(fileInfo)) {
+          if (validatePdf(fileInfo, false)) {
             validate = {
               valid: true,
               isNotaFiscal: false,
@@ -263,12 +271,14 @@ export function getFilesZip(fileInfo: IFileInfo): IFile[] {
   return [];
 }
 
-function validatePdf(fileInfo: IFileInfo): boolean {
+function validatePdf(fileInfo: IFileInfo, certificate: boolean): boolean {
   try {
     const buf = fsSync.readFileSync(fileInfo.filepath);
     const documentParser = createDocumentParser(new Uint8Array(buf));
     const pdfText = documentParser?.contents?.text;
     if (!pdfText) return false;
+
+    if (certificate) return true;
 
     PDF_PATTERNS.declaracao.lastIndex = 0;
     PDF_PATTERNS.extrato.lastIndex = 0;
@@ -387,7 +397,9 @@ export async function recicleDb() {
       txts: 0,
       zips: 0,
       totalFiles: 0,
+      pfx: 0,
     })) ?? [];
+
   const discoredDirecories: IDirectory[] =
     db.directoriesAndSubDirectories?.map(x => ({
       ...x,
@@ -396,8 +408,10 @@ export async function recicleDb() {
       pdfs: 0,
       txts: 0,
       zips: 0,
+      pfx: 0,
       totalFiles: 0,
     })) ?? [];
+
   const files: IFileInfo[] =
     db.files?.map(x => ({
       filepath: x.filepath,
@@ -582,6 +596,19 @@ function validateTxt(fileInfo: IFileInfo): boolean {
     const first28Chars = fileContent.substring(0, 28);
 
     return /^\d{28}$/.test(first28Chars);
+  } catch (error) {
+    return false;
+  }
+}
+
+function validatePfx(fileInfo: IFileInfo): boolean {
+  try {
+    if (!fsSync.existsSync(fileInfo.filepath)) {
+      console.log('Arquivo não encontrado:', fileInfo.filepath);
+      return false;
+    }
+
+    return true;
   } catch (error) {
     return false;
   }

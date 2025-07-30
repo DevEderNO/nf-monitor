@@ -1,29 +1,17 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
-import { useAppState } from "./state";
-import { w3cwebsocket } from "websocket";
-import {
-  WSMessage,
-  WSMessageType,
-  WSMessageTyped,
-} from "@interfaces/ws-message";
-import { ActionType } from "./state-reducer";
-import { IProcessamento, ProcessamentoStatus } from "@interfaces/processamento";
-import { format } from "date-fns";
-import { IDbHistoric } from "@/interfaces/db-historic";
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useAppState } from './state';
+import { w3cwebsocket } from 'websocket';
+import { WSMessage, WSMessageType, WSMessageTyped } from '@interfaces/ws-message';
+import { ActionType } from './state-reducer';
+import { IProcessamento, ProcessamentoStatus } from '@interfaces/processamento';
+import { format } from 'date-fns';
+import { IDbHistoric } from '@/interfaces/db-historic';
 
 interface SocketContextData {
   client: w3cwebsocket | undefined;
 }
 
-export const SocketContext = createContext<SocketContextData>(
-  {} as SocketContextData
-);
+export const SocketContext = createContext<SocketContextData>({} as SocketContextData);
 
 const SocketProvider = ({ children }: React.PropsWithChildren) => {
   const { dispatch } = useAppState();
@@ -32,69 +20,34 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
 
   useEffect(() => {
     if (!client) return;
-    client.onmessage = (message) => {
-      if (typeof message.data === "string") {
+    client.onmessage = message => {
+      if (typeof message.data === 'string') {
         const response: WSMessage = JSON.parse(message.data);
-        if (response.message.type === WSMessageType.Discovery) {
-          const {
-            message: {
-              data: { messages, progress, value, max, status, id },
-            },
-          }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
-          if (ProcessamentoStatus.Concluded === status) {
-            const request: WSMessageTyped<IProcessamento> = {
-              type: "message",
-              message: {
-                type: WSMessageType.StartProcess,
-                data: { id: id ?? undefined } as IProcessamento,
-              },
-            };
-            client?.send(JSON.stringify(request));
-          }
-          dispatch({
-            type: ActionType.Processamento,
-            payload: {
-              messages,
-              progress,
-              value,
-              max,
-              status,
-            },
-          });
-        }
-        if (response.message.type === WSMessageType.Process) {
+
+        if (response.message.type === WSMessageType.Invoice) {
           const {
             message: {
               data: { messages, progress, value, max, status },
             },
           }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
-          console.log("Process", message.data);
-          if (
-            [
-              ProcessamentoStatus.Concluded,
-              ProcessamentoStatus.Stopped,
-            ].includes(status)
-          ) {
-            window.ipcRenderer
-              .invoke("get-historic")
-              .then((historic: IDbHistoric[]) => {
-                if (historic.length > 0) {
-                  dispatch({
-                    type: ActionType.Historic,
-                    payload: historic.map(
-                      (x) =>
-                        `${format(x.startDate, "dd/MM/yyyy HH:mm:ss")}${
-                          x.endDate
-                            ? format(x.endDate, " - dd/MM/yyyy HH:mm:ss")
-                            : " - Não finalizado ou interrompido"
-                        }`
-                    ),
-                  });
-                }
-              });
+          console.log('Process', message.data);
+          if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
+            window.ipcRenderer.invoke('get-historic').then((historic: IDbHistoric[]) => {
+              if (historic.length > 0) {
+                dispatch({
+                  type: ActionType.Historic,
+                  payload: historic.map(
+                    x =>
+                      `${format(x.startDate, 'dd/MM/yyyy HH:mm:ss')}${
+                        x.endDate ? format(x.endDate, ' - dd/MM/yyyy HH:mm:ss') : ' - Não finalizado ou interrompido'
+                      }`
+                  ),
+                });
+              }
+            });
           }
           dispatch({
-            type: ActionType.Processamento,
+            type: ActionType.InvoicesLog,
             payload: {
               messages,
               progress,
@@ -104,6 +57,41 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
             },
           });
         }
+
+        if (response.message.type === WSMessageType.Certificates) {
+          const {
+            message: {
+              data: { messages, progress, value, max, status },
+            },
+          }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
+          console.log('Process', message.data);
+          if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
+            window.ipcRenderer.invoke('get-historic').then((historic: IDbHistoric[]) => {
+              if (historic.length > 0) {
+                dispatch({
+                  type: ActionType.Historic,
+                  payload: historic.map(
+                    x =>
+                      `${format(x.startDate, 'dd/MM/yyyy HH:mm:ss')}${
+                        x.endDate ? format(x.endDate, ' - dd/MM/yyyy HH:mm:ss') : ' - Não finalizado ou interrompido'
+                      }`
+                  ),
+                });
+              }
+            });
+          }
+          dispatch({
+            type: ActionType.CertificatesLog,
+            payload: {
+              messages,
+              progress,
+              value,
+              max,
+              status,
+            },
+          });
+        }
+
         if (response.message.type === WSMessageType.Sieg) {
           const {
             message: {
@@ -111,7 +99,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
             },
           }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
           dispatch({
-            type: ActionType.ProcessamentoSieg,
+            type: ActionType.SiegLog,
             payload: {
               messages,
               progress,
@@ -126,23 +114,23 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
   }, [client, dispatch]);
 
   const connectWebSocket = useCallback(() => {
-    const cli = new w3cwebsocket("ws://127.0.0.1:4444");
+    const cli = new w3cwebsocket('ws://127.0.0.1:4444');
 
     cli.onopen = () => {
       setIsConnected(true);
-      console.info("Conectado ao WebSocket");
+      console.info('Conectado ao WebSocket');
     };
 
     cli.onclose = () => {
       setIsConnected(false);
-      console.info("Conexão perdida. Tentando reconectar...");
+      console.info('Conexão perdida. Tentando reconectar...');
       // Tenta reconectar após 3 segundos
       setTimeout(connectWebSocket, 3000);
     };
 
-    cli.onerror = (error) => {
+    cli.onerror = error => {
       setIsConnected(false);
-      console.error("Erro na conexão WebSocket", error);
+      console.error('Erro na conexão WebSocket', error);
       setTimeout(connectWebSocket, 3000);
     };
 
@@ -160,18 +148,14 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
     };
   }, []);
 
-  return (
-    <SocketContext.Provider value={{ client }}>
-      {children}
-    </SocketContext.Provider>
-  );
+  return <SocketContext.Provider value={{ client }}>{children}</SocketContext.Provider>;
 };
 
 function useSocket() {
   const context = useContext(SocketContext);
 
   if (!context) {
-    throw new Error("useSocket must be used within an SocketProvider");
+    throw new Error('useSocket must be used within an SocketProvider');
   }
 
   return context;
