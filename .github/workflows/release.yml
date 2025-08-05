@@ -35,4 +35,5 @@ jobs:
           VITE_PASSWORD_SECRET: ${{ vars.VITE_PASSWORD_SECRET }}
           VITE_API_HEALTH_BROKER_URL: ${{ vars.VITE_API_HEALTH_BROKER_URL }}
           VITE_API_SIEG_URL: ${{ vars.VITE_API_SIEG_URL }}
+          VITE_WEB_API_URL: ${{ vars.VITE_WEB_API_URL }}
         run: yarn build:win
