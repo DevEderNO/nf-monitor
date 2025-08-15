@@ -46,7 +46,7 @@ export function Signin() {
       navigate("/invoices", { replace: true });
     } catch (error) {
       toast({
-        title: "Algo deu errado 😯 verifique suas credências",
+        title: `Algo deu errado 😯 verifique suas credênciais. ${error}`,
         description: "",
         type: "foreground",
       });
