@@ -461,13 +461,7 @@ async function copyRecursiveAsync(srcDir: string, destDir: string): Promise<void
 
     await Promise.all(semaphore.map(() => processEntry()));
   } catch (error) {
-    this.sendMessageClient(
-      [`❌ Houve um problema ao copiar arquivos recursivos: ${error}`],
-      0,
-      0,
-      this.max,
-      ProcessamentoStatus.Stopped
-    );
+    throw error;
   }
 }
 
@@ -488,13 +482,7 @@ export function copyRecursive(srcDir: string, destDir: string) {
       }
     }
   } catch (error) {
-    this.sendMessageClient(
-      [`❌ Houve um problema ao copiar arquivos: ${error}`],
-      0,
-      0,
-      this.max,
-      ProcessamentoStatus.Stopped
-    );
+    throw error;
   }
 }
 
@@ -513,15 +501,8 @@ export async function listarArquivos(diretorios: string[]): Promise<IFileInfo[]>
     );
 
     return arquivos.flat();
-  } catch (erro) {
-    await this.sendMessageClient(
-      [`❌ Houve um problema ao processar diretorios para envio de arquivos no Sittax: ${erro}`],
-      0,
-      0,
-      this.max,
-      ProcessamentoStatus.Stopped
-    );
-    return [];
+  } catch (error) {
+    throw error;
   }
 }
 
@@ -574,15 +555,8 @@ async function processDirectoryAsync(diretorio: string): Promise<IFileInfo[]> {
     }
 
     return results;
-  } catch (erro) {
-    await this.sendMessageClient(
-      [`❌ Houve um problema ao processar diretorio para envio de arquivos: ${erro}`],
-      0,
-      0,
-      this.max,
-      ProcessamentoStatus.Stopped
-    );
-    return [];
+  } catch (error) {
+    throw error;
   }
 }
 
