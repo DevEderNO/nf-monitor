@@ -15,7 +15,6 @@ import { IDb } from '../interfaces/db';
 import { IConfig } from '../interfaces/config';
 import { signInSittax } from '../listeners';
 import prisma from '../lib/prisma';
-import { ProcessamentoStatus } from '../interfaces/processamento';
 
 const VALID_EXTENSIONS = new Set(['.xml', '.pdf', '.zip', '.txt', '.pfx']);
 
