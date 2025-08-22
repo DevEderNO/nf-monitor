@@ -205,13 +205,15 @@ export class InvoiceTask {
 
       await healthBrokerComunication(this.hasError ? XHealthType.Error : XHealthType.Success, message);
     } catch (error) {
+
       await this.sendMessageClient(
-        ['❌ Houve um problema ao enviar os arquivos para o Sittax'],
+        [`❌ Houve um problema ao enviar os arquivos para o Sittax: ${error}`],
         0,
         lastProcessedIndex,
         this.max,
         ProcessamentoStatus.Running
       );
+
       await healthBrokerComunication(
         XHealthType.Error,
         `Houve um problema ao enviar os arquivos para o Sittax. Continuando do arquivo ${lastProcessedIndex + 1}`
