@@ -15,6 +15,7 @@ import { IDb } from '../interfaces/db';
 import { IConfig } from '../interfaces/config';
 import { signInSittax } from '../listeners';
 import prisma from '../lib/prisma';
+import { ProcessamentoStatus } from '../interfaces/processamento';
 
 const VALID_EXTENSIONS = new Set(['.xml', '.pdf', '.zip', '.txt', '.pfx']);
 
@@ -460,7 +461,13 @@ async function copyRecursiveAsync(srcDir: string, destDir: string): Promise<void
 
     await Promise.all(semaphore.map(() => processEntry()));
   } catch (error) {
-    console.error('Erro ao copiar arquivos:', error);
+    this.sendMessageClient(
+      [`❌ Houve um problema ao copiar arquivos recursivos: ${error}`],
+      0,
+      0,
+      this.max,
+      ProcessamentoStatus.Stopped
+    );
   }
 }
 
@@ -481,7 +488,13 @@ export function copyRecursive(srcDir: string, destDir: string) {
       }
     }
   } catch (error) {
-    console.error('Erro ao copiar:', error);
+    this.sendMessageClient(
+      [`❌ Houve um problema ao copiar arquivos: ${error}`],
+      0,
+      0,
+      this.max,
+      ProcessamentoStatus.Stopped
+    );
   }
 }
 
@@ -501,7 +514,13 @@ export async function listarArquivos(diretorios: string[]): Promise<IFileInfo[]>
 
     return arquivos.flat();
   } catch (erro) {
-    console.error('Erro ao ler diretorio:', erro);
+    await this.sendMessageClient(
+      [`❌ Houve um problema ao processar diretorios para envio de arquivos no Sittax: ${erro}`],
+      0,
+      0,
+      this.max,
+      ProcessamentoStatus.Stopped
+    );
     return [];
   }
 }
@@ -556,7 +575,13 @@ async function processDirectoryAsync(diretorio: string): Promise<IFileInfo[]> {
 
     return results;
   } catch (erro) {
-    console.error('Erro ao ler diretorio:', erro);
+    await this.sendMessageClient(
+      [`❌ Houve um problema ao processar diretorio para envio de arquivos: ${erro}`],
+      0,
+      0,
+      this.max,
+      ProcessamentoStatus.Stopped
+    );
     return [];
   }
 }
