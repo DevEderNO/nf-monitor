@@ -1,11 +1,11 @@
-import axios from 'axios';
-import { decrypt } from './cryptography';
+import axios, { AxiosError } from 'axios';
+import { decrypt } from '../cryptography';
 import { createReadStream } from 'fs';
 import FormData from 'form-data';
-import { ISignIn } from '../interfaces/signin';
-import { ISiegCountNotesRequest, ISiegDownloadNotesRequest, ISiegDownloadNotesResponse } from '../interfaces/sieg';
-import { BrowserWindow } from 'electron';
-import { NFMoniotorHealth } from '../interfaces/health-message';
+import { ISignIn } from '../../interfaces/signin';
+import { ISiegCountNotesRequest, ISiegDownloadNotesRequest, ISiegDownloadNotesResponse } from '../../interfaces/sieg';
+import { NFMoniotorHealth } from '../../interfaces/health-message';
+import { handleAxiosError } from './error-handle';
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -47,6 +47,7 @@ export async function checkRoute(url: string) {
 }
 
 export async function signIn(username: string, password: string, useCryptography?: boolean): Promise<ISignIn> {
+  try {
   const currentPassword = useCryptography ? decrypt(password) : password;
   const resp = await apiAuth.get<ISignIn>(`auth/logar-nfe-monitor`, {
     params: {
@@ -56,8 +57,11 @@ export async function signIn(username: string, password: string, useCryptography
     headers: {
       Origin: 'https://app.sittax.com.br',
     },
-  });
-  return resp.data;
+    });
+    return resp.data;
+  } catch (error) {
+    throw handleAxiosError(error as AxiosError);
+  }
 }
 
 const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
@@ -77,7 +81,9 @@ export async function retry(url: string, filepath: string, token: string, maximu
     if (data) return data;
     throw new Error('Nenhuma resposta da API');
   } catch (e) {
-    if (attempt >= maximumRetry) throw e;
+    if (attempt >= maximumRetry) {
+      throw handleAxiosError(e as AxiosError);
+    }
     return retry(url, filepath, token, maximumRetry, attempt + 1, (delay || 500) * 2);
   }
 }
@@ -104,7 +110,9 @@ export async function retryCertificate(
     if (data) return data;
     throw new Error('Nenhuma resposta da API');
   } catch (e) {
-    if (attempt >= maximumRetry) throw e;
+    if (attempt >= maximumRetry) {
+      throw handleAxiosError(e as AxiosError);
+    }
     return retry(url, filepath, token, maximumRetry, attempt + 1, (delay || 500) * 2);
   }
 }
@@ -135,7 +143,9 @@ export async function retrySieg(
     if (resp.data) return resp.data;
     throw new Error('Nenhuma resposta da API');
   } catch (e) {
-    if (attempt >= maximumRetry) throw e;
+    if (attempt >= maximumRetry) {
+      throw handleAxiosError(e as AxiosError);
+    }
     console.info('Erro ao baixar notas numero de tentativas: ', attempt, 'delay: ', delay);
     return retrySieg(url, apiKey, data, maximumRetry, attempt + 1, (delay > 0 ? delay : 1000) * 2);
   }
@@ -156,54 +166,14 @@ export async function healthBrokerSetHealf(message: NFMoniotorHealth) {
   try {
     await apiHealthBroker.post('set-health', message);
   } catch (error) {
-    console.error('Erro ao enviar mensagem para o Health Broker', error);
+    if (error instanceof AxiosError) {
+      const errorMessage = handleAxiosError(error as AxiosError);
+      console.error('Erro ao enviar mensagem para o Health Broker', {
+        type: errorMessage.type,
+        message: errorMessage.message,
+      });
+    } else {
+      console.error('Erro ao enviar mensagem para o Health Broker', error);
+    }
   }
 }
-
-api.interceptors.request.use(config => {
-  return config;
-});
-
-apiAuth.interceptors.request.use(config => {
-  return config;
-});
-
-// Response interceptor
-api.interceptors.response.use(
-  response => {
-    // Any status code within the range of 2xx triggers this function
-    return response;
-  },
-  error => {
-    BrowserWindow.getAllWindows().forEach(window => {
-      window.webContents.send('main-process-message', `error: ${JSON.stringify(error)}`);
-    });
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor
-apiAuth.interceptors.response.use(
-  response => {
-    // Any status code within the range of 2xx triggers this function
-    return response;
-  },
-  error => {
-    BrowserWindow.getAllWindows().forEach(window => {
-      window.webContents.send('main-process-message', `error: ${JSON.stringify(error)}`);
-    });
-    return Promise.reject(error);
-  }
-);
-
-apiSieg.interceptors.response.use(
-  response => {
-    return response;
-  },
-  error => {
-    BrowserWindow.getAllWindows().forEach(window => {
-      window.webContents.send('main-process-message', `error: ${JSON.stringify(error)}`);
-    });
-    return Promise.reject(error);
-  }
-);

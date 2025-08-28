@@ -8,7 +8,6 @@ import { createDirectoryFolder, getDirectoryData } from './file-operation-servic
 import { ICountedNotes } from '../interfaces/count-notes';
 import { IAuth } from '../interfaces/auth';
 import prisma from '../lib/prisma';
-import { BrowserWindow } from 'electron';
 import { endOfDay, startOfDay } from 'date-fns';
 import path from 'node:path';
 import { IEmpresa } from '../interfaces/empresa';
@@ -35,8 +34,15 @@ export async function updateConfiguration(data: IConfig) {
 export async function getAuth(): Promise<IAuth | null> {
   const user = await prisma.user.findFirst();
   const auth = await prisma.auth.findFirst();
+  const config = await getConfiguration();
+
   if (!auth) return null;
-  return { ...auth, user };
+
+  return {
+    ...auth,
+    user,
+    configuration: config || undefined,
+  };
 }
 
 export async function addAuth(data: {
@@ -51,81 +57,81 @@ export async function addAuth(data: {
     senhaSieg: string;
   };
 }) {
-  try {
-    // Create user record first
-    const savedUser = await prisma.user.create({
+  // Create user record first
+  const savedUser = await prisma.user.create({
+    data: {
+      userId: data.user.userId,
+      nome: data.user.nome,
+      sobrenome: data.user.sobrenome,
+      cpf: data.user.cpf,
+      email: data.user.email,
+      phoneNumber: data.user.phoneNumber,
+      ativo: data.user.ativo,
+      emailConfirmed: data.user.emailConfirmed,
+      accessFailedCount: data.user.accessFailedCount,
+      dataDeCriacao: data.user.dataDeCriacao,
+      lockoutEnd: data.user.lockoutEnd,
+      eUsuarioEmpresa: data.user.eUsuarioEmpresa,
+      role: JSON.stringify(data.user.role),
+      ePrimeiroAcesso: data.user.ePrimeiroAcesso,
+      nivel: data.user.nivel.valueOf(),
+    },
+  });
+
+  // Create empresas record with reference to user
+  await prisma.empresa.createMany({
+    data: data.empresas.map(empresa => ({
+      empresaId: empresa.empresaId,
+      nome: empresa.nome,
+      cnpj: empresa.cnpj,
+      userId: savedUser.id,
+    })),
+  });
+
+  // Create auth record with reference to user
+  const auth = await prisma.auth.create({
+    data: {
+      token: data.token,
+      userId: savedUser.id,
+      name: data.user.nome,
+      username: data.username,
+      password: data.password,
+    },
+  });
+  const config = await getConfiguration();
+  if (config) {
+    await prisma.configuration.update({
+      where: { id: config?.id },
       data: {
-        userId: data.user.userId,
-        nome: data.user.nome,
-        sobrenome: data.user.sobrenome,
-        cpf: data.user.cpf,
-        email: data.user.email,
-        phoneNumber: data.user.phoneNumber,
-        ativo: data.user.ativo,
-        emailConfirmed: data.user.emailConfirmed,
-        accessFailedCount: data.user.accessFailedCount,
-        dataDeCriacao: data.user.dataDeCriacao,
-        lockoutEnd: data.user.lockoutEnd,
-        eUsuarioEmpresa: data.user.eUsuarioEmpresa,
-        role: JSON.stringify(data.user.role),
-        ePrimeiroAcesso: data.user.ePrimeiroAcesso,
-        nivel: data.user.nivel.valueOf(),
+        ...config,
+        apiKeySieg: data.configuration.apiKeySieg,
+        emailSieg: data.configuration.emailSieg,
+        senhaSieg: data.configuration.senhaSieg,
       },
     });
-
-    // Create empresas record with reference to user
-    await prisma.empresa.createMany({
-      data: data.empresas.map(empresa => ({
-        empresaId: empresa.empresaId,
-        nome: empresa.nome,
-        cnpj: empresa.cnpj,
-        userId: savedUser.id,
-      })),
-    });
-
-    // Create auth record with reference to user
-    const auth = await prisma.auth.create({
+  } else {
+    await prisma.configuration.create({
       data: {
-        token: data.token,
-        userId: savedUser.id,
-        name: data.user.nome,
-        username: data.username,
-        password: data.password,
+        timeForProcessing: '00:00',
+        timeForConsultingSieg: '00:00',
+        viewUploadedFiles: false,
+        apiKeySieg: data.configuration.apiKeySieg,
+        emailSieg: data.configuration.emailSieg,
+        senhaSieg: data.configuration.senhaSieg,
       },
-    });
-    const config = await getConfiguration();
-    if (config) {
-      await prisma.configuration.update({
-        where: { id: config?.id },
-        data: {
-          ...config,
-          apiKeySieg: data.configuration.apiKeySieg,
-          emailSieg: data.configuration.emailSieg,
-          senhaSieg: data.configuration.senhaSieg,
-        },
-      });
-    } else {
-      await prisma.configuration.create({
-        data: {
-          timeForProcessing: '00:00',
-          timeForConsultingSieg: '00:00',
-          viewUploadedFiles: false,
-          apiKeySieg: data.configuration.apiKeySieg,
-          emailSieg: data.configuration.emailSieg,
-          senhaSieg: data.configuration.senhaSieg,
-        },
-      });
-    }
-
-    return { ...auth, config, token: data.token };
-  } catch (error) {
-    BrowserWindow.getAllWindows().forEach(window => {
-      window.webContents.send(
-        'main-process-message',
-        `signIn error: ${JSON.stringify(error, Object.getOwnPropertyNames(error))}`
-      );
     });
   }
+
+  return {
+    ...auth,
+    user: savedUser,
+    configuration: {
+      apiKeySieg: data.configuration.apiKeySieg,
+      emailSieg: data.configuration.emailSieg,
+      senhaSieg: data.configuration.senhaSieg,
+    },
+    token: data.token,
+  };
 }
 
 export async function updateAuth(data: { id: number; token?: string; username?: string; password?: string }) {

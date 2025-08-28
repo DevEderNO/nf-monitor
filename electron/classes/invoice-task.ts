@@ -30,7 +30,7 @@ import { healthBrokerComunication } from '../services/health-broker-service';
 import * as path from 'path';
 import * as fs from 'fs';
 
-const AdmZip = require('adm-zip');
+import AdmZip from 'adm-zip';
 
 export class InvoiceTask {
   isPaused: boolean;

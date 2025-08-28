@@ -90,7 +90,7 @@ export function validFile(fileInfo: IFileInfo, certificate: boolean): { valid: b
 
   try {
     let data = '';
-    switch (fileInfo.extension) {
+    switch (fileInfo.extension.toLowerCase()) {
       case '.xml':
         data = fsSync.readFileSync(fileInfo.filepath, 'utf-8')?.trim();
         if (!data.startsWith('<')) {
@@ -436,52 +436,44 @@ export async function recicleDb() {
 }
 
 async function copyRecursiveAsync(srcDir: string, destDir: string): Promise<void> {
-  try {
-    await fs.mkdir(destDir, { recursive: true });
+  await fs.mkdir(destDir, { recursive: true });
 
-    const entries = await fs.readdir(srcDir, { withFileTypes: true });
+  const entries = await fs.readdir(srcDir, { withFileTypes: true });
 
-    const semaphore = new Array(MAX_CONCURRENT_OPERATIONS).fill(null);
-    let index = 0;
+  const semaphore = new Array(MAX_CONCURRENT_OPERATIONS).fill(null);
+  let index = 0;
 
-    const processEntry = async () => {
-      while (index < entries.length) {
-        const entry = entries[index++];
-        const srcPath = path.join(srcDir, entry.name);
-        const destPath = path.join(destDir, entry.name);
-
-        if (entry.isDirectory()) {
-          await copyRecursiveAsync(srcPath, destPath);
-        } else {
-          await fs.copyFile(srcPath, destPath);
-        }
-      }
-    };
-
-    await Promise.all(semaphore.map(() => processEntry()));
-  } catch (error) {
-    throw error;
-  }
-}
-
-export function copyRecursive(srcDir: string, destDir: string) {
-  try {
-    fsSync.mkdirSync(destDir, { recursive: true });
-
-    const entries = fsSync.readdirSync(srcDir, { withFileTypes: true });
-
-    for (const entry of entries) {
+  const processEntry = async () => {
+    while (index < entries.length) {
+      const entry = entries[index++];
       const srcPath = path.join(srcDir, entry.name);
       const destPath = path.join(destDir, entry.name);
 
       if (entry.isDirectory()) {
-        copyRecursive(srcPath, destPath);
+        await copyRecursiveAsync(srcPath, destPath);
       } else {
-        fsSync.copyFileSync(srcPath, destPath);
+        await fs.copyFile(srcPath, destPath);
       }
     }
-  } catch (error) {
-    throw error;
+  };
+
+  await Promise.all(semaphore.map(() => processEntry()));
+}
+
+export function copyRecursive(srcDir: string, destDir: string) {
+  fsSync.mkdirSync(destDir, { recursive: true });
+
+  const entries = fsSync.readdirSync(srcDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const srcPath = path.join(srcDir, entry.name);
+    const destPath = path.join(destDir, entry.name);
+
+    if (entry.isDirectory()) {
+      copyRecursive(srcPath, destPath);
+    } else {
+      fsSync.copyFileSync(srcPath, destPath);
+    }
   }
 }
 
@@ -492,71 +484,63 @@ export function createDirectoryFolder(directoryPath: string) {
 }
 
 export async function listarArquivos(diretorios: string[]): Promise<IFileInfo[]> {
-  try {
-    const arquivos = await Promise.all(
-      diretorios.map(async (diretorio): Promise<IFileInfo[]> => {
-        return await processDirectoryAsync(diretorio);
-      })
-    );
+  const arquivos = await Promise.all(
+    diretorios.map(async (diretorio): Promise<IFileInfo[]> => {
+      return await processDirectoryAsync(diretorio);
+    })
+  );
 
-    return arquivos.flat();
-  } catch (error) {
-    throw error;
-  }
+  return arquivos.flat();
 }
 
 async function processDirectoryAsync(diretorio: string): Promise<IFileInfo[]> {
-  try {
-    const itens = await fs.readdir(diretorio, {
-      withFileTypes: true,
-    });
+  const itens = await fs.readdir(diretorio, {
+    withFileTypes: true,
+  });
 
-    const results: IFileInfo[] = [];
+  const results: IFileInfo[] = [];
 
-    for (let i = 0; i < itens.length; i += BATCH_SIZE) {
-      const batch = itens.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < itens.length; i += BATCH_SIZE) {
+    const batch = itens.slice(i, i + BATCH_SIZE);
 
-      const paths = await Promise.all(
-        batch.map(async (item): Promise<IFileInfo | IFileInfo[]> => {
-          const caminhoCompleto = path.join(diretorio, item.name);
+    const paths = await Promise.all(
+      batch.map(async (item): Promise<IFileInfo | IFileInfo[]> => {
+        const caminhoCompleto = path.join(diretorio, item.name);
 
-          if (item.isDirectory()) {
-            return processDirectoryAsync(caminhoCompleto);
-          }
+        if (item.isDirectory()) {
+          return processDirectoryAsync(caminhoCompleto);
+        }
 
-          let stats: fsSync.Stats;
-          if (fileStatsCache.has(caminhoCompleto)) {
-            stats = fileStatsCache.get(caminhoCompleto)!;
-          } else {
-            stats = await fs.stat(caminhoCompleto);
-            fileStatsCache.set(caminhoCompleto, stats);
-          }
+        let stats: fsSync.Stats;
+        if (fileStatsCache.has(caminhoCompleto)) {
+          stats = fileStatsCache.get(caminhoCompleto)!;
+        } else {
+          stats = await fs.stat(caminhoCompleto);
+          fileStatsCache.set(caminhoCompleto, stats);
+        }
 
-          const extension = path.extname(item.name);
+        const extension = path.extname(item.name).toLowerCase();
 
-          return {
-            filepath: caminhoCompleto,
-            filename: item.name,
-            extension: extension,
-            isDirectory: false,
-            isFile: true,
-            wasSend: false,
-            dataSend: null,
-            isValid: VALID_EXTENSIONS.has(extension),
-            bloqued: false,
-            modifiedtime: stats.mtime,
-            size: stats.size,
-          };
-        })
-      );
+        return {
+          filepath: caminhoCompleto,
+          filename: item.name,
+          extension: extension,
+          isDirectory: false,
+          isFile: true,
+          wasSend: false,
+          dataSend: null,
+          isValid: VALID_EXTENSIONS.has(extension),
+          bloqued: false,
+          modifiedtime: stats.mtime,
+          size: stats.size,
+        };
+      })
+    );
 
-      results.push(...paths.flat());
-    }
-
-    return results;
-  } catch (error) {
-    throw error;
+    results.push(...paths.flat());
   }
+
+  return results;
 }
 
 export function clearCaches(): void {
@@ -611,3 +595,4 @@ function validatePfx(fileInfo: IFileInfo): boolean {
     return false;
   }
 }
+''

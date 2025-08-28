@@ -1,4 +1,5 @@
 import { IUser } from "./user";
+import { IConfig } from "./config";
 
 export interface IAuth {
   id?: number;
@@ -7,6 +8,7 @@ export interface IAuth {
   name: string | null;
   username: string | null;
   password: string | null;
+  configuration?: IConfig;
   createdAt?: Date;
   updatedAt?: Date;
 }

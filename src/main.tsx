@@ -40,3 +40,12 @@ window.ipcRenderer.on("update-downloaded", (_event, message) => {
     type: "foreground",
   });
 });
+
+window.ipcRenderer.on("error", (_event, message) => {
+  const parsedMessage = JSON.parse(message);
+  toast({
+    title: parsedMessage.title,
+    description: parsedMessage.message,
+    type: "foreground",
+  });
+});

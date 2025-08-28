@@ -26,6 +26,11 @@ const AuthProvider = ({ children }: React.PropsWithChildren) => {
       dispatch({ type: ActionType.Loading, payload: true });
       try {
         const auth = await window.ipcRenderer.invoke("signIn", credentials);
+        
+        if (!auth) {
+          throw new Error("Falha na autenticação");
+        }
+        
         dispatch([
           {
             type: ActionType.Auth,
@@ -33,11 +38,12 @@ const AuthProvider = ({ children }: React.PropsWithChildren) => {
           },
           {
             type: ActionType.Config,
-            payload: auth.configuration,
+            payload: auth.configuration || {},
           },
         ]);
       } catch (error) {
-        throw error;
+        console.error('Erro no login:', error);
+        throw error; // Re-throw para que o componente Signin possa tratar
       } finally {
         dispatch({ type: ActionType.Loading, payload: false });
       }

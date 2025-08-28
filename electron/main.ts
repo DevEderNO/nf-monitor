@@ -128,7 +128,16 @@ function createWindow() {
   process.on('uncaughtException', async error => {
     await logError(error, ErrorType.UncaughtException);
     BrowserWindow.getAllWindows().forEach(window => {
-      window.webContents.send('main-process-message', error);
+      if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+        try {
+          window.webContents.send('error', JSON.stringify({
+            title: 'Erro não tratado',
+            message: (error as Error).message
+          }));
+        } catch (err) {
+          console.error('Erro ao enviar mensagem para renderer:', err);
+        }
+      }
     });
   });
 
@@ -137,12 +146,30 @@ function createWindow() {
     if (reason instanceof Error) {
       await logError(reason, ErrorType.UnhandledRejection);
       BrowserWindow.getAllWindows().forEach(window => {
-        window.webContents.send('main-process-message', reason);
+        if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+          try {
+            window.webContents.send('error', JSON.stringify({
+              title: 'Erro não tratado',
+              message: (reason as Error).message
+            }));
+          } catch (err) {
+            console.error('Erro ao enviar mensagem para renderer:', err);
+          }
+        }
       });
     } else {
       await logError(new Error(String(reason)), ErrorType.UnhandledRejection);
       BrowserWindow.getAllWindows().forEach(window => {
-        window.webContents.send('main-process-message', reason);
+        if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+          try {
+            window.webContents.send('error', JSON.stringify({
+              title: 'Erro não tratado',
+              message: (reason as Error).message
+            }));
+          } catch (err) {
+            console.error('Erro ao enviar mensagem para renderer:', err);
+          }
+        }
       });
     }
   });
@@ -151,7 +178,10 @@ function createWindow() {
   app.on('render-process-gone', async (_event, _webContents, details) => {
     await logError(new Error(`Render process gone: ${details.reason}`), ErrorType.RenderProcessGone);
     BrowserWindow.getAllWindows().forEach(window => {
-      window.webContents.send('main-process-message', details.reason);
+      window.webContents.send('error', JSON.stringify({
+        title: 'Erro de renderização',
+        message: details.reason
+      }));
     });
   });
 
@@ -159,7 +189,10 @@ function createWindow() {
   app.on('child-process-gone', async (_event, details) => {
     await logError(new Error(`GPU process gone: ${details.type}`), ErrorType.GPUProcessGone);
     BrowserWindow.getAllWindows().forEach(window => {
-      window.webContents.send('main-process-message', details.type);
+      window.webContents.send('error', JSON.stringify({
+        title: 'Erro de GPU',
+        message: details.type
+      }));
     });
   });
 

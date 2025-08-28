@@ -22,6 +22,7 @@ import { IDirectory } from './interfaces/directory';
 import { IUser } from './interfaces/user';
 
 export async function signInSittax(user: string, password: string, encripted: boolean) {
+  try {
   const data = await signIn(user, password, encripted);
   const {
     Token,
@@ -81,8 +82,17 @@ export async function signInSittax(user: string, password: string, encripted: bo
       senhaSieg: SenhaSieg ?? '',
     },
   };
-  await addAuth(auth);
-  return auth;
+    await addAuth(auth);
+    return auth;
+  } catch (error) {
+    BrowserWindow.getAllWindows().forEach(window => {
+      window.webContents.send('error', JSON.stringify({
+        title: 'Algo deu errado 😯.',
+        message: (error as Error).message
+      }));
+    });
+    return null;
+  }
 }
 
 export async function registerListeners(win: BrowserWindow | null) {

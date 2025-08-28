@@ -30,7 +30,6 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
               data: { messages, progress, value, max, status },
             },
           }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
-          console.log('Process', message.data);
           if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
             window.ipcRenderer.invoke('get-historic').then((historic: IDbHistoric[]) => {
               if (historic.length > 0) {
@@ -64,7 +63,6 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
               data: { messages, progress, value, max, status },
             },
           }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
-          console.log('Process', message.data);
           if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
             window.ipcRenderer.invoke('get-historic').then((historic: IDbHistoric[]) => {
               if (historic.length > 0) {
