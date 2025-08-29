@@ -12,6 +12,10 @@
   files: [
     "dist",
     "dist-electron",
+    {
+      from: "resources",
+      to: "dist-electron",
+    },
   ],
   extraResources: [
     {

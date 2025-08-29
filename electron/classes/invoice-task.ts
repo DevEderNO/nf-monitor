@@ -14,6 +14,7 @@ import { signIn, upload } from '../lib/axios';
 import { IDbHistoric } from '../interfaces/db-historic';
 import {
   addFiles,
+  addHistoric,
   getAuth,
   getConfiguration,
   getCountFilesSended,
@@ -694,10 +695,13 @@ export class InvoiceTask {
 
     if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
       this.historic.endDate = new Date();
-      if (this.historic.id) {
+      if (this.historic.id && this.historic.id > 0) {
         await updateHistoric(this.historic);
+      } else {
+        await addHistoric(this.historic);
       }
     }
+    this.historic.log.push(`${getTimestamp()} - ${message}`);
     this.connection?.sendUTF(
       JSON.stringify({
         type: 'message',
