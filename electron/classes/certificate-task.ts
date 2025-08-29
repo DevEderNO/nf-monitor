@@ -220,6 +220,8 @@ export class CertificateTask {
 
   async continueFromIndex(startIndex: number) {
     try {
+      if (this.files.length === 0) return;
+
       await this.sendMessageClient([`🔄 Continuando o processo do arquivo ${startIndex + 1}`]);
 
       const progressIncrement = 100 / this.files.length;
