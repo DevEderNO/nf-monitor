@@ -23,11 +23,10 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
     client.onmessage = message => {
       if (typeof message.data === 'string') {
         const response: WSMessage = JSON.parse(message.data);
-
         if (response.message.type === WSMessageType.Invoice) {
           const {
             message: {
-              data: { messages, progress, value, max, status },
+              data: { message: messageProcessamento, progress, value, max, status },
             },
           }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
           if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
@@ -48,7 +47,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
           dispatch({
             type: ActionType.InvoicesLog,
             payload: {
-              messages,
+              message: messageProcessamento,
               progress,
               value,
               max,
@@ -60,7 +59,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
         if (response.message.type === WSMessageType.Certificates) {
           const {
             message: {
-              data: { messages, progress, value, max, status },
+              data: { message: messageProcessamento, progress, value, max, status },
             },
           }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
           if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
@@ -81,7 +80,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
           dispatch({
             type: ActionType.CertificatesLog,
             payload: {
-              messages,
+              message: messageProcessamento,
               progress,
               value,
               max,
@@ -93,13 +92,13 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
         if (response.message.type === WSMessageType.Sieg) {
           const {
             message: {
-              data: { messages, progress, value, max, status },
+              data: { message: messageProcessamento, progress, value, max, status },
             },
           }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
           dispatch({
             type: ActionType.SiegLog,
             payload: {
-              messages,
+              message: messageProcessamento,
               progress,
               value,
               max,

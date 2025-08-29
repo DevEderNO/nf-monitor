@@ -17,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAppState } from "@/hooks/state";
 import { ActionType } from "@/hooks/state-reducer";
 import { FolderIcon, TrashIcon } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 export function Configuration() {
   const { state, dispatch } = useAppState();
@@ -29,7 +29,7 @@ export function Configuration() {
     setViewUploadedFiles(state?.config?.viewUploadedFiles ?? false);
   }, [state?.config?.viewUploadedFiles, state?.historic]);
 
-  const handleSelectDirectoryDownloadSieg = useCallback(async () => {
+  const handleSelectDirectoryDownloadSieg = async () => {
     const config = await window.ipcRenderer.invoke(
       "select-directory-download-sieg"
     );
@@ -39,10 +39,9 @@ export function Configuration() {
         payload: config,
       });
     }
-  }, []);
+  };
 
-  const handleTimeForProcessing = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTimeForProcessing = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const config = await window.ipcRenderer.invoke(
         "change-time-for-processing",
         e.target.value
@@ -51,12 +50,9 @@ export function Configuration() {
         type: ActionType.Config,
         payload: config,
       });
-    },
-    []
-  );
+  };
 
-  const handleTimeForConsultingSieg = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTimeForConsultingSieg = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const config = await window.ipcRenderer.invoke(
         "change-time-for-consulting-sieg",
         e.target.value
@@ -65,17 +61,14 @@ export function Configuration() {
         type: ActionType.Config,
         payload: config,
       });
-    },
-    []
-  );
+    };
 
-  const handleCleanHistoric = useCallback(() => {
+  const handleCleanHistoric = () => {
     window.ipcRenderer.send("clear-historic");
     dispatch({ type: ActionType.Historic, payload: [] });
-  }, [dispatch]);
+  };
 
-  const handleCleanDirectoryDownloadSieg = useCallback(
-    async (clearFiles: boolean) => {
+  const handleCleanDirectoryDownloadSieg = async (clearFiles: boolean) => {
       const config = await window.ipcRenderer.invoke(
         "clear-directory-download-sieg",
         clearFiles
@@ -84,11 +77,9 @@ export function Configuration() {
         type: ActionType.Config,
         payload: config,
       });
-    },
-    [dispatch]
-  );
+    };
 
-  const changeViewUploadedFiles = useCallback(async () => {
+  const changeViewUploadedFiles = async () => {
     const config = await window.ipcRenderer.invoke(
       "change-view-uploaded-files",
       !viewUploadedFiles
@@ -97,10 +88,10 @@ export function Configuration() {
       type: ActionType.Config,
       payload: config,
     });
-  }, [dispatch, viewUploadedFiles]);
+  };
 
   return (
-    <div className="p-4 m-4 flex flex-1 flex-col gap-4 border rounded-md">
+    <div className="p-4 flex flex-col gap-4 border rounded-md h-full overflow-hidden">
       <div className="flex items-center space-x-2">
         <Switch
           id="airplane-mode"

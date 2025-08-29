@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { StopIcon } from '@radix-ui/react-icons';
 import { addMonths, format } from 'date-fns';
 import { CalendarIcon, Pause, Play } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { DateRange } from 'react-day-picker';
 
 interface IStepProcess {
@@ -34,17 +34,15 @@ export function Sieg() {
   } = useAppState();
   const { client } = useSocket();
   const { toast } = useToast();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const newDate = new Date();
   const [date, setDate] = useState<DateRange | undefined>({
     from: addMonths(new Date(newDate.getFullYear(), newDate.getMonth(), 1), -1),
     to: newDate,
   });
+  const [messages, setMessages] = useState<string[]>([]);
 
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
-    }
+      setMessages(prev => [siegLog.message, ...prev]);
   }, [siegLog]);
 
   const hasDerectories = useCallback(() => {
@@ -62,7 +60,7 @@ export function Sieg() {
       return true;
     }
     return false;
-  }, [config.directoryDownloadSieg && config.directoryDownloadSieg?.length, toast]);
+  }, [config.directoryDownloadSieg, toast]);
 
   const stepStart = useCallback(
     (dateInitial: Date | undefined, dateEnd: Date | undefined) => {
@@ -202,10 +200,9 @@ export function Sieg() {
       </div>
       <div className="flex flex-1 flex-col gap-1">
         <Textarea
-          ref={textareaRef}
           className="flex flex-1 h-full cursor-default resize-none"
           readOnly
-          value={siegLog?.messages?.slice(siegLog?.messages?.length - 1000, siegLog?.messages?.length - 1)?.join('\n')}
+          value={messages.join('\n')}
         />
       </div>
     </div>

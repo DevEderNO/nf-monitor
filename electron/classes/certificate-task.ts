@@ -15,6 +15,7 @@ import {
   addFiles,
   getAuth,
   getConfiguration,
+  getCountFilesSendedPfx,
   getDirectories,
   getFiles,
   removeFiles,
@@ -37,7 +38,7 @@ export class CertificateTask {
   connection: connection | null;
   progress: number;
   files: IFileInfo[];
-  filesSended: IFileInfo[];
+  filesSended: number;
   hasError: boolean;
   historic: IDbHistoric;
   viewUploadedFiles: boolean = false;
@@ -52,7 +53,7 @@ export class CertificateTask {
     this.connection = null;
     this.progress = 0;
     this.files = [];
-    this.filesSended = [];
+    this.filesSended = 0;
     this.hasError = false;
     this.historic = {
       startDate: new Date(),
@@ -83,17 +84,17 @@ export class CertificateTask {
     try {
       this.initializeProperties(connection);
       const directories = await getDirectories();
-      await this.sendMessageClient(['🔎 Realizando a descoberta dos arquivos']);
+      await this.sendMessageClient('🔎 Realizando a descoberta dos arquivos');
       await healthBrokerComunication(XHealthType.Info, `Iniciado processo de envio de arquivos para o Sittax`);
       await addFiles(await listarArquivos(directories.map(x => x.path)));
       this.files = (await getFiles()).filter(x => !x.wasSend && x.isValid);
-      this.filesSended = (await getFiles()).filter(x => x.wasSend || !x.isValid);
+      this.filesSended = await getCountFilesSendedPfx();
       this.viewUploadedFiles = (await getConfiguration())?.viewUploadedFiles ?? false;
-      if (this.viewUploadedFiles && this.filesSended.length > 0) {
-        this.files.push(...this.filesSended);
+      if (this.viewUploadedFiles && this.filesSended > 0) {
+        this.files.push(...(await getFiles()).filter(x => x.wasSend || !x.isValid));
       }
       if (this.files.length > 0) {
-        await this.sendMessageClient(['🚀 Iniciando o envio dos arquivos para o Sittax']);
+        await this.sendMessageClient('⚡ Iniciando o envio dos arquivos para o Sittax');
         const progressIncrement = 100 / this.files.length;
         this.max = this.files.length;
         let currentProgress = 0;
@@ -104,8 +105,11 @@ export class CertificateTask {
           lastProcessedIndex = index;
 
           if (this.isCancelled) {
-            this.cancelledMessage ??= `Tarefa de envio de arquivo para o Sittax foi cancelada. Foram enviados ${this.files.reduce((acc, file) => acc + (file.wasSend ? 1 : 0), 0)} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`;
-            await this.sendMessageClient([this.cancelledMessage], 0, index + 1, this.max, ProcessamentoStatus.Stopped);
+            this.cancelledMessage ??= `Tarefa de envio de arquivo para o Sittax foi cancelada. Foram enviados ${this.files.reduce(
+              (acc, file) => acc + (file.wasSend ? 1 : 0),
+              0
+            )} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`;
+            await this.sendMessageClient(this.cancelledMessage, 0, index + 1, this.max, ProcessamentoStatus.Stopped);
             await healthBrokerComunication(XHealthType.Warning, this.cancelledMessage);
             this.isCancelled = false;
             this.isPaused = false;
@@ -118,7 +122,7 @@ export class CertificateTask {
             if (this.pausedMessage === null) {
               this.pausedMessage = 'Tarefa de envio de arquivo para o Sittax foi pausada.';
               await this.sendMessageClient(
-                [this.pausedMessage],
+                this.pausedMessage,
                 currentProgress,
                 index + 1,
                 this.max,
@@ -134,7 +138,7 @@ export class CertificateTask {
             if (element.wasSend) {
               if (!element.isValid) {
                 await this.sendMessageClient(
-                  [`⚠️ Arquivo não e válido para o envio ${element.filepath}`],
+                  `⚠️ Arquivo não e válido para o envio ${element.filepath}`,
                   currentProgress,
                   index + 1,
                   this.max,
@@ -147,7 +151,7 @@ export class CertificateTask {
                 continue;
               }
               await this.sendMessageClient(
-                [`☑️ Já foi enviando ${element.filepath}`],
+                `☑️ Já foi enviando ${element.filepath}`,
                 currentProgress,
                 index + 1,
                 this.max,
@@ -156,7 +160,7 @@ export class CertificateTask {
             } else {
               if (!validateDFileExists(element)) {
                 await this.sendMessageClient(
-                  [`🗑️ O arquivo ${element.filepath} não existe, será removido da lista de arquivos`],
+                  `🗑️ O arquivo ${element.filepath} não existe, será removido da lista de arquivos`,
                   currentProgress,
                   index + 1,
                   this.max,
@@ -169,7 +173,7 @@ export class CertificateTask {
               if (process.platform === 'win32') {
                 if (isFileBlocked(element.filepath)) {
                   await this.sendMessageClient(
-                    [`🔓 desbloqueando o arquivo ${element.filepath}`],
+                    `🔓 desbloqueando o arquivo ${element.filepath}`,
                     currentProgress,
                     index + 1,
                     this.max,
@@ -185,7 +189,7 @@ export class CertificateTask {
         }
       } else {
         await this.sendMessageClient(
-          ['🥲 Não foram encontrados novos arquivos para o envio'],
+          '🥲 Não foram encontrados novos arquivos para o envio',
           100,
           0,
           this.max,
@@ -195,15 +199,18 @@ export class CertificateTask {
       }
 
       const message = this.hasError
-        ? `😨 Tarefa concluída com erros. Foram enviados ${this.files.reduce((acc, file) => acc + (file.wasSend ? 1 : 0), 0)} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`
-        : `😁 Tarefa concluída. Foram enviados ${this.filesSended.length} arquivos.`;
+        ? `😨 Tarefa concluída com erros. Foram enviados ${this.files.reduce(
+            (acc, file) => acc + (file.wasSend ? 1 : 0),
+            0
+          )} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`
+        : `😁 Tarefa concluída. Foram enviados ${this.filesSended} arquivos.`;
 
-      await this.sendMessageClient([message], 100, this.max, this.max, ProcessamentoStatus.Concluded);
+      await this.sendMessageClient(message, 100, this.max, this.max, ProcessamentoStatus.Concluded);
 
       await healthBrokerComunication(this.hasError ? XHealthType.Error : XHealthType.Success, message);
     } catch (error) {
       await this.sendMessageClient(
-        ['❌ Houve um problema ao enviar os arquivos para o Sittax'],
+        '❌ Houve um problema ao enviar os arquivos para o Sittax',
         0,
         lastProcessedIndex,
         this.max,
@@ -220,7 +227,7 @@ export class CertificateTask {
 
   async continueFromIndex(startIndex: number) {
     try {
-      await this.sendMessageClient([`🔄 Continuando o processo do arquivo ${startIndex + 1}`]);
+      await this.sendMessageClient(`🔄 Continuando o processo do arquivo ${startIndex + 1}`);
 
       const progressIncrement = 100 / this.files.length;
 
@@ -232,7 +239,7 @@ export class CertificateTask {
       }
     } catch (error) {
       await this.sendMessageClient(
-        ['❌ houve um problema ao enviar os arquivos para o Sittax'],
+        '❌ houve um problema ao enviar os arquivos para o Sittax',
         0,
         startIndex,
         this.max,
@@ -248,14 +255,13 @@ export class CertificateTask {
 
     while (attempts < this.maxRetries && !success && !this.isCancelled && !this.isPaused) {
       try {
-
         if (this.isPaused || this.isCancelled) break;
 
         attempts++;
 
         if (attempts > 1) {
           await this.sendMessageClient(
-            [`🔄 Tentativa ${attempts}/${this.maxRetries} para ${element.filepath}`],
+            `🔄 Tentativa ${attempts}/${this.maxRetries} para ${element.filepath}`,
             currentProgress,
             index + 1,
             this.max,
@@ -264,7 +270,7 @@ export class CertificateTask {
           await timeout(this.retryDelay);
         }
 
-        switch (element.extension) {
+        switch (element.extension.toLowerCase()) {
           case '.pdf':
           case '.pfx':
             success = await this.sendCertificatesToSittax(index, currentProgress);
@@ -277,7 +283,7 @@ export class CertificateTask {
         if (attempts === this.maxRetries) {
           this.hasError = true;
           await this.sendMessageClient(
-            [`❌ Falha definitiva após ${this.maxRetries} tentativas: ${element.filepath}`],
+            `❌ Falha definitiva após ${this.maxRetries} tentativas: ${element.filepath}`,
             currentProgress,
             index + 1,
             this.max,
@@ -304,7 +310,7 @@ export class CertificateTask {
           if (attempts === maxAuthRetries) {
             this.hasError = true;
             await this.sendMessageClient(
-              ['❌ Não foi possível autenticar no Sittax após múltiplas tentativas'],
+              '❌ Não foi possível autenticar no Sittax após múltiplas tentativas',
               0,
               0,
               this.max,
@@ -332,7 +338,7 @@ export class CertificateTask {
         if (attempts === maxAuthRetries) {
           this.hasError = true;
           await this.sendMessageClient(
-            ['❌ Erro na autenticação no Sittax'],
+            '❌ Erro na autenticação no Sittax',
             0,
             0,
             this.max,
@@ -353,7 +359,7 @@ export class CertificateTask {
     this.pausedMessage = null;
     this.hasError = false;
     this.progress = 0;
-    this.filesSended = [];
+    this.filesSended = 0;
     this.connection = connection;
   }
 
@@ -364,7 +370,7 @@ export class CertificateTask {
       this.files[index].isValid = true;
       try {
         await this.sendMessageClient(
-          [`🚀 Enviando ${this.files[index].filepath}`],
+          `🚀 Enviando ${this.files[index].filepath}`,
           currentProgress,
           index + 1,
           this.max,
@@ -378,8 +384,9 @@ export class CertificateTask {
         });
         this.files[index].wasSend = true;
         this.files[index].dataSend = new Date();
+        this.filesSended++;
         await this.sendMessageClient(
-          [`✅ Enviado com sucesso ${this.files[index].filepath}`],
+          `✅ Enviado com sucesso ${this.files[index].filepath}`,
           currentProgress,
           index + 1,
           this.max,
@@ -398,16 +405,15 @@ export class CertificateTask {
             errorMessage = `❌ Servidor rejeitou o arquivo: ${this.files[index].filepath}`;
           }
         }
-        await this.sendMessageClient([errorMessage], currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
+        await this.sendMessageClient(errorMessage, currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
         throw error;
       }
     } else {
       await this.sendMessageClient(
-        [
-          file.isNotaFiscal
-            ? `⚠️ Arquivo não é válido por que a data de emissão e anterior 3️⃣ messes ${this.files[index].filepath}`
-            : `⚠️ Arquivo não e válido para o envio ${this.files[index].filepath}`,
-        ],
+        file.isNotaFiscal
+          ? `⚠️ Arquivo não é válido por que a data de emissão e anterior 3️⃣ messes ${this.files[index].filepath}`
+          : `⚠️ Arquivo não e válido para o envio ${this.files[index].filepath}`,
+
         currentProgress,
         index + 1,
         this.max,
@@ -441,7 +447,7 @@ export class CertificateTask {
   }
 
   private async sendMessageClient(
-    messages: string[],
+    message: string,
     progress = 0,
     value = 0,
     max = 0,
@@ -449,12 +455,6 @@ export class CertificateTask {
     replace = false
   ) {
     await timeout();
-
-    const timestampedMessages = messages.map(message => {
-      return `${getTimestamp()} - ${message}`;
-    });
-
-    timestampedMessages.forEach(x => this.historic.log?.push(x));
 
     if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
       this.historic.endDate = new Date();
@@ -469,7 +469,7 @@ export class CertificateTask {
         message: {
           type: WSMessageType.Certificates,
           data: {
-            messages: timestampedMessages,
+            message: `${getTimestamp()} - ${message}`,
             progress,
             value,
             max,

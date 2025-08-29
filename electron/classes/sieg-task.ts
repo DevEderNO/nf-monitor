@@ -67,7 +67,7 @@ export class SiegTask {
 
   async run(connection: connection, dateInitial: Date, dateEnd: Date) {
     try {
-      await this.sendMessageClient(['']);
+      await this.sendMessageClient('');
       this.initializeProperties(connection);
 
       const config = await getConfiguration();
@@ -77,21 +77,17 @@ export class SiegTask {
         try {
           this.empresas = await getEmpresas();
         } catch (error: any) {
-          await this.sendMessageClient(
-            ['❌ Erro ao buscar empresas: ' + error.message],
-            0,
-            ProcessamentoStatus.Stopped
-          );
+          await this.sendMessageClient('❌ Erro ao buscar empresas: ' + error.message, 0, ProcessamentoStatus.Stopped);
           return;
         }
       }
 
       if (this.empresas.length === 0) {
-        await this.sendMessageClient(['Nenhuma empresa encontrada'], 0, ProcessamentoStatus.Stopped);
+        await this.sendMessageClient('Nenhuma empresa encontrada', 0, ProcessamentoStatus.Stopped);
         return;
       }
 
-      await this.sendMessageClient(['Iniciando contagem de notas'], 0, ProcessamentoStatus.Running);
+      await this.sendMessageClient('Iniciando contagem de notas', 0, ProcessamentoStatus.Running);
 
       this.config = config;
       this.dateInitial = dateInitial;
@@ -101,17 +97,17 @@ export class SiegTask {
         await this.countNotesPerCompany();
       } catch (error) {
         await this.sendMessageClient(
-          ['❌ Erro na contagem de notas: ' + (error as Error).message],
+          '❌ Erro na contagem de notas: ' + (error as Error).message,
           0,
           ProcessamentoStatus.Stopped
         );
         return;
       }
 
-      await this.sendMessageClient([`Finalizado a contagem de notas`], 0, ProcessamentoStatus.Running);
+      await this.sendMessageClient(`Finalizado a contagem de notas`, 0, ProcessamentoStatus.Running);
 
       await this.sendMessageClient(
-        [`Iniciando o processo de download das notas fiscais`],
+        `Iniciando o processo de download das notas fiscais`,
         0,
         ProcessamentoStatus.Running
       );
@@ -124,7 +120,7 @@ export class SiegTask {
         await this.downloadNotes(SiegXmlType.CFe);
       } catch (error) {
         await this.sendMessageClient(
-          ['❌ Erro no download das notas: ' + (error as Error).message],
+          '❌ Erro no download das notas: ' + (error as Error).message,
           0,
           ProcessamentoStatus.Stopped
         );
@@ -132,14 +128,14 @@ export class SiegTask {
       }
 
       await this.sendMessageClient(
-        [`😁 Finalizado o processo de download das notas fiscais`],
+        `😁 Finalizado o processo de download das notas fiscais`,
         0,
         ProcessamentoStatus.Concluded
       );
-      await this.sendMessageClient([''], 0, ProcessamentoStatus.Concluded);
+      await this.sendMessageClient('', 0, ProcessamentoStatus.Concluded);
     } catch (error) {
       await this.sendMessageClient(
-        ['❌ Erro geral na execução: ' + (error as Error).message],
+        '❌ Erro geral na execução: ' + (error as Error).message,
         0,
         ProcessamentoStatus.Stopped
       );
@@ -167,12 +163,10 @@ export class SiegTask {
           continue;
         } else {
           await this.sendMessageClient(
-            [
-              `📦 Realizando o download das ${SiegXmlType[xmlType]} - ${i} a ${Math.min(
-                i + 30,
-                countNotesXmlType
-              )} de ${countNotesXmlType}`,
-            ],
+            `📦 Realizando o download das ${SiegXmlType[xmlType]} - ${i} a ${Math.min(
+              i + 30,
+              countNotesXmlType
+            )} de ${countNotesXmlType}`,
             0,
             ProcessamentoStatus.Running
           );
@@ -245,21 +239,17 @@ export class SiegTask {
             }
           } catch (error) {
             await this.sendMessageClient(
-              [`❌ Erro no download do lote ${i}-${Math.min(i + 30, countNotesXmlType)}: ${(error as Error).message}`],
+              `❌ Erro no download do lote ${i}-${Math.min(i + 30, countNotesXmlType)}: ${(error as Error).message}`,
               0,
               ProcessamentoStatus.Running
             );
           }
         }
       }
-      await this.sendMessageClient(
-        [`Finalizado o download das ${SiegXmlType[xmlType]}`],
-        0,
-        ProcessamentoStatus.Running
-      );
+      await this.sendMessageClient(`Finalizado o download das ${SiegXmlType[xmlType]}`, 0, ProcessamentoStatus.Running);
     } catch (error) {
       await this.sendMessageClient(
-        [`❌ Erro geral no download de ${SiegXmlType[xmlType]}: ${(error as Error).message}`],
+        `❌ Erro geral no download de ${SiegXmlType[xmlType]}: ${(error as Error).message}`,
         0,
         ProcessamentoStatus.Running
       );
@@ -274,7 +264,7 @@ export class SiegTask {
         case SiegXmlType.NFCe:
           return xmlString.match(/<dest>\s*<CNPJ>(\d{14})<\/CNPJ>/gi)?.[0].replace(/[^\d]/g, '') ?? null;
         case SiegXmlType.CTe:
-          const tagToma = xmlString.match(/<toma>(\d{1})<\/toma>/gi)?.[0];
+          const tagToma = xmlString.match(/<toma>(\d{1})<\/toma>/gi)?.[0] as string | null;
           switch (tagToma?.replace(/[^\d]/g, '')) {
             case '0':
               return xmlString.match(/<rem>\s*<CNPJ>(\d{14})<\/CNPJ>/gi)?.[0].replace(/[^\d]/g, '') ?? null;
@@ -349,7 +339,7 @@ export class SiegTask {
     if (this.isCancelled) {
       if (this.cancelledMessage === null) {
         this.cancelledMessage = 'Tarefa de contagem de notas foi cancelada.';
-        await this.sendMessageClient([this.cancelledMessage], 0, ProcessamentoStatus.Stopped);
+        await this.sendMessageClient(this.cancelledMessage, 0, ProcessamentoStatus.Stopped);
       }
       return true;
     }
@@ -360,7 +350,7 @@ export class SiegTask {
     if (this.isPaused) {
       if (this.pausedMessage === null) {
         this.pausedMessage = 'Tarefa de contagem de notas foi pausada.';
-        await this.sendMessageClient([this.pausedMessage], 0, ProcessamentoStatus.Paused);
+        await this.sendMessageClient(this.pausedMessage, 0, ProcessamentoStatus.Paused);
       }
       return true;
     }
@@ -386,9 +376,7 @@ export class SiegTask {
           countedNotesDb.nfse === this.countNotes.NFSe
         ) {
           await this.sendMessageClient(
-            [
-              `Foram encontradas ${this.countNotes.NFe} NFe | ${this.countNotes.NFCe} NFCe | ${this.countNotes.CTe} CTe | ${this.countNotes.CFe} CFe | ${this.countNotes.NFSe} NFSe`,
-            ],
+            `Foram encontradas ${this.countNotes.NFe} NFe | ${this.countNotes.NFCe} NFCe | ${this.countNotes.CTe} CTe | ${this.countNotes.CFe} CFe | ${this.countNotes.NFSe} NFSe`,
             0,
             ProcessamentoStatus.Running
           );
@@ -430,9 +418,7 @@ export class SiegTask {
       }
 
       await this.sendMessageClient(
-        [
-          `Foram encontradas ${this.countNotes.NFe} NFe | ${this.countNotes.NFCe} NFCe | ${this.countNotes.CTe} CTe | ${this.countNotes.CFe} CFe | ${this.countNotes.NFSe} NFSe`,
-        ],
+        `Foram encontradas ${this.countNotes.NFe} NFe | ${this.countNotes.NFCe} NFCe | ${this.countNotes.CTe} CTe | ${this.countNotes.CFe} CFe | ${this.countNotes.NFSe} NFSe`,
         0,
         ProcessamentoStatus.Running
       );
@@ -460,14 +446,8 @@ export class SiegTask {
     } as IDbHistoric;
   }
 
-  private async sendMessageClient(messages: string[], progress = 0, status = ProcessamentoStatus.Running) {
+  private async sendMessageClient(message: string, progress = 0, status = ProcessamentoStatus.Running) {
     await timeout();
-
-    const timestampedMessages = messages.map(message => {
-      return `${getTimestamp()} - ${message}`;
-    });
-
-    timestampedMessages.forEach(x => this.historic.log?.push(x));
 
     if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) await addHistoric(this.historic);
 
@@ -477,7 +457,7 @@ export class SiegTask {
         message: {
           type: WSMessageType.Sieg,
           data: {
-            messages: timestampedMessages,
+            message: `${getTimestamp()} - ${message}`,
             progress,
             status,
           },

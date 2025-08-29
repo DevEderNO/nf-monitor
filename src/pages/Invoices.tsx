@@ -1,6 +1,5 @@
 import { Button } from '@components/ui/button';
-import { useCallback, useEffect, useRef } from 'react';
-import { Textarea } from '@components/ui/textarea';
+import { useCallback, useEffect, useState } from 'react';
 import { Progress } from '@components/ui/progress';
 import { Play, Pause } from 'lucide-react';
 import { useSocket } from '@hooks/socket';
@@ -10,6 +9,7 @@ import { ProcessamentoStatus } from '@/interfaces/processamento';
 import { StopIcon } from '@radix-ui/react-icons';
 import { ActionType } from '@/hooks/state-reducer';
 import { useToast } from '@/components/ui/use-toast';
+import { Textarea } from '@/components/ui/textarea';
 
 interface IStepProcess {
   [key: string]: {
@@ -27,13 +27,12 @@ export function Invoices() {
     dispatch,
   } = useAppState();
   const { toast } = useToast();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [messages, setMessages] = useState<string[]>([]);
 
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
-    }
-  }, [invoicesLog]);
+    if (invoicesLog.message.length === 0) return;
+    setMessages(prev => [invoicesLog.message, ...prev]);
+  }, [invoicesLog.message]);
 
   const hasDerectories = useCallback(() => {
     if (directories.length <= 0) {
@@ -125,7 +124,7 @@ export function Invoices() {
   };
 
   return (
-    <div className="p-4 m-4 flex flex-col gap-4 border rounded-md flex-1">
+    <div className="p-4 flex flex-col gap-4 border rounded-md h-full overflow-hidden">
       <div className="flex gap-3">
         <Button className="flex gap-1" onClick={send[invoicesLog.status].onClick}>
           {send[invoicesLog.status].icon}
@@ -138,13 +137,8 @@ export function Invoices() {
           </Button>
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-1">
-        <Textarea
-          ref={textareaRef}
-          className="flex flex-1 h-full cursor-default resize-none"
-          readOnly
-          value={invoicesLog?.messages.map(message => message).join('\n')}
-        />
+      <div className="flex flex-1 flex-col gap-1 min-h-0 overflow-hidden">
+        <Textarea className="flex flex-1 h-full cursor-default resize-none" readOnly value={messages.join('\n')} />
         <Progress value={invoicesLog?.progress} />
         <span className="text-xs text-muted-foreground text-right">
           {invoicesLog?.value} / {invoicesLog?.max}

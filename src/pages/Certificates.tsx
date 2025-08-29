@@ -1,5 +1,5 @@
 import { Button } from '@components/ui/button';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Textarea } from '@components/ui/textarea';
 import { Progress } from '@components/ui/progress';
 import { Play, Pause } from 'lucide-react';
@@ -27,12 +27,10 @@ export function Certificates() {
     dispatch,
   } = useAppState();
   const { toast } = useToast();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [messages, setMessages] = useState<string[]>([]);
 
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
-    }
+      setMessages(prev => [certificatesLog.message, ...prev]);
   }, [certificatesLog]);
 
   const hasDerectories = useCallback(() => {
@@ -125,7 +123,7 @@ export function Certificates() {
   };
 
   return (
-    <div className="p-4 m-4 flex flex-col gap-4 border rounded-md flex-1">
+    <div className="p-4 flex flex-col gap-4 border rounded-md h-full overflow-hidden">
       <div className="flex gap-3">
         <Button className="flex gap-1" onClick={send[certificatesLog.status].onClick}>
           {send[certificatesLog.status].icon}
@@ -138,12 +136,11 @@ export function Certificates() {
           </Button>
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-1">
+      <div className="flex flex-1 flex-col gap-1 min-h-0 overflow-hidden">
         <Textarea
-          ref={textareaRef}
           className="flex flex-1 h-full cursor-default resize-none"
           readOnly
-          value={certificatesLog?.messages.map(message => message).join('\n')}
+          value={messages.join('\n')}
         />
         <Progress value={certificatesLog?.progress} />
         <span className="text-xs text-muted-foreground text-right">

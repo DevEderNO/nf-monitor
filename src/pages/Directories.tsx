@@ -14,21 +14,21 @@ export function Directories() {
   } = useAppState();
   const location = useLocation();
 
-  const getDirectories = async () => {
+  const getDirectories = useCallback(async () => {
     const result = await window.ipcRenderer.invoke('get-directories');
     dispatch({
       type: ActionType.Directories,
       payload: result,
     });
-  };
+  }, [dispatch]);
 
   useEffect(() => {
     if (location.pathname === '/directories') {
       getDirectories();
     }
-  }, [location.pathname]);
+  }, [getDirectories, location.pathname]);
 
-  const handleInvoiceSelectDirectories = useCallback(async () => {
+  const handleInvoiceSelectDirectories = async () => {
     const filepaths: IDirectory[] = await window.ipcRenderer.invoke('select-directories-invoices');
     if (filepaths) {
       dispatch({
@@ -36,9 +36,9 @@ export function Directories() {
         payload: filepaths,
       });
     }
-  }, []);
+  };
 
-  const handleCertificatesSelectDirectories = useCallback(async () => {
+  const handleCertificatesSelectDirectories = async () => {
     const filepaths: IDirectory[] = await window.ipcRenderer.invoke('select-directories-certificates');
     if (filepaths) {
       dispatch({
@@ -46,26 +46,26 @@ export function Directories() {
         payload: filepaths,
       });
     }
-  }, []);
+  };
 
-  const handleRemoveInvoicesDirectory = useCallback(async (item: string) => {
+  const handleRemoveInvoicesDirectory = async (item: string) => {
     const directories = await window.ipcRenderer.invoke('remove-directory', item, 'invoices');
     dispatch({
       type: ActionType.Directories,
       payload: directories,
     });
-  }, []);
+  };
 
-  const handleRemoveCertificatesDirectory = useCallback(async (item: string) => {
+  const handleRemoveCertificatesDirectory = async (item: string) => {
     const directories = await window.ipcRenderer.invoke('remove-directory', item, 'certificates');
     dispatch({
       type: ActionType.Directories,
       payload: directories,
     });
-  }, []);
+  };
 
   return (
-    <div className="p-4 m-4 flex flex-1 flex-col gap-8 border rounded-md h-full basis-full overflow-y-auto">
+    <div className="p-4 flex flex-col gap-4 border rounded-md h-full overflow-hidden">
       <div className="flex">
         <Button onClick={handleInvoiceSelectDirectories}>Selecionar diretórios para envio de notas</Button>
       </div>
@@ -104,7 +104,7 @@ export function Directories() {
       </div>
       <div className="flex">
         <Button onClick={handleCertificatesSelectDirectories}>
-          Selecionar diretórios para envio de documentos de cadastro 
+          Selecionar diretórios para envio de documentos de cadastro
         </Button>
       </div>
       <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 190px)' }}>

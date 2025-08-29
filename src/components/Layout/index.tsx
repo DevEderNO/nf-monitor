@@ -5,9 +5,11 @@ import Menu from "../Menu";
 export function Layout() {
   const { state } = useAppState();
   return state?.auth?.token?.length > 0 ? (
-    <div className="flex flex-col min-h-full w-full">
+    <div className="flex flex-col h-full w-full">
       <Menu />
-      <Outlet />
+      <div className="flex-1 min-h-0">
+        <Outlet />
+      </div>
     </div>
   ) : (
     <Outlet />

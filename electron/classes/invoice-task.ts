@@ -16,6 +16,7 @@ import {
   addFiles,
   getAuth,
   getConfiguration,
+  getCountFilesSended,
   getDirectories,
   getFiles,
   removeFiles,
@@ -40,7 +41,7 @@ export class InvoiceTask {
   connection: connection | null;
   progress: number;
   files: IFileInfo[];
-  filesSended: IFileInfo[];
+  filesSendedCount: number;
   hasError: boolean;
   historic: IDbHistoric;
   viewUploadedFiles: boolean = false;
@@ -55,7 +56,7 @@ export class InvoiceTask {
     this.connection = null;
     this.progress = 0;
     this.files = [];
-    this.filesSended = [];
+    this.filesSendedCount = 0;
     this.hasError = false;
     this.historic = {
       startDate: new Date(),
@@ -86,17 +87,17 @@ export class InvoiceTask {
     try {
       this.initializeProperties(connection);
       const directories = await getDirectories();
-      await this.sendMessageClient(['🔎 Realizando a descoberta dos arquivos']);
+      await this.sendMessageClient('🔎 Realizando a descoberta dos arquivos');
       await healthBrokerComunication(XHealthType.Info, `Iniciado processo de envio de arquivos para o Sittax`);
       await addFiles(await listarArquivos(directories.map(x => x.path)));
       this.files = (await getFiles()).filter(x => !x.wasSend && x.isValid);
-      this.filesSended = (await getFiles()).filter(x => x.wasSend || !x.isValid);
+      this.filesSendedCount = await getCountFilesSended();
       this.viewUploadedFiles = (await getConfiguration())?.viewUploadedFiles ?? false;
-      if (this.viewUploadedFiles && this.filesSended.length > 0) {
-        this.files.push(...this.filesSended);
+      if (this.viewUploadedFiles && this.filesSendedCount > 0) {
+        this.files.push(...(await getFiles()).filter(x => x.wasSend || !x.isValid));
       }
       if (this.files.length > 0) {
-        await this.sendMessageClient(['🚀 Iniciando o envio dos arquivos para o Sittax']);
+        await this.sendMessageClient('⚡ Iniciando o envio dos arquivos para o Sittax');
         const progressIncrement = 100 / this.files.length;
         this.max = this.files.length;
         let currentProgress = 0;
@@ -107,8 +108,11 @@ export class InvoiceTask {
           lastProcessedIndex = index;
 
           if (this.isCancelled) {
-            this.cancelledMessage ??= `Tarefa de envio de arquivo para o Sittax foi cancelada. Foram enviados ${this.files.reduce((acc, file) => acc + (file.wasSend ? 1 : 0), 0)} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`;
-            await this.sendMessageClient([this.cancelledMessage], 0, index + 1, this.max, ProcessamentoStatus.Stopped);
+            this.cancelledMessage ??= `Tarefa de envio de arquivo para o Sittax foi cancelada. Foram enviados ${this.files.reduce(
+              (acc, file) => acc + (file.wasSend ? 1 : 0),
+              0
+            )} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`;
+            await this.sendMessageClient(this.cancelledMessage, 0, index + 1, this.max, ProcessamentoStatus.Stopped);
             await healthBrokerComunication(XHealthType.Warning, this.cancelledMessage);
             this.isCancelled = false;
             this.isPaused = false;
@@ -121,7 +125,7 @@ export class InvoiceTask {
             if (this.pausedMessage === null) {
               this.pausedMessage = 'Tarefa de envio de arquivo para o Sittax foi pausada.';
               await this.sendMessageClient(
-                [this.pausedMessage],
+                this.pausedMessage,
                 currentProgress,
                 index + 1,
                 this.max,
@@ -137,7 +141,7 @@ export class InvoiceTask {
             if (element.wasSend) {
               if (!element.isValid) {
                 await this.sendMessageClient(
-                  [`⚠️ Arquivo não e válido para o envio ${element.filepath}`],
+                  `⚠️ Arquivo não e válido para o envio ${element.filepath}`,
                   currentProgress,
                   index + 1,
                   this.max,
@@ -150,7 +154,7 @@ export class InvoiceTask {
                 continue;
               }
               await this.sendMessageClient(
-                [`☑️ Já foi enviando ${element.filepath}`],
+                `☑️ Já foi enviando ${element.filepath}`,
                 currentProgress,
                 index + 1,
                 this.max,
@@ -159,7 +163,7 @@ export class InvoiceTask {
             } else {
               if (!validateDFileExists(element)) {
                 await this.sendMessageClient(
-                  [`🗑️ O arquivo ${element.filepath} não existe, será removido da lista de arquivos`],
+                  `🗑️ O arquivo ${element.filepath} não existe, será removido da lista de arquivos`,
                   currentProgress,
                   index + 1,
                   this.max,
@@ -172,7 +176,7 @@ export class InvoiceTask {
               if (process.platform === 'win32') {
                 if (isFileBlocked(element.filepath)) {
                   await this.sendMessageClient(
-                    [`🔓 desbloqueando o arquivo ${element.filepath}`],
+                    `🔓 desbloqueando o arquivo ${element.filepath}`,
                     currentProgress,
                     index + 1,
                     this.max,
@@ -188,7 +192,7 @@ export class InvoiceTask {
         }
       } else {
         await this.sendMessageClient(
-          ['🥲 Não foram encontrados novos arquivos para o envio'],
+          '🥲 Não foram encontrados novos arquivos para o envio',
           100,
           0,
           this.max,
@@ -198,16 +202,18 @@ export class InvoiceTask {
       }
 
       const message = this.hasError
-        ? `😨 Tarefa concluída com erros. Foram enviados ${this.files.reduce((acc, file) => acc + (file.wasSend ? 1 : 0), 0)} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`
-        : `😁 Tarefa concluída. Foram enviados ${this.filesSended.length} arquivos.`;
+        ? `😨 Tarefa concluída com erros. Foram enviados ${this.files.reduce(
+            (acc, file) => acc + (file.wasSend ? 1 : 0),
+            0
+          )} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`
+        : `😁 Tarefa concluída. Foram enviados ${this.filesSendedCount} arquivos.`;
 
-      await this.sendMessageClient([message], 100, this.max, this.max, ProcessamentoStatus.Concluded);
+      await this.sendMessageClient(message, 100, this.max, this.max, ProcessamentoStatus.Concluded);
 
       await healthBrokerComunication(this.hasError ? XHealthType.Error : XHealthType.Success, message);
     } catch (error) {
-
       await this.sendMessageClient(
-        [`❌ Houve um problema ao enviar os arquivos para o Sittax: ${error}`],
+        `❌ Houve um problema ao enviar os arquivos para o Sittax: ${error}`,
         0,
         lastProcessedIndex,
         this.max,
@@ -225,7 +231,7 @@ export class InvoiceTask {
 
   async continueFromIndex(startIndex: number) {
     try {
-      await this.sendMessageClient([`🔄 Continuando o processo do arquivo ${startIndex + 1}`]);
+      await this.sendMessageClient(`🔄 Continuando o processo do arquivo ${startIndex + 1}`);
 
       const progressIncrement = 100 / this.files.length;
 
@@ -237,7 +243,7 @@ export class InvoiceTask {
       }
     } catch (error) {
       await this.sendMessageClient(
-        ['❌ houve um problema ao enviar os arquivos para o Sittax'],
+        '❌ houve um problema ao enviar os arquivos para o Sittax',
         0,
         startIndex,
         this.max,
@@ -253,13 +259,12 @@ export class InvoiceTask {
 
     while (attempts < this.maxRetries && !success && !this.isCancelled && !this.isPaused) {
       try {
-
         if (this.isPaused || this.isCancelled) break;
         attempts++;
 
         if (attempts > 1) {
           await this.sendMessageClient(
-            [`🔄 Tentativa ${attempts}/${this.maxRetries} para ${element.filepath}`],
+            `🔄 Tentativa ${attempts}/${this.maxRetries} para ${element.filepath}`,
             currentProgress,
             index + 1,
             this.max,
@@ -268,7 +273,7 @@ export class InvoiceTask {
           await timeout(this.retryDelay);
         }
 
-        switch (element.extension) {
+        switch (element.extension.toLowerCase()) {
           case '.xml':
           case '.pdf':
           case '.txt':
@@ -285,7 +290,7 @@ export class InvoiceTask {
         if (attempts === this.maxRetries) {
           this.hasError = true;
           await this.sendMessageClient(
-            [`❌ Falha definitiva após ${this.maxRetries} tentativas: ${element.filepath}`],
+            `❌ Falha definitiva após ${this.maxRetries} tentativas: ${element.filepath}`,
             currentProgress,
             index + 1,
             this.max,
@@ -312,7 +317,7 @@ export class InvoiceTask {
           if (attempts === maxAuthRetries) {
             this.hasError = true;
             await this.sendMessageClient(
-              ['❌ Não foi possível autenticar no Sittax após múltiplas tentativas'],
+              '❌ Não foi possível autenticar no Sittax após múltiplas tentativas',
               0,
               0,
               this.max,
@@ -340,7 +345,7 @@ export class InvoiceTask {
         if (attempts === maxAuthRetries) {
           this.hasError = true;
           await this.sendMessageClient(
-            ['❌ Erro na autenticação no Sittax'],
+            '❌ Erro na autenticação no Sittax',
             0,
             0,
             this.max,
@@ -361,7 +366,7 @@ export class InvoiceTask {
     this.pausedMessage = null;
     this.hasError = false;
     this.progress = 0;
-    this.filesSended = [];
+    this.filesSendedCount = 0;
     this.connection = connection;
   }
 
@@ -372,7 +377,7 @@ export class InvoiceTask {
       this.files[index].isValid = true;
       try {
         await this.sendMessageClient(
-          [`🚀 Enviando ${this.files[index].filepath}`],
+          `🚀 Enviando ${this.files[index].filepath}`,
           currentProgress,
           index + 1,
           this.max,
@@ -386,8 +391,9 @@ export class InvoiceTask {
         });
         this.files[index].wasSend = true;
         this.files[index].dataSend = new Date();
+        this.filesSendedCount++;
         await this.sendMessageClient(
-          [`✅ Enviado com sucesso ${this.files[index].filepath}`],
+          `✅ Enviado com sucesso ${this.files[index].filepath}`,
           currentProgress,
           index + 1,
           this.max,
@@ -406,16 +412,14 @@ export class InvoiceTask {
             errorMessage = `❌ Servidor rejeitou o arquivo: ${this.files[index].filepath}`;
           }
         }
-        await this.sendMessageClient([errorMessage], currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
+        await this.sendMessageClient(errorMessage, currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
         throw error;
       }
     } else {
       await this.sendMessageClient(
-        [
-          file.isNotaFiscal
-            ? `⚠️ Arquivo não é válido por que a data de emissão e anterior 3️⃣ messes ${this.files[index].filepath}`
-            : `⚠️ Arquivo não e válido para o envio ${this.files[index].filepath}`,
-        ],
+        file.isNotaFiscal
+          ? `⚠️ Arquivo não é válido por que a data de emissão e anterior 3️⃣ messes ${this.files[index].filepath}`
+          : `⚠️ Arquivo não e válido para o envio ${this.files[index].filepath}`,
         currentProgress,
         index + 1,
         this.max,
@@ -433,11 +437,9 @@ export class InvoiceTask {
     const file = validZip(this.files[index]);
     if (!file.valid) {
       await this.sendMessageClient(
-        [
-          file.isNotaFiscal
-            ? `⚠️ Arquivo não é válido por que a data de emissão e anterior 3️⃣ messes ${this.files[index].filepath}`
-            : `⚠️ Arquivo não é válido para o envio ${this.files[index].filepath}`,
-        ],
+        file.isNotaFiscal
+          ? `⚠️ Arquivo não é válido por que a data de emissão e anterior 3️⃣ messes ${this.files[index].filepath}`
+          : `⚠️ Arquivo não é válido para o envio ${this.files[index].filepath}`,
         currentProgress,
         index + 1,
         this.max,
@@ -454,7 +456,7 @@ export class InvoiceTask {
 
     try {
       await this.sendMessageClient(
-        [`📦 Extraindo arquivo ZIP ${this.files[index].filepath}`],
+        `📦 Extraindo arquivo ZIP ${this.files[index].filepath}`,
         currentProgress,
         index + 1,
         this.max,
@@ -474,7 +476,7 @@ export class InvoiceTask {
       zip.extractAllTo(extractPath, true);
 
       await this.sendMessageClient(
-        [`✅ Arquivo ZIP extraído para ${extractPath}`],
+        `✅ Arquivo ZIP extraído para ${extractPath}`,
         currentProgress,
         index + 1,
         this.max,
@@ -485,7 +487,7 @@ export class InvoiceTask {
 
       if (extractedFiles.length > 0) {
         await this.sendMessageClient(
-          [`📁 Encontrados ${extractedFiles.length} arquivos para envio`],
+          `📁 Encontrados ${extractedFiles.length} arquivos para envio`,
           currentProgress,
           index + 1,
           this.max,
@@ -500,7 +502,7 @@ export class InvoiceTask {
             if (this.isCancelled || this.isPaused) break;
 
             await this.sendMessageClient(
-              [`🚀 Enviando arquivo extraído: ${extractedFile.filename}`],
+              `🚀 Enviando arquivo extraído: ${extractedFile.filename}`,
               currentProgress,
               index + 1,
               this.max,
@@ -513,7 +515,7 @@ export class InvoiceTask {
               successCount++;
 
               await this.sendMessageClient(
-                [`✅ Arquivo extraído enviado com sucesso: ${extractedFile.filename}`],
+                `✅ Arquivo extraído enviado com sucesso: ${extractedFile.filename}`,
                 currentProgress,
                 index + 1,
                 this.max,
@@ -522,7 +524,7 @@ export class InvoiceTask {
             } else {
               errorCount++;
               await this.sendMessageClient(
-                [`⚠️ Arquivo extraído não é válido: ${extractedFile.filename}`],
+                `⚠️ Arquivo extraído não é válido: ${extractedFile.filename}`,
                 currentProgress,
                 index + 1,
                 this.max,
@@ -544,7 +546,7 @@ export class InvoiceTask {
             }
 
             await this.sendMessageClient(
-              [errorMessage],
+              errorMessage,
               currentProgress,
               index + 1,
               this.max,
@@ -556,7 +558,7 @@ export class InvoiceTask {
         try {
           this.removeDirectory(extractPath);
           await this.sendMessageClient(
-            [`🧹 Diretório temporário removido: ${extractPath}`],
+            `🧹 Diretório temporário removido: ${extractPath}`,
             currentProgress,
             index + 1,
             this.max,
@@ -564,7 +566,7 @@ export class InvoiceTask {
           );
         } catch (cleanupError) {
           await this.sendMessageClient(
-            [`⚠️ Não foi possível remover diretório temporário: ${extractPath}`],
+            `⚠️ Não foi possível remover diretório temporário: ${extractPath}`,
             currentProgress,
             index + 1,
             this.max,
@@ -580,7 +582,7 @@ export class InvoiceTask {
         this.files[index].dataSend = new Date();
 
         await this.sendMessageClient(
-          [`📊 Processamento do ZIP concluído: ${successCount} enviados, ${errorCount} com erro`],
+          `📊 Processamento do ZIP concluído: ${successCount} enviados, ${errorCount} com erro`,
           currentProgress,
           index + 1,
           this.max,
@@ -590,7 +592,7 @@ export class InvoiceTask {
         return true;
       } else {
         await this.sendMessageClient(
-          [`⚠️ Nenhum arquivo válido encontrado no ZIP ${this.files[index].filepath}`],
+          `⚠️ Nenhum arquivo válido encontrado no ZIP ${this.files[index].filepath}`,
           currentProgress,
           index + 1,
           this.max,
@@ -613,7 +615,7 @@ export class InvoiceTask {
     } catch (error: any) {
       this.hasError = true;
       const errorMessage = `❌ Erro ao processar ZIP ${this.files[index].filepath}: ${error.message}`;
-      await this.sendMessageClient([errorMessage], currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
+      await this.sendMessageClient(errorMessage, currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
       throw error;
     }
   }
@@ -681,7 +683,7 @@ export class InvoiceTask {
   }
 
   private async sendMessageClient(
-    messages: string[],
+    message: string,
     progress = 0,
     value = 0,
     max = 0,
@@ -690,26 +692,19 @@ export class InvoiceTask {
   ) {
     await timeout();
 
-    const timestampedMessages = messages.map(message => {
-      return `${getTimestamp()} - ${message}`;
-    });
-
-    timestampedMessages.forEach(x => this.historic.log?.push(x));
-
     if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
       this.historic.endDate = new Date();
       if (this.historic.id) {
         await updateHistoric(this.historic);
       }
     }
-
     this.connection?.sendUTF(
       JSON.stringify({
         type: 'message',
         message: {
           type: WSMessageType.Invoice,
           data: {
-            messages: timestampedMessages,
+            message: `${getTimestamp()} - ${message}`,
             progress,
             value,
             max,

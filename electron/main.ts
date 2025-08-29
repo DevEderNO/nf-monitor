@@ -52,22 +52,21 @@ function createWindow() {
   } else {
     win.loadFile(path.join(process.env.DIST ?? '', 'index.html'));
     Menu.setApplicationMenu(null);
-    const toggleMenu = () => {
-      if (Menu.getApplicationMenu()) {
-        Menu.setApplicationMenu(null);
-      } else {
-        const defaultMenu = Menu.buildFromTemplate([
-          { role: 'fileMenu' },
-          { role: 'editMenu' },
-          { role: 'viewMenu' },
-          { role: 'windowMenu' },
-          { role: 'help' },
-        ]);
-        Menu.setApplicationMenu(defaultMenu);
-      }
-    };
+    
+    globalShortcut.register('CommandOrControl+Shift+Alt+I', () => {
+      const defaultMenu = Menu.buildFromTemplate([
+        { role: 'fileMenu' },
+        { role: 'editMenu' },
+        { role: 'viewMenu' },
+        { role: 'windowMenu' },
+        { role: 'help' },
+      ]);
+      Menu.setApplicationMenu(defaultMenu);
+    });
 
-    globalShortcut.register('Ctrl+Q', toggleMenu);
+    globalShortcut.register('CommandOrControl+Shift+Alt+I', () => {
+      Menu.setApplicationMenu(null);
+    });
   }
 
   const icon = nativeImage.createFromPath(path.join(envVitePublic, 'sittax.png'));

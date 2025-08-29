@@ -24,7 +24,7 @@ export const initialState: IState = {
   directories: [],
   loading: false,
   invoicesLog: {
-    messages: [],
+    message: '',
     progress: 0,
     value: 0,
     max: 0,
@@ -32,7 +32,7 @@ export const initialState: IState = {
     status: ProcessamentoStatus.Stopped,
   },
   certificatesLog: {
-    messages: [],
+    message: '',
     progress: 0,
     value: 0,
     max: 0,
@@ -40,7 +40,7 @@ export const initialState: IState = {
     status: ProcessamentoStatus.Stopped,
   },
   siegLog: {
-    messages: [],
+    message: '',
     progress: 0,
     value: 0,
     max: 0,
@@ -91,11 +91,17 @@ export const StateReducer = (state: IState, action: IAction | IAction[]): IState
     case ActionType.Loading:
       return { ...state, loading: action.payload };
     case ActionType.InvoicesLog:
-      return invoicesLogReducer(action);
+      return { ...state, invoicesLog: { ...action.payload } };
     case ActionType.CertificatesLog:
-      return certificatesLogReducer(action);
+      return {
+        ...state,
+        certificatesLog: { ...action.payload },
+      };
     case ActionType.SiegLog:
-      return siegLogReducer(action);
+      return {
+        ...state,
+        siegLog: { ...action.payload },
+      };
     case ActionType.Historic:
       return { ...state, historic: action.payload };
     case ActionType.Config:
@@ -106,82 +112,19 @@ export const StateReducer = (state: IState, action: IAction | IAction[]): IState
     case ActionType.ClearInvoicesLog:
       return {
         ...state,
-        invoicesLog: { ...state.invoicesLog, messages: [] },
+        invoicesLog: { ...state.invoicesLog, message: '' },
       };
     case ActionType.ClearCertificatesLog:
       return {
         ...state,
-        certificatesLog: { ...state.invoicesLog, messages: [] },
+        certificatesLog: { ...state.invoicesLog, message: '' },
       };
     case ActionType.ClearSiegLog:
       return {
         ...state,
-        siegLog: { ...state.siegLog, messages: [] },
+        siegLog: { ...state.siegLog, message: '' },
       };
     default:
       return state;
-  }
-
-  function invoicesLogReducer(action: IAction) {
-    const messages = state.invoicesLog.messages;
-    if (action.payload.messages.length > 0) {
-      if (action.payload.replace) {
-        messages.splice(messages.length - 1, 1);
-      }
-      messages.push(action.payload.messages);
-    }
-    return {
-      ...state,
-      invoicesLog: {
-        messages,
-        progress: action.payload.progress,
-        value: action.payload.value,
-        max: action.payload.max,
-        status: action.payload.status,
-        replace: action.payload.replace,
-      },
-    };
-  }
-
-  function certificatesLogReducer(action: IAction) {
-    const messages = state.certificatesLog.messages;
-    if (action.payload.messages.length > 0) {
-      if (action.payload.replace) {
-        messages.splice(messages.length - 1, 1);
-      }
-      messages.push(action.payload.messages);
-    }
-    return {
-      ...state,
-      certificatesLog: {
-        messages,
-        progress: action.payload.progress,
-        value: action.payload.value,
-        max: action.payload.max,
-        status: action.payload.status,
-        replace: action.payload.replace,
-      },
-    };
-  }
-
-  function siegLogReducer(action: IAction) {
-    const messages = state.siegLog.messages;
-    if (action.payload.messages.length > 0) {
-      if (action.payload.replace) {
-        messages.splice(messages.length - 1, 1);
-      }
-      messages.push(action.payload.messages);
-    }
-    return {
-      ...state,
-      siegLog: {
-        messages,
-        progress: action.payload.progress,
-        value: action.payload.value,
-        max: action.payload.max,
-        status: action.payload.status,
-        replace: action.payload.replace,
-      },
-    };
   }
 };

@@ -287,6 +287,14 @@ export async function getFiles(): Promise<IFileInfo[]> {
   return (await prisma.file.findMany()) ?? [];
 }
 
+export async function getCountFilesSended(): Promise<number> {
+  return (await prisma.file.count({ where: { wasSend: true, extension: { not: { equals: '.pfx' } } } })) ?? 0;
+}
+
+export async function getCountFilesSendedPfx(): Promise<number> {
+  return (await prisma.file.count({ where: { wasSend: true, extension: { equals: '.pfx' } } })) ?? 0;
+}
+
 export async function addFiles(
   data: {
     filepath: string;

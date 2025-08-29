@@ -1,5 +1,5 @@
 export interface IProcessamento {
-  messages: string[];
+  message: string;
   progress: number;
   value: number;
   max: number;
