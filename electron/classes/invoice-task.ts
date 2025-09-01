@@ -232,6 +232,7 @@ export class InvoiceTask {
 
   async continueFromIndex(startIndex: number) {
     try {
+      if (startIndex < 0 || startIndex >= this.files.length) return;
       if (this.files.length === 0) return;
 
       await this.sendMessageClient(`🔄 Continuando o processo do arquivo ${startIndex + 1}`);
@@ -259,8 +260,11 @@ export class InvoiceTask {
     const element = this.files[index];
     let attempts = 0;
     let success = false;
+    let safetyCounter = 0;
+    const maxIterations = 1000;
 
     while (attempts < this.maxRetries && !success && !this.isCancelled && !this.isPaused) {
+      if (++safetyCounter > maxIterations) break;
       try {
         if (this.isPaused || this.isCancelled) break;
         attempts++;
