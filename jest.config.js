@@ -14,7 +14,7 @@ module.exports = {
     '!electron/main.ts',
     '!electron/preload.ts',
   ],
-  coverageDirectory: 'coverage',
+  coverageDirectory: 'tests/coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   moduleNameMapper: {
     '^electron$': '<rootDir>/tests/mocks/electron.ts',
