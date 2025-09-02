@@ -2,6 +2,7 @@ import * as cheerio from "cheerio";
 import { toDate } from "./date-utils";
 
 export const emissaoSelectors = [
+  "NfeData",
   "data_emissao",
   "DataEmissao",
   "DataEmissaoNFe",
