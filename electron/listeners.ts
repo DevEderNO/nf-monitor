@@ -85,7 +85,7 @@ export async function signInSittax(user: string, password: string, encripted: bo
     await addAuth(auth);
     return auth;
   } catch (error) {
-    BrowserWindow.getAllWindows().forEach(window => {
+    BrowserWindow.getAllWindows().forEach((window: any) => {
       window.webContents.send('error', JSON.stringify({
         title: 'Algo deu errado 😯.',
         message: (error as Error).message
@@ -94,6 +94,8 @@ export async function signInSittax(user: string, password: string, encripted: bo
     return null;
   }
 }
+
+
 
 export async function registerListeners(win: BrowserWindow | null) {
   ipcMain.handle('get-auth', async () => {

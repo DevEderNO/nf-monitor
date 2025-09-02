@@ -119,7 +119,7 @@ export async function retryCertificate(
 
 export async function upload(token: string, filepath: string, invoices: boolean) {
   if (invoices) await retry('upload/importar-arquivo', filepath, token, 5);
-  else await retryCertificate('v2/implantacao/importar-arquivo', filepath, token, 5);
+  else await retryCertificate('v2/nova-implantacao/importar-arquivo', filepath, token, 5);
 }
 
 export async function retrySieg(

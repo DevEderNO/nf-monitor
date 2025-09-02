@@ -29,3 +29,6 @@ release
 *.production
 *.db
 migration_lock.toml
+
+# Tests
+tests/coverage

@@ -2,6 +2,14 @@ import { AxiosError } from 'axios';
 import { ICustomAxiosError, IAppError, ErrorType, IApiErrorResponse } from './error';
 
 export function handleAxiosError(error: AxiosError): IAppError {
+  if (!(error instanceof AxiosError)) {
+    return {
+      type: ErrorType.UNKNOWN_ERROR,
+      message: (error as Error).message,
+      originalError: error,
+      timestamp: new Date()
+    };
+  }
   const axiosError = error as ICustomAxiosError;
   
   // Verifica se é um erro de rede
@@ -13,7 +21,6 @@ export function handleAxiosError(error: AxiosError): IAppError {
       timestamp: new Date()
     };
   }
-  console.log('axiosError: ', axiosError);
   const { status, data } = axiosError.response;
   const errorData = data as IApiErrorResponse;
 

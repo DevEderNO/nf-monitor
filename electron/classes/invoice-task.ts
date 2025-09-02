@@ -50,6 +50,7 @@ export class InvoiceTask {
   max: number = 0;
   maxRetries: number = 3;
   retryDelay: number = 2000;
+  private recoveryAttempts: number = 0;
 
   constructor() {
     this.isPaused = false;
@@ -121,7 +122,6 @@ export class InvoiceTask {
             this.progress = 0;
             return;
           }
-
           if (this.isPaused) {
             if (this.pausedMessage === null) {
               this.pausedMessage = 'Tarefa de envio de arquivo para o Sittax foi pausada.';
@@ -214,60 +214,30 @@ export class InvoiceTask {
       await healthBrokerComunication(this.hasError ? XHealthType.Error : XHealthType.Success, message);
     } catch (error) {
       await this.sendMessageClient(
-        `❌ Houve um problema ao enviar os arquivos para o Sittax: ${error}`,
+        `❌ Houve um problema ao enviar os arquivos para o Sittax: ${(error as Error).message ?? error}`,
         0,
         lastProcessedIndex,
         this.max,
-        ProcessamentoStatus.Running
+        ProcessamentoStatus.Stopped
       );
 
       await healthBrokerComunication(
         XHealthType.Error,
         `Houve um problema ao enviar os arquivos para o Sittax. Continuando do arquivo ${lastProcessedIndex + 1}`
       );
-
-      await this.continueFromIndex(lastProcessedIndex);
-    }
-  }
-
-  async continueFromIndex(startIndex: number) {
-    try {
-      if (this.files.length === 0) return;
-
-      await this.sendMessageClient(`🔄 Continuando o processo do arquivo ${startIndex + 1}`);
-
-      const progressIncrement = 100 / this.files.length;
-
-      for (let index = startIndex; index < this.files.length; index++) {
-        if (this.isCancelled || this.isPaused) break;
-
-        const currentProgress = this.progress + progressIncrement * (index + 1);
-        await this.processFileWithRetry(index, currentProgress);
-      }
-    } catch (error) {
-      await this.sendMessageClient(
-        '❌ houve um problema ao enviar os arquivos para o Sittax',
-        0,
-        startIndex,
-        this.max,
-        ProcessamentoStatus.Stopped
-      );
     }
   }
 
   async processFileWithRetry(index: number, currentProgress: number) {
     const element = this.files[index];
-    let attempts = 0;
     let success = false;
 
-    while (attempts < this.maxRetries && !success && !this.isCancelled && !this.isPaused) {
+    while (this.recoveryAttempts <= this.maxRetries && !success && !this.isCancelled && !this.isPaused && !this.hasError) {
       try {
         if (this.isPaused || this.isCancelled) break;
-        attempts++;
-
-        if (attempts > 1) {
+        if (this.recoveryAttempts > 1) {
           await this.sendMessageClient(
-            `🔄 Tentativa ${attempts}/${this.maxRetries} para ${element.filepath}`,
+            `🔄 Tentativa ${this.recoveryAttempts}/${this.maxRetries} para ${element.filepath}`,
             currentProgress,
             index + 1,
             this.max,
@@ -289,9 +259,9 @@ export class InvoiceTask {
             success = true;
             break;
         }
+        if(success) this.recoveryAttempts = 0;
       } catch (error) {
-        if (attempts === this.maxRetries) {
-          this.hasError = true;
+        if (this.recoveryAttempts >= this.maxRetries) {
           await this.sendMessageClient(
             `❌ Falha definitiva após ${this.maxRetries} tentativas: ${element.filepath}`,
             currentProgress,
@@ -299,7 +269,9 @@ export class InvoiceTask {
             this.max,
             ProcessamentoStatus.Stopped
           );
+          throw error;
         }
+        this.recoveryAttempts++;
       }
     }
   }
@@ -308,33 +280,21 @@ export class InvoiceTask {
     let attempts = 0;
     const maxAuthRetries = 3;
 
-    while (attempts < maxAuthRetries) {
+    while (attempts <= maxAuthRetries) {
       try {
-        attempts++;
         this.auth = await getAuth();
         if (!this.auth?.id) return false;
 
+        await this.sendMessageClient(
+          attempts > 0 ? `🔄 Tentativa ${attempts}/${maxAuthRetries} para autenticar no Sittax` : '🥸 Autenticando no Sittax',
+          0,
+          0,
+          this.max,
+          ProcessamentoStatus.Running
+        );
         const resp = await signIn(this.auth.username ?? '', this.auth.password ?? '', true);
 
-        if (!resp.Token) {
-          if (attempts === maxAuthRetries) {
-            this.hasError = true;
-            await this.sendMessageClient(
-              '❌ Não foi possível autenticar no Sittax após múltiplas tentativas',
-              0,
-              0,
-              this.max,
-              ProcessamentoStatus.Stopped
-            );
-            await healthBrokerComunication(
-              XHealthType.Error,
-              `Não foi possível autenticar no Sittax após ${maxAuthRetries} tentativas`
-            );
-            return false;
-          }
-          await timeout(2000);
-          continue;
-        }
+        if (!resp.Token) continue;
 
         this.auth.token = resp.Token;
         await updateAuth({
@@ -346,17 +306,22 @@ export class InvoiceTask {
         return true;
       } catch (error) {
         if (attempts === maxAuthRetries) {
-          this.hasError = true;
+          this.hasError = true; 
           await this.sendMessageClient(
-            '❌ Erro na autenticação no Sittax',
+            '❌ Não foi possível autenticar no Sittax após múltiplas tentativas',
             0,
             0,
             this.max,
             ProcessamentoStatus.Stopped
           );
+          await healthBrokerComunication(
+            XHealthType.Error,
+            `Não foi possível autenticar no Sittax após ${maxAuthRetries} tentativas`
+          );
           return false;
         }
-        await timeout(2000);
+        attempts++;
+        await timeout(500);
       }
     }
     return false;
@@ -371,6 +336,7 @@ export class InvoiceTask {
     this.progress = 0;
     this.filesSendedCount = 0;
     this.connection = connection;
+    this.recoveryAttempts = 0;
   }
 
   private async sendInvoicesFileToSittax(index: number, currentProgress: number): Promise<boolean> {
@@ -404,8 +370,7 @@ export class InvoiceTask {
         );
         return true;
       } catch (error: any) {
-        this.hasError = true;
-        let errorMessage = `❌ Erro ao enviar ${this.files[index].filepath} \n Erro: ${error}`;
+        let errorMessage = `❌ Erro ao enviar ${this.files[index].filepath} \n Erro: ${error?.message ?? error}`;
 
         if (error.code === 'ERR_BAD_RESPONSE') {
           if (error.config?.headers?.['Content-Length']) {
@@ -536,7 +501,6 @@ export class InvoiceTask {
             }
           } catch (error: any) {
             errorCount++;
-            this.hasError = true;
             let errorMessage = `❌ Erro ao enviar arquivo extraído ${extractedFile.filename} \n Erro: ${error}`;
 
             if (error.code === 'ERR_BAD_RESPONSE') {
@@ -616,7 +580,6 @@ export class InvoiceTask {
         return true;
       }
     } catch (error: any) {
-      this.hasError = true;
       const errorMessage = `❌ Erro ao processar ZIP ${this.files[index].filepath}: ${error.message}`;
       await this.sendMessageClient(errorMessage, currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
       throw error;
@@ -674,7 +637,7 @@ export class InvoiceTask {
         const filePath = path.join(dirPath, file);
         const stat = fs.statSync(filePath);
 
-        if (stat.isDirectory()) {
+        if (stat.isDirectory()) {0-9
           this.removeDirectory(filePath);
         } else {
           fs.unlinkSync(filePath);

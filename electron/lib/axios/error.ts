@@ -28,7 +28,7 @@ export enum ErrorType {
 export interface IAppError {
   type: ErrorType;
   message: string;
-  originalError?: ICustomAxiosError;
+  originalError?: ICustomAxiosError | Error;
   statusCode?: number;
   timestamp: Date;
 }

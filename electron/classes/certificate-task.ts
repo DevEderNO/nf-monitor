@@ -210,7 +210,7 @@ export class CertificateTask {
       await healthBrokerComunication(this.hasError ? XHealthType.Error : XHealthType.Success, message);
     } catch (error) {
       await this.sendMessageClient(
-        '❌ Houve um problema ao enviar os arquivos para o Sittax',
+        '❌ Houve um problema ao enviar os arquivos para o Sittax ' + (error as Error).message,
         0,
         lastProcessedIndex,
         this.max,
