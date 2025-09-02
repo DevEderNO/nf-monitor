@@ -32,3 +32,4 @@ migration_lock.toml
 
 # Tests
 tests/coverage
+coverage
