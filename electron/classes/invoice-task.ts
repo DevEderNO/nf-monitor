@@ -50,8 +50,8 @@ export class InvoiceTask {
   auth: IAuth | null = null;
   max: number = 0;
   maxRetries: number = 3;
-  retryDelay: number = 2000;
-  private recoveryAttempts: number = 0;
+  retryDelay: number = 500;
+  private recoveryAttempts: number = 1;
 
   constructor() {
     this.isPaused = false;
@@ -259,9 +259,9 @@ export class InvoiceTask {
             success = true;
             break;
         }
-        if(success) this.recoveryAttempts = 0;
+        if(success) this.recoveryAttempts = 1;
       } catch (error) {
-        if (this.recoveryAttempts >= this.maxRetries) {
+        if (this.recoveryAttempts === this.maxRetries) {
           this.hasError = true;
           const errorMessage = `❌ Falha definitiva após ${this.maxRetries} tentativas: ${element.filepath}`;
           await this.sendMessageClient(
@@ -276,7 +276,6 @@ export class InvoiceTask {
             message: errorMessage,
             type: 'background'
           });
-          throw error;
         }
         this.recoveryAttempts++;
       }
@@ -377,7 +376,7 @@ export class InvoiceTask {
         );
         return true;
       } catch (error: any) {
-        let errorMessage = `❌ Erro ao enviar ${this.files[index].filepath} \n Erro: ${error?.message ?? error}`;
+        let errorMessage = `❌ Erro ao enviar ${this.files[index].filepath} motivo: ${error?.message ?? error}`;
 
         if (error.code === 'ERR_BAD_RESPONSE') {
           if (error.config?.headers?.['Content-Length']) {
@@ -390,10 +389,10 @@ export class InvoiceTask {
         await this.sendMessageClient(errorMessage, currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
         sendToAllRenderers('error', {
           title: 'Algo deu errado 😯.',
-          message: errorMessage,
+          message: error?.message ?? errorMessage,
           type: 'background'
         });
-        throw error;
+        throw new Error(errorMessage);
       }
     } else {
       await this.sendMessageClient(

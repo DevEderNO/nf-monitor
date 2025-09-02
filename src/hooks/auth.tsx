@@ -27,9 +27,7 @@ const AuthProvider = ({ children }: React.PropsWithChildren) => {
       try {
         const auth = await window.ipcRenderer.invoke("signIn", credentials);
         
-        if (!auth) {
-          throw new Error("Falha na autenticação");
-        }
+        if (!auth?.token) return;
         
         dispatch([
           {

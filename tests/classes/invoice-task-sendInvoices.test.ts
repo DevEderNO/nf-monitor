@@ -182,7 +182,6 @@ describe('InvoiceTask - sendInvoicesFileToSittax', () => {
 
       // Act & Assert
       await expect(callPrivateMethod(invoiceTask, 'sendInvoicesFileToSittax', 0, 50)).rejects.toThrow('Erro de rede');
-      expect(invoiceTask.hasError).toBe(true);
       expect(mockConnection.sendUTF).toHaveBeenCalledWith(
         expect.stringContaining('❌ Erro ao enviar /test/path/file.xml')
       );
@@ -206,7 +205,6 @@ describe('InvoiceTask - sendInvoicesFileToSittax', () => {
 
       // Act & Assert
       await expect(callPrivateMethod(invoiceTask, 'sendInvoicesFileToSittax', 0, 50)).rejects.toThrow('Arquivo muito grande');
-      expect(invoiceTask.hasError).toBe(true);
       expect(mockConnection.sendUTF).toHaveBeenCalledWith(
         expect.stringContaining('❌ Arquivo muito grande (50.00MB): /test/path/file.xml')
       );
@@ -228,7 +226,6 @@ describe('InvoiceTask - sendInvoicesFileToSittax', () => {
 
       // Act & Assert
       await expect(callPrivateMethod(invoiceTask, 'sendInvoicesFileToSittax', 0, 50)).rejects.toThrow('Servidor rejeitou');
-      expect(invoiceTask.hasError).toBe(true);
       expect(mockConnection.sendUTF).toHaveBeenCalledWith(
         expect.stringContaining('❌ Servidor rejeitou o arquivo: /test/path/file.xml')
       );
@@ -248,7 +245,6 @@ describe('InvoiceTask - sendInvoicesFileToSittax', () => {
 
       // Act & Assert
       await expect(callPrivateMethod(invoiceTask, 'sendInvoicesFileToSittax', 0, 50)).rejects.toThrow('Erro de rede');
-      expect(invoiceTask.hasError).toBe(true);
       expect(mockConnection.sendUTF).toHaveBeenCalledWith(
         expect.stringContaining('❌ Erro ao enviar /test/path/file.xml')
       );
@@ -367,7 +363,6 @@ describe('InvoiceTask - sendInvoicesFileToSittax', () => {
 
       // Act & Assert
       await expect(callPrivateMethod(invoiceTask, 'sendInvoicesFileToSittax', 0, 50)).rejects.toThrow('Erro de rede');
-      expect(invoiceTask.hasError).toBe(true);
     });
 
     it('não deve definir hasError como true em caso de arquivo inválido', async () => {

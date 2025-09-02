@@ -7,6 +7,7 @@ type IpcPayload = {
 };
 
 export function sendToAllRenderers(channel: string, payload: IpcPayload): void {
+  console.log("sendToAllRenderers", channel, payload);
   BrowserWindow.getAllWindows().forEach(window => {
     try {
       if (!window.isDestroyed() && !window.webContents.isDestroyed()) {

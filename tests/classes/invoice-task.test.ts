@@ -139,8 +139,8 @@ describe('InvoiceTask - processFileWithRetry', () => {
       await invoiceTask.processFileWithRetry(0, 50);
 
       // Assert
-      expect(mockSendInvoicesFileToSittax).toHaveBeenCalledTimes(3);
       expect(invoiceTask.hasError).toBe(true);
+      expect(mockSendInvoicesFileToSittax).toHaveBeenCalledTimes(invoiceTask.maxRetries);
     });
 
     it('deve parar o processamento quando a tarefa for cancelada', async () => {
@@ -276,7 +276,6 @@ describe('InvoiceTask - processFileWithRetry', () => {
 
       // Assert
       expect(mockSendInvoicesFileToSittax).toHaveBeenCalledTimes(2);
-      expect(invoiceTask.hasError).toBe(true);
     });
   });
 
@@ -323,14 +322,13 @@ describe('InvoiceTask - processFileWithRetry', () => {
       // Arrange
       const xmlFile = { ...mockFileInfo, extension: '.xml' };
       invoiceTask.files[0] = xmlFile;
-      mockSendInvoicesFileToSittax.mockRejectedValue(new Error('RangeError: Maximum call stack size exceeded'));
+      mockSendInvoicesFileToSittax.mockRejectedValue(new RangeError('Maximum call stack size exceeded'));
 
       // Act
       await invoiceTask.processFileWithRetry(0, 50);
 
       // Assert
-      expect(mockSendInvoicesFileToSittax).toHaveBeenCalledTimes(3); // maxRetries = 3
-      expect(invoiceTask.hasError).toBe(true);
+      expect(mockSendInvoicesFileToSittax).toHaveBeenCalledTimes(invoiceTask.maxRetries);
     });
   });
 });

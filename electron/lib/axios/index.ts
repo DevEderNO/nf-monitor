@@ -49,19 +49,22 @@ export async function checkRoute(url: string) {
 
 export async function signIn(username: string, password: string, useCryptography?: boolean): Promise<ISignIn> {
   try {
-  const currentPassword = useCryptography ? decrypt(password) : password;
-  const resp = await apiAuth.get<ISignIn>(`auth/logar-nfe-monitor`, {
-    params: {
-      usuario: username,
-      senha: currentPassword,
-    },
-    headers: {
-      Origin: 'https://app.sittax.com.br',
-    },
+    const currentPassword = useCryptography ? decrypt(password) : password;
+    const { data } = await apiAuth.get<ISignIn | { Mensagem: string }>(`auth/logar-nfe-monitor`, {
+      params: {
+        usuario: username,
+        senha: currentPassword,
+      },
+      headers: {
+        Origin: 'https://app.sittax.com.br',
+      },
     });
-    return resp.data;
+    if (!(data as ISignIn).Token) {
+      throw new Error((data as { Mensagem: string })?.Mensagem);
+    }
+    return data as ISignIn;
   } catch (error) {
-    throw handleAxiosError(error as AxiosError);
+    throw new Error(handleAxiosError(error as AxiosError).message);
   }
 }
 
@@ -85,10 +88,10 @@ export async function retry(url: string, filepath: string, token: string, maximu
     sendToAllRenderers('error', {
       title: 'Algo deu errado 😯.',
       message: handleAxiosError(e as AxiosError).message,
-      type: 'background'
+      type: 'background',
     });
     if (attempt >= maximumRetry) {
-      throw handleAxiosError(e as AxiosError);
+      throw new Error(handleAxiosError(e as AxiosError).message);
     }
     return retry(url, filepath, token, maximumRetry, attempt + 1, (delay || 500) * 2);
   }
@@ -116,13 +119,13 @@ export async function retryCertificate(
     if (data) return data;
     throw new Error('Nenhuma resposta da API');
   } catch (e) {
+    sendToAllRenderers('error', {
+      title: 'Algo deu errado 😯.',
+      message: handleAxiosError(e as AxiosError).message,
+      type: 'background',
+    });
     if (attempt >= maximumRetry) {
-      sendToAllRenderers('error', {
-        title: 'Algo deu errado 😯.',
-        message: handleAxiosError(e as AxiosError).message,
-        type: 'background'
-      });
-      throw handleAxiosError(e as AxiosError);
+      throw new Error(handleAxiosError(e as AxiosError).message);
     }
     return retry(url, filepath, token, maximumRetry, attempt + 1, (delay || 500) * 2);
   }
@@ -155,7 +158,7 @@ export async function retrySieg(
     throw new Error('Nenhuma resposta da API');
   } catch (e) {
     if (attempt >= maximumRetry) {
-      throw handleAxiosError(e as AxiosError);
+      throw new Error(handleAxiosError(e as AxiosError).message);
     }
     console.info('Erro ao baixar notas numero de tentativas: ', attempt, 'delay: ', delay);
     return retrySieg(url, apiKey, data, maximumRetry, attempt + 1, (delay > 0 ? delay : 1000) * 2);

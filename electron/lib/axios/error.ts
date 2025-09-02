@@ -25,7 +25,7 @@ export enum ErrorType {
 }
 
 // Interface para erro tratado da aplicação
-export interface IAppError {
+export interface IAppError extends Error {
   type: ErrorType;
   message: string;
   originalError?: ICustomAxiosError | Error;

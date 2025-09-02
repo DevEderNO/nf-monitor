@@ -42,11 +42,12 @@ window.ipcRenderer.on("update-downloaded", (_event, message) => {
 });
 
 window.ipcRenderer.on("error", (_event, message) => {
+  console.error('ipcRenderer', message);
   const parsedMessage = JSON.parse(message);
-  console.log(parsedMessage);
+  if (parsedMessage?.type !== "foreground") return;
   toast({
     title: parsedMessage.title,
     description: parsedMessage.message,
-    type: parsedMessage?.type ?? "background",
+    type: parsedMessage.type,
   });
 });

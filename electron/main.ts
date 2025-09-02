@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, Menu, nativeImage, Tray } from 'electron';
+import { app, BrowserWindow, globalShortcut, Menu, MenuItemConstructorOptions, nativeImage, Tray } from 'electron';
 import path from 'node:path';
 import { registerListeners } from './listeners';
 import { createWebsocket } from './websocket';
@@ -24,6 +24,9 @@ process.env.VITE_PUBLIC = envVitePublic;
 
 let win: BrowserWindow | null;
 let tray: Tray;
+let menuAtivo = false;
+const isMac = process.platform === 'darwin';
+
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 
@@ -31,6 +34,52 @@ app.setAppUserModelId('Monitor');
 
 // Impede que o sistema entre em suspensão
 const id = powerSaveBlocker.start('prevent-app-suspension');
+
+const criarMenuPadrao = () => Menu.buildFromTemplate([
+  ...(isMac ? [{ role: 'appMenu' }] : []) as MenuItemConstructorOptions[],
+  { role: 'fileMenu' },
+  { role: 'editMenu' },
+  { role: 'viewMenu' },
+  { role: 'windowMenu' },
+  { role: 'help' },
+]);
+
+const criarMenuMinimoMac = () => Menu.buildFromTemplate([
+  {
+    label: app.name,
+    submenu: [
+      { role: 'about' },
+      { type: 'separator' },
+      { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' },
+      { type: 'separator' },
+      { role: 'quit' },
+    ]
+  }
+]);
+
+function aplicarEstadoDoMenu() {
+  if (menuAtivo) {
+    Menu.setApplicationMenu(criarMenuPadrao());
+    if (!isMac) {
+      BrowserWindow.getAllWindows().forEach(w => {
+        w.setAutoHideMenuBar(false);
+        w.setMenuBarVisibility(true);
+      });
+    }
+    sendToAllRenderers('info', { title: 'Menu ativado', message: 'O menu da aplicação foi ativado', type: 'background' });
+  } else {
+    if (isMac) {
+      Menu.setApplicationMenu(criarMenuMinimoMac()); // “remover” no mac = menu mínimo
+    } else {
+      Menu.setApplicationMenu(null);
+      BrowserWindow.getAllWindows().forEach(w => {
+        w.setAutoHideMenuBar(true);   // Alt não exibe mais
+        w.setMenuBarVisibility(false);
+      });
+    }
+    sendToAllRenderers('info', { title: 'Menu desativado', message: 'O menu da aplicação foi desativado', type: 'background' });
+  }
+}
 
 function createWindow() {
   win = new BrowserWindow({
@@ -50,27 +99,16 @@ function createWindow() {
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL);
-  } else {
-    win.loadFile(path.join(process.env.DIST ?? '', 'index.html'));
-    Menu.setApplicationMenu(null);
-
-    if (Menu.getApplicationMenu() === null) {
-      globalShortcut.register('CommandOrControl+Shift+Alt+I', () => {
-        const defaultMenu = Menu.buildFromTemplate([
-          { role: 'fileMenu' },
-          { role: 'editMenu' },
-          { role: 'viewMenu' },
-          { role: 'windowMenu' },
-          { role: 'help' },
-        ]);
-        Menu.setApplicationMenu(defaultMenu);
-      });
-    } else {
-      globalShortcut.register('CommandOrControl+Shift+Alt+I', () => {
-        Menu.setApplicationMenu(null);
-      });
-    }
+    menuAtivo = true;
   }
+  
+  win.loadFile(path.join(process.env.DIST ?? '', 'index.html'));
+  Menu.setApplicationMenu(null);
+
+  globalShortcut.register('CommandOrControl+Shift+Alt+I', () => {
+    menuAtivo = !menuAtivo;
+    aplicarEstadoDoMenu();
+  });
 
   const icon = nativeImage.createFromPath(path.join(envVitePublic, 'sittax.png'));
 
@@ -182,6 +220,10 @@ function createWindow() {
       path: app.getPath('exe'),
     });
   }
+
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
+  });
 }
 
 app.on('ready', async () => {
