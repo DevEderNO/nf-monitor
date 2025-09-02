@@ -6,6 +6,7 @@ import { ISignIn } from '../../interfaces/signin';
 import { ISiegCountNotesRequest, ISiegDownloadNotesRequest, ISiegDownloadNotesResponse } from '../../interfaces/sieg';
 import { NFMoniotorHealth } from '../../interfaces/health-message';
 import { handleAxiosError } from './error-handle';
+import { sendToAllRenderers } from '../ipc';
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -81,6 +82,11 @@ export async function retry(url: string, filepath: string, token: string, maximu
     if (data) return data;
     throw new Error('Nenhuma resposta da API');
   } catch (e) {
+    sendToAllRenderers('error', {
+      title: 'Algo deu errado 😯.',
+      message: handleAxiosError(e as AxiosError).message,
+      type: 'background'
+    });
     if (attempt >= maximumRetry) {
       throw handleAxiosError(e as AxiosError);
     }
@@ -111,6 +117,11 @@ export async function retryCertificate(
     throw new Error('Nenhuma resposta da API');
   } catch (e) {
     if (attempt >= maximumRetry) {
+      sendToAllRenderers('error', {
+        title: 'Algo deu errado 😯.',
+        message: handleAxiosError(e as AxiosError).message,
+        type: 'background'
+      });
       throw handleAxiosError(e as AxiosError);
     }
     return retry(url, filepath, token, maximumRetry, attempt + 1, (delay || 500) * 2);

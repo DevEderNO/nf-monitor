@@ -7,6 +7,7 @@ import { acceptStreamsEula, applyMigrations, copyMigrations, recicleDb } from '.
 import { logError } from './services/error-service';
 import { ErrorType } from '@prisma/client';
 import { powerSaveBlocker } from 'electron';
+import { sendToAllRenderers } from './lib/ipc';
 
 // The built directory structure
 //
@@ -52,21 +53,23 @@ function createWindow() {
   } else {
     win.loadFile(path.join(process.env.DIST ?? '', 'index.html'));
     Menu.setApplicationMenu(null);
-    
-    globalShortcut.register('CommandOrControl+Shift+Alt+I', () => {
-      const defaultMenu = Menu.buildFromTemplate([
-        { role: 'fileMenu' },
-        { role: 'editMenu' },
-        { role: 'viewMenu' },
-        { role: 'windowMenu' },
-        { role: 'help' },
-      ]);
-      Menu.setApplicationMenu(defaultMenu);
-    });
 
-    globalShortcut.register('CommandOrControl+Shift+Alt+I', () => {
-      Menu.setApplicationMenu(null);
-    });
+    if (Menu.getApplicationMenu() === null) {
+      globalShortcut.register('CommandOrControl+Shift+Alt+I', () => {
+        const defaultMenu = Menu.buildFromTemplate([
+          { role: 'fileMenu' },
+          { role: 'editMenu' },
+          { role: 'viewMenu' },
+          { role: 'windowMenu' },
+          { role: 'help' },
+        ]);
+        Menu.setApplicationMenu(defaultMenu);
+      });
+    } else {
+      globalShortcut.register('CommandOrControl+Shift+Alt+I', () => {
+        Menu.setApplicationMenu(null);
+      });
+    }
   }
 
   const icon = nativeImage.createFromPath(path.join(envVitePublic, 'sittax.png'));
@@ -126,17 +129,10 @@ function createWindow() {
   // Intercepta erros não tratados
   process.on('uncaughtException', async error => {
     await logError(error, ErrorType.UncaughtException);
-    BrowserWindow.getAllWindows().forEach(window => {
-      if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-        try {
-          window.webContents.send('error', JSON.stringify({
-            title: 'Erro não tratado',
-            message: (error as Error).message
-          }));
-        } catch (err) {
-          console.error('Erro ao enviar mensagem para renderer:', err);
-        }
-      }
+    sendToAllRenderers('error', {
+      title: 'Erro não tratado',
+      message: (error as Error).message,
+      type: 'background',
     });
   });
 
@@ -144,31 +140,17 @@ function createWindow() {
   process.on('unhandledRejection', async reason => {
     if (reason instanceof Error) {
       await logError(reason, ErrorType.UnhandledRejection);
-      BrowserWindow.getAllWindows().forEach(window => {
-        if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-          try {
-            window.webContents.send('error', JSON.stringify({
-              title: 'Erro não tratado',
-              message: (reason as Error).message
-            }));
-          } catch (err) {
-            console.error('Erro ao enviar mensagem para renderer:', err);
-          }
-        }
+      sendToAllRenderers('error', {
+        title: 'Erro não tratado',
+        message: (reason as Error).message,
+        type: 'background',
       });
     } else {
       await logError(new Error(String(reason)), ErrorType.UnhandledRejection);
-      BrowserWindow.getAllWindows().forEach(window => {
-        if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-          try {
-            window.webContents.send('error', JSON.stringify({
-              title: 'Erro não tratado',
-              message: (reason as Error).message
-            }));
-          } catch (err) {
-            console.error('Erro ao enviar mensagem para renderer:', err);
-          }
-        }
+      sendToAllRenderers('error', {
+        title: 'Erro não tratado',
+        message: (reason as Error).message,
+        type: 'background',
       });
     }
   });
@@ -176,22 +158,20 @@ function createWindow() {
   // Intercepta erros de renderização
   app.on('render-process-gone', async (_event, _webContents, details) => {
     await logError(new Error(`Render process gone: ${details.reason}`), ErrorType.RenderProcessGone);
-    BrowserWindow.getAllWindows().forEach(window => {
-      window.webContents.send('error', JSON.stringify({
-        title: 'Erro de renderização',
-        message: details.reason
-      }));
+    sendToAllRenderers('error', {
+      title: 'Erro de renderização',
+      message: details.reason,
+      type: 'background',
     });
   });
 
   // Intercepta erros de GPU
   app.on('child-process-gone', async (_event, details) => {
     await logError(new Error(`GPU process gone: ${details.type}`), ErrorType.GPUProcessGone);
-    BrowserWindow.getAllWindows().forEach(window => {
-      window.webContents.send('error', JSON.stringify({
-        title: 'Erro de GPU',
-        message: details.type
-      }));
+    sendToAllRenderers('error', {
+      title: 'Erro de GPU',
+      message: details.type,
+      type: 'background',
     });
   });
 
@@ -236,11 +216,19 @@ setInterval(() => {
 }, 60000);
 
 autoUpdater.on('update-available', () => {
-  win?.webContents.send('update-available', '⚙️ Identificada uma nova versão.');
+  sendToAllRenderers('update-available', {
+    title: '⚙️ Identificada uma nova versão.',
+    message: '⚙️ Identificada uma nova versão.',
+    type: 'foreground',
+  });
 });
 
 autoUpdater.on('update-downloaded', () => {
-  win?.webContents.send('update-downloaded', '🚀 Atualização começará em 5 segundos');
+  sendToAllRenderers('update-downloaded', {
+    title: '🚀 Atualização começará em 5 segundos',
+    message: '🚀 Atualização começará em 5 segundos',
+    type: 'foreground',
+  });
   setInterval(() => {}, 5000);
   autoUpdater.quitAndInstall();
 });

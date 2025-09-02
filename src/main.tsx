@@ -29,7 +29,7 @@ window.ipcRenderer.on("update-available", (_event, message) => {
   toast({
     title: message,
     description: "",
-    type: "foreground",
+    type: "background",
   });
 });
 
@@ -37,15 +37,16 @@ window.ipcRenderer.on("update-downloaded", (_event, message) => {
   toast({
     title: message,
     description: "",
-    type: "foreground",
+    type: "background",
   });
 });
 
 window.ipcRenderer.on("error", (_event, message) => {
   const parsedMessage = JSON.parse(message);
+  console.log(parsedMessage);
   toast({
     title: parsedMessage.title,
     description: parsedMessage.message,
-    type: "foreground",
+    type: parsedMessage?.type ?? "background",
   });
 });

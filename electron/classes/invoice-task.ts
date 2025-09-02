@@ -33,6 +33,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 import AdmZip from 'adm-zip';
+import { sendToAllRenderers } from '../lib/ipc';
 
 export class InvoiceTask {
   isPaused: boolean;
@@ -186,7 +187,6 @@ export class InvoiceTask {
                   unblockFile(element.filepath);
                 }
               }
-
               await this.processFileWithRetry(index, currentProgress);
             }
           }
@@ -262,13 +262,20 @@ export class InvoiceTask {
         if(success) this.recoveryAttempts = 0;
       } catch (error) {
         if (this.recoveryAttempts >= this.maxRetries) {
+          this.hasError = true;
+          const errorMessage = `❌ Falha definitiva após ${this.maxRetries} tentativas: ${element.filepath}`;
           await this.sendMessageClient(
-            `❌ Falha definitiva após ${this.maxRetries} tentativas: ${element.filepath}`,
+            errorMessage,
             currentProgress,
             index + 1,
             this.max,
             ProcessamentoStatus.Stopped
           );
+          sendToAllRenderers('error', {
+            title: 'Algo deu errado 😯.',
+            message: errorMessage,
+            type: 'background'
+          });
           throw error;
         }
         this.recoveryAttempts++;
@@ -381,6 +388,11 @@ export class InvoiceTask {
           }
         }
         await this.sendMessageClient(errorMessage, currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
+        sendToAllRenderers('error', {
+          title: 'Algo deu errado 😯.',
+          message: errorMessage,
+          type: 'background'
+        });
         throw error;
       }
     } else {
@@ -512,6 +524,12 @@ export class InvoiceTask {
               }
             }
 
+            sendToAllRenderers('error', {
+              title: 'Algo deu errado 😯.',
+              message: errorMessage,
+              type: 'background'
+            });
+
             await this.sendMessageClient(
               errorMessage,
               currentProgress,
@@ -581,6 +599,11 @@ export class InvoiceTask {
       }
     } catch (error: any) {
       const errorMessage = `❌ Erro ao processar ZIP ${this.files[index].filepath}: ${error.message}`;
+      sendToAllRenderers('error', {
+        title: 'Algo deu errado 😯.',
+        message: errorMessage,
+        type: 'background'
+      });
       await this.sendMessageClient(errorMessage, currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
       throw error;
     }

@@ -1,4 +1,5 @@
 import { BrowserWindow, ipcMain, Notification } from 'electron';
+import { sendToAllRenderers } from './lib/ipc';
 import { selectDirectories } from './services/file-operation-service';
 import { updateJobs } from './services/schedules';
 import { encrypt } from './lib/cryptography';
@@ -85,11 +86,10 @@ export async function signInSittax(user: string, password: string, encripted: bo
     await addAuth(auth);
     return auth;
   } catch (error) {
-    BrowserWindow.getAllWindows().forEach((window: any) => {
-      window.webContents.send('error', JSON.stringify({
-        title: 'Algo deu errado 😯.',
-        message: (error as Error).message
-      }));
+    sendToAllRenderers('error', {
+      title: 'Algo deu errado 😯.',
+      message: (error as Error).message,
+      type: 'foreground',
     });
     return null;
   }
