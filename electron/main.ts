@@ -105,7 +105,7 @@ function createWindow() {
   win.loadFile(path.join(process.env.DIST ?? '', 'index.html'));
   Menu.setApplicationMenu(null);
 
-  globalShortcut.register('CommandOrControl+Shift+Alt+I', () => {
+  globalShortcut.register('CommandOrControl+Shift+I', () => {
     menuAtivo = !menuAtivo;
     aplicarEstadoDoMenu();
   });
