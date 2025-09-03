@@ -51,7 +51,7 @@ export class InvoiceTask {
   max: number = 0;
   maxRetries: number = 3;
   retryDelay: number = 500;
-  private recoveryAttempts: number = 1;
+  recoveryAttempts: number = 1;
 
   constructor() {
     this.isPaused = false;
@@ -94,10 +94,11 @@ export class InvoiceTask {
       await healthBrokerComunication(XHealthType.Info, `Iniciado processo de envio de arquivos para o Sittax`);
       await addFiles(await listarArquivos(directories.map(x => x.path)));
       this.files = (await getFiles()).filter(x => !x.wasSend && x.isValid);
-      this.filesSendedCount = await getCountFilesSended();
       this.viewUploadedFiles = (await getConfiguration())?.viewUploadedFiles ?? false;
-      if (this.viewUploadedFiles && this.filesSendedCount > 0) {
-        this.files.push(...(await getFiles()).filter(x => x.wasSend || !x.isValid));
+      if (this.viewUploadedFiles) {
+        this.filesSendedCount = await getCountFilesSended();
+        if(this.filesSendedCount > 0) 
+          this.files.push(...(await getFiles()).filter(x => x.wasSend || !x.isValid));
       }
       if (this.files.length > 0) {
         await this.sendMessageClient('⚡ Iniciando o envio dos arquivos para o Sittax');
@@ -610,63 +611,98 @@ export class InvoiceTask {
 
   private getExtractedFiles(extractPath: string): IFileInfo[] {
     const files: IFileInfo[] = [];
-
-    const scanDirectory = (dirPath: string) => {
+    
+    // Usar abordagem iterativa com fila para evitar estouro da pilha
+    const queue: string[] = [extractPath];
+    const maxDepth = 100; // Limite de profundidade para evitar loops infinitos
+    let currentDepth = 0;
+    
+    while (queue.length > 0 && currentDepth < maxDepth) {
+      const currentPath = queue.shift()!;
+      
       try {
-        const items = fs.readdirSync(dirPath);
-
-        items.forEach(item => {
-          const fullPath = path.join(dirPath, item);
-          try {
-            const stat = fs.statSync(fullPath);
-
-            if (stat.isDirectory()) {
-              scanDirectory(fullPath);
-            } else {
-              const ext = path.extname(item).toLowerCase();
-              if (['.xml', '.pdf', '.txt'].includes(ext)) {
-                files.push({
-                  filepath: fullPath,
-                  filename: item,
-                  extension: ext,
-                  size: stat.size,
-                  dateCreated: stat.birthtime,
-                  dateModified: stat.mtime,
-                  wasSend: false,
-                  isValid: true,
-                  dataSend: null,
-                } as any);
-              }
-            }
-          } catch (statError) {
-            console.warn(`Não foi possível acessar: ${fullPath}`, statError);
+        const stat = fs.statSync(currentPath);
+        
+        if (stat.isDirectory()) {
+          const items = fs.readdirSync(currentPath);
+          
+          // Adicionar todos os itens do diretório à fila
+          items.forEach(item => {
+            const itemPath = path.join(currentPath, item);
+            queue.push(itemPath);
+          });
+          
+          currentDepth++;
+        } else {
+          // É um arquivo, verificar se é válido
+          const ext = path.extname(currentPath).toLowerCase();
+          if (['.xml', '.pdf', '.txt'].includes(ext)) {
+            files.push({
+              filepath: currentPath,
+              filename: path.basename(currentPath),
+              extension: ext,
+              size: stat.size,
+              wasSend: false,
+              isValid: true,
+              dataSend: null,
+              isDirectory: false,
+              bloqued: false,
+              isFile: true,
+              modifiedtime: stat.mtime,
+              createdAt: stat.birthtime,
+              updatedAt: stat.mtime,
+            } as IFileInfo);
           }
-        });
-      } catch (readError) {
-        console.warn(`Não foi possível ler diretório: ${dirPath}`, readError);
+        }
+      } catch (error) {
+        console.warn(`Não foi possível acessar: ${currentPath}`, error);
+        // Continuar com o próximo item
       }
-    };
-
-    scanDirectory(extractPath);
+    }
+    
+    if (currentDepth >= maxDepth) {
+      console.warn(`Atingido limite máximo de profundidade (${maxDepth}) ao escanear diretório: ${extractPath}`);
+    }
+    
     return files;
   }
 
   private removeDirectory(dirPath: string) {
-    if (fs.existsSync(dirPath)) {
-      const files = fs.readdirSync(dirPath);
+    if (!fs.existsSync(dirPath)) return;
 
-      files.forEach(file => {
-        const filePath = path.join(dirPath, file);
-        const stat = fs.statSync(filePath);
-
-        if (stat.isDirectory()) {0-9
-          this.removeDirectory(filePath);
+    // Usar abordagem iterativa com pilha para evitar estouro da pilha
+    const stack: string[] = [dirPath];
+    
+    while (stack.length > 0) {
+      const currentPath = stack.pop()!;
+      
+      try {
+        const stat = fs.statSync(currentPath);
+        
+        if (stat.isDirectory()) {
+          const items = fs.readdirSync(currentPath);
+          
+          if (items.length === 0) {
+            // Diretório vazio, pode remover
+            fs.rmdirSync(currentPath);
+          } else {
+            // Adicionar diretório de volta à pilha para processar depois
+            stack.push(currentPath);
+            
+            // Adicionar todos os itens do diretório à pilha
+            items.forEach(item => {
+              const itemPath = path.join(currentPath, item);
+              stack.push(itemPath);
+            });
+          }
         } else {
-          fs.unlinkSync(filePath);
+          // É um arquivo, remover
+          fs.unlinkSync(currentPath);
         }
-      });
-
-      fs.rmdirSync(dirPath);
+      } catch (error) {
+        console.warn(`Erro ao processar: ${currentPath}`, error);
+        // Continuar com o próximo item
+      }
     }
   }
 
