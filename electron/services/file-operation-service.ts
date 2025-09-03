@@ -595,4 +595,3 @@ function validatePfx(fileInfo: IFileInfo): boolean {
     return false;
   }
 }
-''
