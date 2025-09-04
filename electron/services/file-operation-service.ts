@@ -494,50 +494,68 @@ export async function listarArquivos(diretorios: string[]): Promise<IFileInfo[]>
 }
 
 async function processDirectoryAsync(diretorio: string): Promise<IFileInfo[]> {
-  const itens = await fs.readdir(diretorio, {
-    withFileTypes: true,
-  });
-
   const results: IFileInfo[] = [];
+  const dirQueue: string[] = [diretorio];
+  const visitedDirs = new Set<string>();
 
-  for (let i = 0; i < itens.length; i += BATCH_SIZE) {
-    const batch = itens.slice(i, i + BATCH_SIZE);
+  while (dirQueue.length > 0) {
+    const currentDir = dirQueue.shift()!;
+    const normalizedPath = path.resolve(currentDir);
 
-    const paths = await Promise.all(
-      batch.map(async (item): Promise<IFileInfo | IFileInfo[]> => {
-        const caminhoCompleto = path.join(diretorio, item.name);
+    if (visitedDirs.has(normalizedPath)) {
+      continue;
+    }
 
-        if (item.isDirectory()) {
-          return processDirectoryAsync(caminhoCompleto);
-        }
+    visitedDirs.add(normalizedPath);
 
-        let stats: fsSync.Stats;
-        if (fileStatsCache.has(caminhoCompleto)) {
-          stats = fileStatsCache.get(caminhoCompleto)!;
-        } else {
-          stats = await fs.stat(caminhoCompleto);
-          fileStatsCache.set(caminhoCompleto, stats);
-        }
+    try {
+      const itens = await fs.readdir(currentDir, {
+        withFileTypes: true,
+      });
 
-        const extension = path.extname(item.name).toLowerCase();
+      for (let i = 0; i < itens.length; i += BATCH_SIZE) {
+        const batch = itens.slice(i, i + BATCH_SIZE);
 
-        return {
-          filepath: caminhoCompleto,
-          filename: item.name,
-          extension: extension,
-          isDirectory: false,
-          isFile: true,
-          wasSend: false,
-          dataSend: null,
-          isValid: VALID_EXTENSIONS.has(extension),
-          bloqued: false,
-          modifiedtime: stats.mtime,
-          size: stats.size,
-        };
-      })
-    );
+        const paths = await Promise.all(
+          batch.map(async (item): Promise<IFileInfo | null> => {
+            const caminhoCompleto = path.join(currentDir, item.name);
 
-    results.push(...paths.flat());
+            if (item.isDirectory()) {
+              dirQueue.push(caminhoCompleto);
+              return null;
+            }
+
+            let stats: fsSync.Stats;
+            if (fileStatsCache.has(caminhoCompleto)) {
+              stats = fileStatsCache.get(caminhoCompleto)!;
+            } else {
+              stats = await fs.stat(caminhoCompleto);
+              fileStatsCache.set(caminhoCompleto, stats);
+            }
+
+            const extension = path.extname(item.name).toLowerCase();
+
+            return {
+              filepath: caminhoCompleto,
+              filename: item.name,
+              extension: extension,
+              isDirectory: false,
+              isFile: true,
+              wasSend: false,
+              dataSend: null,
+              isValid: VALID_EXTENSIONS.has(extension),
+              bloqued: false,
+              modifiedtime: stats.mtime,
+              size: stats.size,
+            };
+          })
+        );
+
+        results.push(...(paths.filter(p => p !== null) as IFileInfo[]));
+      }
+    } catch (error) {
+      console.error(`Erro ao processar diretório ${currentDir}:`, error);
+    }
   }
 
   return results;
@@ -595,4 +613,5 @@ function validatePfx(fileInfo: IFileInfo): boolean {
     return false;
   }
 }
-''
+('');
+
