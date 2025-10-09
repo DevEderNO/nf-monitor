@@ -1,13 +1,13 @@
 import { Job, scheduleJob } from 'node-schedule';
 import { wsConnection } from '../websocket';
 import { autoConfigureSieg, countFilesSendedToDay, getConfiguration } from './database';
-import { startSieg } from './sieg-service';
-import { addMonths } from 'date-fns';
+// import { startSieg } from './sieg-service';
+// import { addMonths } from 'date-fns';
 import { healthBrokerComunication } from './health-broker-service';
 import { startInvoiceProcess } from './invoice-service';
 import { XHealthType } from '../interfaces/health-message';
 let jobDiscovery: Job | null = null;
-let jobSieg: Job | null = null;
+// let jobSieg: Job | null = null;
 let jobHealth: Job | null = null;
 
 export function updateJobs() {
