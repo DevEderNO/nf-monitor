@@ -93,18 +93,8 @@ export function validFile(fileInfo: IFileInfo, certificate: boolean): { valid: b
     switch (fileInfo.extension.toLowerCase()) {
       case '.xml':
         data = fsSync.readFileSync(fileInfo.filepath, 'utf-8')?.trim();
-        if (!data.startsWith('<')) {
-          validationCache.set(cacheKey, validate);
-          return validate;
-        }
-        validate = validateNotaFiscal(data);
-        if (validate.isNotaFiscal) {
-          validationCache.set(cacheKey, validate);
-          return validate;
-        }
-        validate = validateNotaServico(data);
-        validationCache.set(cacheKey, validate);
-        return validate;
+        if (data.startsWith('<')) return { valid: true, isNotaFiscal: true };
+        return { valid: false, isNotaFiscal: false };
       case '.pdf':
         if (validatePdf(fileInfo, certificate)) {
           validate = { valid: true, isNotaFiscal: false };
@@ -595,7 +585,7 @@ function validateTxt(fileInfo: IFileInfo): boolean {
 
     const first28Chars = fileContent.substring(0, 28);
 
-    return /^\d{28}$/.test(first28Chars);
+    return /^.{28}$/.test(first28Chars);
   } catch (error) {
     return false;
   }
@@ -614,4 +604,3 @@ function validatePfx(fileInfo: IFileInfo): boolean {
   }
 }
 ('');
-
