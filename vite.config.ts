@@ -13,10 +13,10 @@ export default defineConfig({
         entry: 'electron/main.ts',
         onstart(options) {
           if (os.platform() === 'win32') {
-            // Copia os arquivos da pasta resources para dist-electron no início
-            fs.copySync('resources/asset-extractor-wasm_bg.wasm', 'dist-electron/asset-extractor-wasm_bg.wasm');
             fs.copySync('resources/streams.exe', 'dist-electron/streams.exe');
           }
+
+          fs.copySync('resources/asset-extractor-wasm_bg.wasm', 'dist-electron/asset-extractor-wasm_bg.wasm');
           options.startup();
         },
         vite: {

@@ -31,19 +31,20 @@ export async function initializeJob() {
 }
 
 export async function initializeJobSieg() {
-  const timeForConsultingSieg = (await getConfiguration())?.timeForConsultingSieg;
-  if (timeForConsultingSieg && timeForConsultingSieg !== '00:00') {
-    const newDate = new Date();
-    const dateInitial = addMonths(new Date(newDate.getFullYear(), newDate.getMonth(), 1), -1);
-    const dateEnd = newDate;
-    const hour = timeForConsultingSieg.slice(0, 2);
-    const minute = timeForConsultingSieg.slice(3, 5);
-    jobSieg = scheduleJob(`${minute} ${hour} * * *`, () => {
-      startSieg(wsConnection, dateInitial, dateEnd);
-    });
-  } else {
-    jobSieg?.cancel();
-  }
+  return
+  // const timeForConsultingSieg = (await getConfiguration())?.timeForConsultingSieg;
+  // if (timeForConsultingSieg && timeForConsultingSieg !== '00:00') {
+  //   const newDate = new Date();
+  //   const dateInitial = addMonths(new Date(newDate.getFullYear(), newDate.getMonth(), 1), -1);
+  //   const dateEnd = newDate;
+  //   const hour = timeForConsultingSieg.slice(0, 2);
+  //   const minute = timeForConsultingSieg.slice(3, 5);
+  //   jobSieg = scheduleJob(`${minute} ${hour} * * *`, () => {
+  //     startSieg(wsConnection, dateInitial, dateEnd);
+  //   });
+  // } else {
+  //   jobSieg?.cancel();
+  // }
 }
 
 export async function initializeJobHealth() {

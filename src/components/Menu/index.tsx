@@ -61,7 +61,7 @@ const Menu: React.FC = () => {
             state: { from: location },
           });
         },
-        visible: state.config.apiKeySieg && state.config.apiKeySieg.length > 0,
+        visible: state.config.apiKeySieg && state.config.apiKeySieg.length > 0 && false,
       },
       {
         label: 'Configurações',
