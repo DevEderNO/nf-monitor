@@ -161,7 +161,7 @@ export function Configuration() {
           defaultValue={historic?.join("\n")}
         />
       </div>
-      {state.config.apiKeySieg && state.config.apiKeySieg.length > 0 ? (
+      {state.config.apiKeySieg && state.config.apiKeySieg.length > 0 && false ? (
         <div className="flex flex-col flex-1 gap-2">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
