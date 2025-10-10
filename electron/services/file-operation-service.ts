@@ -1,6 +1,5 @@
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
-import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 import { BrowserWindow, dialog, OpenDialogOptions } from 'electron';
 import AdmZip from 'adm-zip';
@@ -15,6 +14,8 @@ import { IDb } from '../interfaces/db';
 import { IConfig } from '../interfaces/config';
 import { signInSittax } from '../listeners';
 import prisma from '../lib/prisma';
+import { execFile } from 'child_process';
+import path from 'path';
 
 const VALID_EXTENSIONS = new Set(['.xml', '.pdf', '.zip', '.txt', '.pfx']);
 
@@ -346,17 +347,14 @@ export async function copyMigrations(): Promise<void> {
 }
 
 export async function applyMigrations(): Promise<void> {
-  try {
-    if (!app.isPackaged) return;
-    const nodePath = path.join(process.resourcesPath, 'nodejs', 'node.exe');
-    const prismaPath = path.join(process.resourcesPath, 'node_modules', 'prisma', 'build', 'index.js');
-    const prismaSchema = path.join(app.getPath('userData'), 'schema.prisma');
-    let prismaMigrateDeployString = fsSync.readFileSync(prismaSchema, 'utf-8');
-    prismaMigrateDeployString = prismaMigrateDeployString.replace('file:./dev.db', 'file:./nfmonitor.db');
-    fsSync.writeFileSync(prismaSchema, prismaMigrateDeployString, 'utf-8');
+  if (!app.isPackaged) return;
 
-    execSync(`"${nodePath}" "${prismaPath}" migrate deploy --schema "${prismaSchema}"`, {
-      stdio: 'pipe',
+  const prismaPath = path.join(process.resourcesPath, 'node_modules', '.bin', 'prisma');
+
+  const prismaSchema = path.join(app.getPath('userData'), 'schema.prisma');
+
+  try {
+    execFile(prismaPath, ['migrate', 'deploy', '--schema', prismaSchema], {
       timeout: 30000,
     });
   } catch (error) {
