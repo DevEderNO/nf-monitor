@@ -23,73 +23,76 @@ import { IUser } from './interfaces/user';
 
 export async function signInSittax(user: string, password: string, encripted: boolean) {
   try {
-  const data = await signIn(user, password, encripted);
-  const {
-    Token,
-    Escritorio: { Usuarios, Empresas, ApiKeySieg, EmailSieg, SenhaSieg },
-  } = data;
+    const data = await signIn(user, password, encripted);
+    const {
+      Token,
+      Escritorio: { Usuarios, Empresas, ApiKeySieg, EmailSieg, SenhaSieg },
+    } = data;
 
-  const {
-    Id,
-    Nome,
-    Sobrenome,
-    Cpf,
-    Email,
-    PhoneNumber,
-    Ativo,
-    EmailConfirmed,
-    AccessFailedCount,
-    DataDeCriacao,
-    LockoutEnd,
-    EUsuarioEmpresa,
-    Role,
-    EPrimeiroAcesso,
-    Nivel,
-  } = Usuarios[0];
+    const {
+      Id,
+      Nome,
+      Sobrenome,
+      Cpf,
+      Email,
+      PhoneNumber,
+      Ativo,
+      EmailConfirmed,
+      AccessFailedCount,
+      DataDeCriacao,
+      LockoutEnd,
+      EUsuarioEmpresa,
+      Role,
+      EPrimeiroAcesso,
+      Nivel,
+    } = Usuarios[0];
 
-  const passwordHash = encrypt(password);
+    const passwordHash = encrypt(password);
 
-  const auth = {
-    token: Token,
-    username: user,
-    name: Nome,
-    password: passwordHash,
-    user: {
-      userId: Id.toString(),
-      nome: Nome,
-      sobrenome: Sobrenome,
-      cpf: Cpf,
-      email: Email,
-      phoneNumber: PhoneNumber,
-      ativo: Ativo,
-      emailConfirmed: EmailConfirmed,
-      accessFailedCount: AccessFailedCount,
-      dataDeCriacao: DataDeCriacao,
-      lockoutEnd: LockoutEnd,
-      eUsuarioEmpresa: EUsuarioEmpresa,
-      role: Role,
-      ePrimeiroAcesso: EPrimeiroAcesso,
-      nivel: Nivel,
-    } as IUser,
-    empresas: Empresas.map(x => ({
-      empresaId: x.Id,
-      nome: x.Nome,
-      cnpj: x.Cnpj,
-    })),
-    configuration: {
-      apiKeySieg: ApiKeySieg ?? '',
-      emailSieg: EmailSieg ?? '',
-      senhaSieg: SenhaSieg ?? '',
-    },
-  };
+    const auth = {
+      token: Token,
+      username: user,
+      name: Nome,
+      password: passwordHash,
+      user: {
+        userId: Id.toString(),
+        nome: Nome,
+        sobrenome: Sobrenome,
+        cpf: Cpf,
+        email: Email,
+        phoneNumber: PhoneNumber,
+        ativo: Ativo,
+        emailConfirmed: EmailConfirmed,
+        accessFailedCount: AccessFailedCount,
+        dataDeCriacao: DataDeCriacao,
+        lockoutEnd: LockoutEnd,
+        eUsuarioEmpresa: EUsuarioEmpresa,
+        role: Role,
+        ePrimeiroAcesso: EPrimeiroAcesso,
+        nivel: Nivel,
+      } as IUser,
+      empresas: Empresas.map(x => ({
+        empresaId: x.Id,
+        nome: x.Nome,
+        cnpj: x.Cnpj,
+      })),
+      configuration: {
+        apiKeySieg: ApiKeySieg ?? '',
+        emailSieg: EmailSieg ?? '',
+        senhaSieg: SenhaSieg ?? '',
+      },
+    };
     await addAuth(auth);
     return auth;
   } catch (error) {
     BrowserWindow.getAllWindows().forEach(window => {
-      window.webContents.send('error', JSON.stringify({
-        title: 'Algo deu errado 😯.',
-        message: (error as Error).message
-      }));
+      window.webContents.send(
+        'error',
+        JSON.stringify({
+          title: 'Algo deu errado 😯.',
+          message: (error as Error).message,
+        })
+      );
     });
     return null;
   }
@@ -172,10 +175,15 @@ export async function registerListeners(win: BrowserWindow | null) {
 
   ipcMain.handle('change-time-for-processing', async (_, timeForProcessing: string) => {
     const data = await getConfiguration();
-    return await updateConfiguration({
+
+    const config = await updateConfiguration({
       ...data,
       timeForProcessing: timeForProcessing,
     } as IConfig);
+
+    updateJobs();
+
+    return config
   });
 
   ipcMain.handle('change-time-for-consulting-sieg', async (_, timeForConsultingSieg: string) => {

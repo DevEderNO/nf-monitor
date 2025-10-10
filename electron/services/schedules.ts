@@ -13,7 +13,7 @@ let jobHealth: Job | null = null;
 export function updateJobs() {
   initializeJobAutoConfigureSieg();
   initializeJob();
-  initializeJobSieg();
+  // initializeJobSieg();
   // initializeJobHealth();
 }
 
