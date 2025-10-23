@@ -228,7 +228,7 @@ export class CertificateTask {
   async continueFromIndex(startIndex: number) {
     try {
       if (this.files.length === 0) return;
-      
+
       await this.sendMessageClient(`🔄 Continuando o processo do arquivo ${startIndex + 1}`);
 
       const progressIncrement = 100 / this.files.length;
@@ -379,7 +379,25 @@ export class CertificateTask {
           ProcessamentoStatus.Running
         );
 
-        await upload(this.auth?.token ?? '', this.files[index].filepath, false);
+        const uploadPromise = upload(this.auth?.token ?? '', this.files[index].filepath, true);
+
+        while (true) {
+          if (this.isCancelled) {
+            return false;
+          }
+
+          if (this.isPaused) {
+            return false;
+          }
+
+          const done = await Promise.race([
+            uploadPromise.then(() => true),
+            new Promise(res => setTimeout(() => res(false), 200)),
+          ]);
+
+          if (done) break;
+        }
+
         await updateFile(this.files[index].filepath, {
           wasSend: true,
           dataSend: new Date(),

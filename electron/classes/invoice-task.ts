@@ -265,8 +265,10 @@ export class InvoiceTask {
 
     while (attempts < this.maxRetries && !success && !this.isCancelled && !this.isPaused) {
       if (++safetyCounter > maxIterations) break;
+
+      if (this.isPaused || this.isCancelled) break;
+
       try {
-        if (this.isPaused || this.isCancelled) break;
         attempts++;
 
         if (attempts > 1) {
@@ -278,6 +280,8 @@ export class InvoiceTask {
             ProcessamentoStatus.Running
           );
           await timeout(this.retryDelay);
+
+          if (this.isPaused || this.isCancelled) break;
         }
 
         switch (element.extension.toLowerCase()) {
@@ -313,6 +317,8 @@ export class InvoiceTask {
     const maxAuthRetries = 3;
 
     while (attempts < maxAuthRetries) {
+      if (this.isPaused || this.isCancelled) return false;
+
       try {
         attempts++;
         this.auth = await getAuth();
@@ -337,6 +343,8 @@ export class InvoiceTask {
             return false;
           }
           await timeout(2000);
+
+          if (this.isPaused || this.isCancelled) return false;
           continue;
         }
 
@@ -361,6 +369,8 @@ export class InvoiceTask {
           return false;
         }
         await timeout(2000);
+
+        if (this.isPaused || this.isCancelled) return false;
       }
     }
     return false;
@@ -378,69 +388,114 @@ export class InvoiceTask {
   }
 
   private async sendInvoicesFileToSittax(index: number, currentProgress: number): Promise<boolean> {
+    if (this.isPaused || this.isCancelled) return false;
+
     const file = validFile(this.files[index], false);
-
-    if (file.valid) {
-      this.files[index].isValid = true;
-      try {
-        await this.sendMessageClient(
-          `🚀 Enviando ${this.files[index].filepath}`,
-          currentProgress,
-          index + 1,
-          this.max,
-          ProcessamentoStatus.Running
-        );
-
-        await upload(this.auth?.token ?? '', this.files[index].filepath, true);
-        await updateFile(this.files[index].filepath, {
-          wasSend: true,
-          dataSend: new Date(),
-        });
-        this.files[index].wasSend = true;
-        this.files[index].dataSend = new Date();
-        this.filesSendedCount++;
-        await this.sendMessageClient(
-          `✅ Enviado com sucesso ${this.files[index].filepath}`,
-          currentProgress,
-          index + 1,
-          this.max,
-          ProcessamentoStatus.Running
-        );
-        return true;
-      } catch (error: any) {
-        this.hasError = true;
-        let errorMessage = `❌ Erro ao enviar ${this.files[index].filepath} \n Erro: ${error}`;
-
-        if (error.code === 'ERR_BAD_RESPONSE') {
-          if (error.config?.headers?.['Content-Length']) {
-            const sizeInMB = (parseInt(error.config.headers['Content-Length']) / (1024 * 1024)).toFixed(2);
-            errorMessage = `❌ Arquivo muito grande (${sizeInMB}MB): ${this.files[index].filepath}`;
-          } else if (error.response?.status === 400) {
-            errorMessage = `❌ Servidor rejeitou o arquivo: ${this.files[index].filepath}`;
-          }
-        }
-        await this.sendMessageClient(errorMessage, currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
-        throw error;
-      }
-    } else {
+    if (!file.valid) {
       await this.sendMessageClient(
         file.isNotaFiscal
-          ? `⚠️ Arquivo não é válido por que a data de emissão e anterior 3️⃣ messes ${this.files[index].filepath}`
-          : `⚠️ Arquivo não e válido para o envio ${this.files[index].filepath}`,
+          ? `⚠️ Arquivo não é válido por que a data de emissão é anterior a 3️⃣ meses ${this.files[index].filepath}`
+          : `⚠️ Arquivo não é válido para o envio ${this.files[index].filepath}`,
         currentProgress,
         index + 1,
         this.max,
         ProcessamentoStatus.Running
       );
-      await updateFile(this.files[index].filepath, {
-        isValid: false,
-      });
+      await updateFile(this.files[index].filepath, { isValid: false });
       this.files[index].isValid = false;
       return true;
+    }
+
+    this.files[index].isValid = true;
+
+    const controller = new AbortController();
+
+    const checkAbort = setInterval(() => {
+      if (this.isPaused || this.isCancelled) {
+        controller.abort();
+        clearInterval(checkAbort);
+      }
+    }, 500);
+
+    try {
+      await this.sendMessageClient(
+        `🚀 Enviando ${this.files[index].filepath}`,
+        currentProgress,
+        index + 1,
+        this.max,
+        ProcessamentoStatus.Running
+      );
+
+      if (this.isPaused || this.isCancelled) {
+        clearInterval(checkAbort);
+        return false;
+      }
+
+      const uploadPromise = upload(this.auth?.token ?? '', this.files[index].filepath, true);
+
+      while (true) {
+        if (this.isCancelled) {
+          return false;
+        }
+
+        if (this.isPaused) {
+          return false;
+        }
+
+        const done = await Promise.race([
+          uploadPromise.then(() => true),
+          new Promise(res => setTimeout(() => res(false), 200)),
+        ]);
+
+        if (done) break;
+      }
+
+      await updateFile(this.files[index].filepath, {
+        wasSend: true,
+        dataSend: new Date(),
+      });
+
+      this.files[index].wasSend = true;
+      this.files[index].dataSend = new Date();
+      this.filesSendedCount++;
+
+      await this.sendMessageClient(
+        `✅ Enviado com sucesso ${this.files[index].filepath}`,
+        currentProgress,
+        index + 1,
+        this.max,
+        ProcessamentoStatus.Running
+      );
+
+      return true;
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.warn(`⏹️ Upload abortado: ${this.files[index].filepath}`);
+        return false;
+      }
+
+      this.hasError = true;
+      let errorMessage = `❌ Erro ao enviar ${this.files[index].filepath} \n Erro: ${error}`;
+
+      if (error.code === 'ERR_BAD_RESPONSE') {
+        if (error.config?.headers?.['Content-Length']) {
+          const sizeInMB = (parseInt(error.config.headers['Content-Length']) / (1024 * 1024)).toFixed(2);
+          errorMessage = `❌ Arquivo muito grande (${sizeInMB}MB): ${this.files[index].filepath}`;
+        } else if (error.response?.status === 400) {
+          errorMessage = `❌ Servidor rejeitou o arquivo: ${this.files[index].filepath}`;
+        }
+      }
+
+      await this.sendMessageClient(errorMessage, currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
+      throw error;
+    } finally {
+      clearInterval(checkAbort);
     }
   }
 
   private async extractAndProcessZip(index: number, currentProgress: number): Promise<boolean> {
+    if (this.isPaused || this.isCancelled) return false;
+
     const file = validZip(this.files[index]);
     if (!file.valid) {
       await this.sendMessageClient(
@@ -505,9 +560,9 @@ export class InvoiceTask {
         let errorCount = 0;
 
         for (const extractedFile of extractedFiles) {
-          try {
-            if (this.isCancelled || this.isPaused) break;
+          if (this.isCancelled || this.isPaused) break;
 
+          try {
             await this.sendMessageClient(
               `🚀 Enviando arquivo extraído: ${extractedFile.filename}`,
               currentProgress,
@@ -515,6 +570,8 @@ export class InvoiceTask {
               this.max,
               ProcessamentoStatus.Running
             );
+
+            if (this.isPaused || this.isCancelled) break;
 
             const validExtractedFile = validFile(extractedFile, false);
             if (validExtractedFile.valid) {

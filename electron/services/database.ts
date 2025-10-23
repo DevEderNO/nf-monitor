@@ -193,18 +193,12 @@ export async function getDirectories(): Promise<IDirectory[]> {
       },
     });
 
-    const directorySieg = await getDirectoriesDownloadSieg();
-
     if (directories?.length > 0) {
       result.push(...directories);
     }
 
     if (directoryCertificates?.length > 0) {
       result.push(...directoryCertificates);
-    }
-
-    if (directorySieg) {
-      result.push(directorySieg);
     }
 
     return result;
@@ -214,8 +208,8 @@ export async function getDirectories(): Promise<IDirectory[]> {
 }
 
 export async function getDirectory(path: string): Promise<IDirectory | null> {
-  const directory: IDirectory | null =
-    (await prisma.directory.findFirst({ where: { path } })) ?? (await getDirectoriesDownloadSieg());
+  const directory: IDirectory | null = await prisma.directory.findFirst({ where: { path } });
+
   return directory;
 }
 
@@ -255,6 +249,7 @@ export async function updateDirectoryByPath(path: string, data: Partial<IDirecto
 }
 
 export async function removeDirectory(path: string, type: 'invoices' | 'certificates'): Promise<number> {
+  console.log('path: ', path);
   return (
     (
       await prisma.directory.deleteMany({
