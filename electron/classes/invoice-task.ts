@@ -31,7 +31,6 @@ import { XHealthType } from '../interfaces/health-message';
 import { healthBrokerComunication } from '../services/health-broker-service';
 import * as path from 'path';
 import * as fs from 'fs';
-
 import AdmZip from 'adm-zip';
 
 export class InvoiceTask {
@@ -50,6 +49,10 @@ export class InvoiceTask {
   max: number = 0;
   maxRetries: number = 3;
   retryDelay: number = 2000;
+
+  private tokenExpireTime: number = 0;
+  private readonly TOKEN_LIFETIME_MS = 2 * 60 * 60 * 1000; // 2 horas, tempo lendário de expiração
+  private readonly TOKEN_REFRESH_BEFORE_MS = 10 * 60 * 1000; // renovar 10 min antes
 
   constructor() {
     this.isPaused = false;
@@ -82,6 +85,20 @@ export class InvoiceTask {
     this.isCancelled = true;
   }
 
+  private isTokenExpiringSoon(): boolean {
+    const now = Date.now();
+    return now >= this.tokenExpireTime - this.TOKEN_REFRESH_BEFORE_MS;
+  }
+
+  private async ensureValidToken(): Promise<boolean> {
+    if (!this.isTokenExpiringSoon() && this.auth?.token) {
+      return true;
+    }
+
+    await this.sendMessageClient('🔄 Renovando autenticação...', this.progress, 0, this.max);
+    return await this.authenticate();
+  }
+
   async run(connection: connection) {
     let lastProcessedIndex = 0;
 
@@ -94,9 +111,11 @@ export class InvoiceTask {
       this.files = (await getFiles()).filter(x => !x.wasSend && x.isValid);
       this.filesSendedCount = await getCountFilesSended();
       this.viewUploadedFiles = (await getConfiguration())?.viewUploadedFiles ?? false;
+
       if (this.viewUploadedFiles && this.filesSendedCount > 0) {
         this.files.push(...(await getFiles()).filter(x => x.wasSend || !x.isValid));
       }
+
       if (this.files.length > 0) {
         await this.sendMessageClient('⚡ Iniciando o envio dos arquivos para o Sittax');
         const progressIncrement = 100 / this.files.length;
@@ -136,26 +155,28 @@ export class InvoiceTask {
             await timeout(500);
             index--;
           } else {
+            if (!(await this.ensureValidToken())) {
+              throw new Error('Não foi possível renovar a autenticação');
+            }
+
             currentProgress = this.progress + progressIncrement * (index + 1);
             const element = this.files[index];
 
             if (element.wasSend) {
               if (!element.isValid) {
                 await this.sendMessageClient(
-                  `⚠️ Arquivo não e válido para o envio ${element.filepath}`,
+                  `⚠️ Arquivo não é válido para o envio ${element.filepath}`,
                   currentProgress,
                   index + 1,
                   this.max,
                   ProcessamentoStatus.Running
                 );
-                await updateFile(element.filepath, {
-                  isValid: false,
-                });
+                await updateFile(element.filepath, { isValid: false });
                 this.files[index].isValid = false;
                 continue;
               }
               await this.sendMessageClient(
-                `☑️ Já foi enviando ${element.filepath}`,
+                `☑️ Já foi enviado ${element.filepath}`,
                 currentProgress,
                 index + 1,
                 this.max,
@@ -177,7 +198,7 @@ export class InvoiceTask {
               if (process.platform === 'win32') {
                 if (isFileBlocked(element.filepath)) {
                   await this.sendMessageClient(
-                    `🔓 desbloqueando o arquivo ${element.filepath}`,
+                    `🔓 Desbloqueando o arquivo ${element.filepath}`,
                     currentProgress,
                     index + 1,
                     this.max,
@@ -210,7 +231,6 @@ export class InvoiceTask {
         : `😁 Tarefa concluída. Foram enviados ${this.filesSendedCount} arquivos.`;
 
       await this.sendMessageClient(message, 100, this.max, this.max, ProcessamentoStatus.Concluded);
-
       await healthBrokerComunication(this.hasError ? XHealthType.Error : XHealthType.Success, message);
     } catch (error) {
       await this.sendMessageClient(
@@ -242,12 +262,16 @@ export class InvoiceTask {
       for (let index = startIndex; index < this.files.length; index++) {
         if (this.isCancelled || this.isPaused) break;
 
+        if (!(await this.ensureValidToken())) {
+          throw new Error('Não foi possível renovar a autenticação');
+        }
+
         const currentProgress = this.progress + progressIncrement * (index + 1);
         await this.processFileWithRetry(index, currentProgress);
       }
     } catch (error) {
       await this.sendMessageClient(
-        '❌ houve um problema ao enviar os arquivos para o Sittax',
+        '❌ Houve um problema ao enviar os arquivos para o Sittax',
         0,
         startIndex,
         this.max,
@@ -265,7 +289,6 @@ export class InvoiceTask {
 
     while (attempts < this.maxRetries && !success && !this.isCancelled && !this.isPaused) {
       if (++safetyCounter > maxIterations) break;
-
       if (this.isPaused || this.isCancelled) break;
 
       try {
@@ -280,8 +303,11 @@ export class InvoiceTask {
             ProcessamentoStatus.Running
           );
           await timeout(this.retryDelay);
-
           if (this.isPaused || this.isCancelled) break;
+        }
+
+        if (!(await this.ensureValidToken())) {
+          throw new Error('Token expirado e não foi possível renovar');
         }
 
         switch (element.extension.toLowerCase()) {
@@ -297,7 +323,21 @@ export class InvoiceTask {
             success = true;
             break;
         }
-      } catch (error) {
+      } catch (error: any) {
+        if (error.response?.status === 401 || error.message?.includes('Unauthorized')) {
+          await this.sendMessageClient(
+            `🔐 Sessão expirada, renovando autenticação...`,
+            currentProgress,
+            index + 1,
+            this.max,
+            ProcessamentoStatus.Running
+          );
+
+          if (await this.authenticate()) {
+            continue;
+          }
+        }
+
         if (attempts === this.maxRetries) {
           this.hasError = true;
           await this.sendMessageClient(
@@ -343,18 +383,22 @@ export class InvoiceTask {
             return false;
           }
           await timeout(2000);
-
           if (this.isPaused || this.isCancelled) return false;
           continue;
         }
 
         this.auth.token = resp.Token;
+        this.tokenExpireTime = Date.now() + this.TOKEN_LIFETIME_MS;
+
         await updateAuth({
           id: this.auth.id,
           token: this.auth.token ?? '',
           username: this.auth.username ?? '',
           password: this.auth.password ?? '',
         });
+
+        await this.sendMessageClient(`✅ Autenticação renovada com sucesso`, this.progress, 0, this.max);
+
         return true;
       } catch (error) {
         if (attempts === maxAuthRetries) {
@@ -369,7 +413,6 @@ export class InvoiceTask {
           return false;
         }
         await timeout(2000);
-
         if (this.isPaused || this.isCancelled) return false;
       }
     }
@@ -385,6 +428,7 @@ export class InvoiceTask {
     this.progress = 0;
     this.filesSendedCount = 0;
     this.connection = connection;
+    this.tokenExpireTime = 0;
   }
 
   private async sendInvoicesFileToSittax(index: number, currentProgress: number): Promise<boolean> {
@@ -394,7 +438,7 @@ export class InvoiceTask {
     if (!file.valid) {
       await this.sendMessageClient(
         file.isNotaFiscal
-          ? `⚠️ Arquivo não é válido por que a data de emissão é anterior a 3️⃣ meses ${this.files[index].filepath}`
+          ? `⚠️ Arquivo não é válido porque a data de emissão é anterior a 3 meses ${this.files[index].filepath}`
           : `⚠️ Arquivo não é válido para o envio ${this.files[index].filepath}`,
         currentProgress,
         index + 1,
@@ -409,7 +453,6 @@ export class InvoiceTask {
     this.files[index].isValid = true;
 
     const controller = new AbortController();
-
     const checkAbort = setInterval(() => {
       if (this.isPaused || this.isCancelled) {
         controller.abort();
@@ -434,13 +477,7 @@ export class InvoiceTask {
       const uploadPromise = upload(this.auth?.token ?? '', this.files[index].filepath, true);
 
       while (true) {
-        if (this.isCancelled) {
-          return false;
-        }
-
-        if (this.isPaused) {
-          return false;
-        }
+        if (this.isCancelled || this.isPaused) return false;
 
         const done = await Promise.race([
           uploadPromise.then(() => true),
@@ -500,16 +537,14 @@ export class InvoiceTask {
     if (!file.valid) {
       await this.sendMessageClient(
         file.isNotaFiscal
-          ? `⚠️ Arquivo não é válido por que a data de emissão e anterior 3️⃣ messes ${this.files[index].filepath}`
+          ? `⚠️ Arquivo não é válido porque a data de emissão é anterior a 3 meses ${this.files[index].filepath}`
           : `⚠️ Arquivo não é válido para o envio ${this.files[index].filepath}`,
         currentProgress,
         index + 1,
         this.max,
         ProcessamentoStatus.Running
       );
-      await updateFile(this.files[index].filepath, {
-        isValid: false,
-      });
+      await updateFile(this.files[index].filepath, { isValid: false });
       this.files[index].isValid = false;
       return true;
     }
@@ -562,6 +597,10 @@ export class InvoiceTask {
         for (const extractedFile of extractedFiles) {
           if (this.isCancelled || this.isPaused) break;
 
+          if (!(await this.ensureValidToken())) {
+            throw new Error('Não foi possível renovar a autenticação');
+          }
+
           try {
             await this.sendMessageClient(
               `🚀 Enviando arquivo extraído: ${extractedFile.filename}`,
@@ -596,6 +635,20 @@ export class InvoiceTask {
               );
             }
           } catch (error: any) {
+            if (error.response?.status === 401 || error.message?.includes('Unauthorized')) {
+              await this.sendMessageClient(
+                `🔐 Sessão expirada durante envio de ZIP, renovando...`,
+                currentProgress,
+                index + 1,
+                this.max,
+                ProcessamentoStatus.Running
+              );
+
+              if (await this.authenticate()) {
+                continue;
+              }
+            }
+
             errorCount++;
             this.hasError = true;
             let errorMessage = `❌ Erro ao enviar arquivo extraído ${extractedFile.filename} \n Erro: ${error}`;
