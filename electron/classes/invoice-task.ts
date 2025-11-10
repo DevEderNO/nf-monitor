@@ -1,12 +1,5 @@
 import { IProcessamento, ProcessamentoStatus } from '../interfaces/processamento';
-import {
-  isFileBlocked,
-  listarArquivos,
-  unblockFile,
-  validFile,
-  validZip,
-  validateDFileExists,
-} from '../services/file-operation-service';
+import { listarArquivos, validFile, validZip, validateDFileExists } from '../services/file-operation-service';
 import { connection } from 'websocket';
 import { IFileInfo } from '../interfaces/file-info';
 import { WSMessageType, WSMessageTyped } from '../interfaces/ws-message';
@@ -193,19 +186,6 @@ export class InvoiceTask {
                 );
                 await removeFiles(element.filepath);
                 continue;
-              }
-
-              if (process.platform === 'win32') {
-                if (isFileBlocked(element.filepath)) {
-                  await this.sendMessageClient(
-                    `🔓 Desbloqueando o arquivo ${element.filepath}`,
-                    currentProgress,
-                    index + 1,
-                    this.max,
-                    ProcessamentoStatus.Running
-                  );
-                  unblockFile(element.filepath);
-                }
               }
 
               await this.processFileWithRetry(index, currentProgress);

@@ -4,12 +4,9 @@ import { IDbHistoric } from '../interfaces/db-historic';
 import { IFileInfo } from '../interfaces/file-info';
 import { IDirectory } from '../interfaces/directory';
 import { IConfig } from '../interfaces/config';
-import { createDirectoryFolder, getDirectoryData } from './file-operation-service';
-import { ICountedNotes } from '../interfaces/count-notes';
 import { IAuth } from '../interfaces/auth';
 import prisma from '../lib/prisma';
 import { endOfDay, startOfDay } from 'date-fns';
-import path from 'node:path';
 import { IEmpresa } from '../interfaces/empresa';
 
 export async function getConfiguration(): Promise<IConfig | null> {
@@ -51,11 +48,6 @@ export async function addAuth(data: {
   username: string;
   password: string;
   empresas: IEmpresa[];
-  configuration: {
-    apiKeySieg: string;
-    emailSieg: string;
-    senhaSieg: string;
-  };
 }) {
   // Create user record first
   const savedUser = await prisma.user.create({
@@ -104,20 +96,13 @@ export async function addAuth(data: {
       where: { id: config?.id },
       data: {
         ...config,
-        apiKeySieg: data.configuration.apiKeySieg,
-        emailSieg: data.configuration.emailSieg,
-        senhaSieg: data.configuration.senhaSieg,
       },
     });
   } else {
     await prisma.configuration.create({
       data: {
         timeForProcessing: '00:00',
-        timeForConsultingSieg: '00:00',
         viewUploadedFiles: false,
-        apiKeySieg: data.configuration.apiKeySieg,
-        emailSieg: data.configuration.emailSieg,
-        senhaSieg: data.configuration.senhaSieg,
       },
     });
   }
@@ -125,11 +110,6 @@ export async function addAuth(data: {
   return {
     ...auth,
     user: savedUser,
-    configuration: {
-      apiKeySieg: data.configuration.apiKeySieg,
-      emailSieg: data.configuration.emailSieg,
-      senhaSieg: data.configuration.senhaSieg,
-    },
     token: data.token,
   };
 }
@@ -170,7 +150,6 @@ export async function getUser(): Promise<IUser | null> {
 
 export async function removeAuth(): Promise<void> {
   return await prisma.$transaction(async tx => {
-    await tx.countedNotes.deleteMany();
     await tx.empresa.deleteMany();
     await tx.auth.deleteMany();
     await tx.user.deleteMany();
@@ -211,15 +190,6 @@ export async function getDirectory(path: string): Promise<IDirectory | null> {
   const directory: IDirectory | null = await prisma.directory.findFirst({ where: { path } });
 
   return directory;
-}
-
-export async function getDirectoriesDownloadSieg(): Promise<IDirectory | null> {
-  const config = await getConfiguration();
-  if (config && config.directoryDownloadSieg) {
-    const directory = getDirectoryData(config.directoryDownloadSieg);
-    return directory;
-  }
-  return null;
 }
 
 export async function addDirectories(data: IDirectory[]): Promise<number> {
@@ -471,55 +441,4 @@ export async function clearHistoric(): Promise<void> {
 
 export async function addError(data: { message: string; stack: string; type: ErrorType }): Promise<void> {
   await prisma.error.create({ data });
-}
-
-export async function getEmpresas(): Promise<IEmpresa[]> {
-  return (await prisma.empresa.findMany({ orderBy: { cnpj: 'asc' } })) ?? [];
-}
-
-export async function addCountedNotes(data: ICountedNotes): Promise<void> {
-  await prisma.countedNotes.create({
-    data,
-  });
-}
-
-export async function getCountedNotes(dataInicio: Date, dataFim: Date): Promise<ICountedNotes | null> {
-  return (
-    (await prisma.countedNotes.findFirst({
-      where: {
-        dataInicio,
-        dataFim,
-      },
-    })) ?? null
-  );
-}
-
-export async function updateCountedNotes(data: ICountedNotes): Promise<void> {
-  await prisma.countedNotes.update({
-    where: { id: data.id },
-    data,
-  });
-}
-
-export async function autoConfigureSieg(): Promise<boolean> {
-  const config = await getConfiguration();
-  const auth = await getAuth();
-  if (!config) return false;
-  if (!auth) return false;
-  if (!auth.token) return false;
-  if (config.apiKeySieg.length === 0) return false;
-  if (config.directoryDownloadSieg && config.directoryDownloadSieg?.length > 0) return false;
-
-  const directories = await getDirectories();
-  if (directories.length > 0) {
-    const directory = directories[0];
-    createDirectoryFolder(path.join(directory.path, 'SIEG'));
-    await updateConfiguration({
-      ...config,
-      directoryDownloadSieg: path.join(directory.path, 'SIEG'),
-      timeForConsultingSieg: config.timeForConsultingSieg !== '00:00' ? config.timeForConsultingSieg : '19:00',
-    });
-    return true;
-  }
-  return false;
 }

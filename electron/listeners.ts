@@ -1,6 +1,5 @@
 import { BrowserWindow, ipcMain, Notification } from 'electron';
 import { selectDirectories } from './services/file-operation-service';
-import { updateJobs } from './services/schedules';
 import { encrypt } from './lib/cryptography';
 import { signIn } from './lib/axios';
 import {
@@ -14,19 +13,19 @@ import {
   removeAuth,
   removeDirectory,
   removeFiles,
-  removeFilesNotSended,
   updateConfiguration,
 } from './services/database';
 import { IConfig } from './interfaces/config';
 import { IDirectory } from './interfaces/directory';
 import { IUser } from './interfaces/user';
+import { initializeJob } from './services/schedules';
 
 export async function signInSittax(user: string, password: string, encripted: boolean) {
   try {
     const data = await signIn(user, password, encripted);
     const {
       Token,
-      Escritorio: { Usuarios, Empresas, ApiKeySieg, EmailSieg, SenhaSieg },
+      Escritorio: { Usuarios, Empresas },
     } = data;
 
     const {
@@ -76,11 +75,6 @@ export async function signInSittax(user: string, password: string, encripted: bo
         nome: x.Nome,
         cnpj: x.Cnpj,
       })),
-      configuration: {
-        apiKeySieg: ApiKeySieg ?? '',
-        emailSieg: EmailSieg ?? '',
-        senhaSieg: SenhaSieg ?? '',
-      },
     };
     await addAuth(auth);
     return auth;
@@ -139,32 +133,6 @@ export async function registerListeners(win: BrowserWindow | null) {
     return await getDirectories();
   });
 
-  ipcMain.handle('select-directory-download-sieg', async () => {
-    const directory = selectDirectories(win!, ['openDirectory']);
-    const config = await getConfiguration();
-    if (directory.length > 0) {
-      return await updateConfiguration({
-        ...config,
-        directoryDownloadSieg: directory.at(0)?.path,
-      } as IConfig);
-    }
-    return config;
-  });
-
-  ipcMain.handle('clear-directory-download-sieg', async (_, clearFiles: boolean) => {
-    const data = await getConfiguration();
-    if (clearFiles && data?.directoryDownloadSieg) {
-      await removeFilesNotSended(data.directoryDownloadSieg.replace(/\//g, '\\'));
-    }
-    const config = await updateConfiguration({
-      ...data,
-      directoryDownloadSieg: null,
-      timeForConsultingSieg: '00:00',
-    } as IConfig);
-    updateJobs();
-    return config;
-  });
-
   ipcMain.handle('change-view-uploaded-files', async (_, viewUploadedFiles: boolean) => {
     const data = await getConfiguration();
     return await updateConfiguration({
@@ -181,17 +149,9 @@ export async function registerListeners(win: BrowserWindow | null) {
       timeForProcessing: timeForProcessing,
     } as IConfig);
 
-    updateJobs();
+    initializeJob();
 
-    return config
-  });
-
-  ipcMain.handle('change-time-for-consulting-sieg', async (_, timeForConsultingSieg: string) => {
-    const data = await getConfiguration();
-    return await updateConfiguration({
-      ...data,
-      timeForConsultingSieg: timeForConsultingSieg,
-    } as IConfig);
+    return config;
   });
 
   ipcMain.handle('remove-directory', async (_, directory: string, type: 'invoices' | 'certificates') => {
@@ -211,7 +171,7 @@ export async function registerListeners(win: BrowserWindow | null) {
   });
 
   ipcMain.on('initialize-job', () => {
-    updateJobs();
+    initializeJob();
   });
 
   ipcMain.on('clear-historic', async () => {

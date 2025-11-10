@@ -2,21 +2,13 @@ import { defineConfig } from 'vite';
 import path from 'node:path';
 import electron from 'vite-plugin-electron';
 import renderer from 'vite-plugin-electron-renderer';
-import fs from 'fs-extra';
-import * as os from 'node:os';
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     electron([
       {
         entry: 'electron/main.ts',
         onstart(options) {
-          if (os.platform() === 'win32') {
-            fs.copySync('resources/streams.exe', 'dist-electron/streams.exe');
-          }
-
-          fs.copySync('resources/asset-extractor-wasm_bg.wasm', 'dist-electron/asset-extractor-wasm_bg.wasm');
           options.startup();
         },
         vite: {

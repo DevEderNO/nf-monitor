@@ -9,7 +9,6 @@ export interface IState {
   loading: boolean;
   invoicesLog: IProcessamento;
   certificatesLog: IProcessamento;
-  siegLog: IProcessamento;
   historic: string[];
   config: IConfig;
 }
@@ -39,23 +38,10 @@ export const initialState: IState = {
     replace: false,
     status: ProcessamentoStatus.Stopped,
   },
-  siegLog: {
-    message: '',
-    progress: 0,
-    value: 0,
-    max: 0,
-    replace: false,
-    status: ProcessamentoStatus.Stopped,
-  },
   historic: [],
   config: {
     viewUploadedFiles: false,
     timeForProcessing: '00:00',
-    timeForConsultingSieg: '00:00',
-    directoryDownloadSieg: null,
-    apiKeySieg: '',
-    emailSieg: null,
-    senhaSieg: null,
   },
 };
 
@@ -65,10 +51,8 @@ export enum ActionType {
   Loading,
   InvoicesLog,
   CertificatesLog,
-  SiegLog,
   ClearInvoicesLog,
   ClearCertificatesLog,
-  ClearSiegLog,
   Clear,
   Historic,
   Config,
@@ -97,11 +81,6 @@ export const StateReducer = (state: IState, action: IAction | IAction[]): IState
         ...state,
         certificatesLog: { ...action.payload },
       };
-    case ActionType.SiegLog:
-      return {
-        ...state,
-        siegLog: { ...action.payload },
-      };
     case ActionType.Historic:
       return { ...state, historic: action.payload };
     case ActionType.Config:
@@ -118,11 +97,6 @@ export const StateReducer = (state: IState, action: IAction | IAction[]): IState
       return {
         ...state,
         certificatesLog: { ...state.invoicesLog, message: '' },
-      };
-    case ActionType.ClearSiegLog:
-      return {
-        ...state,
-        siegLog: { ...state.siegLog, message: '' },
       };
     default:
       return state;

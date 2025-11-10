@@ -3,7 +3,6 @@ import { decrypt } from '../cryptography';
 import { createReadStream } from 'fs';
 import FormData from 'form-data';
 import { ISignIn } from '../../interfaces/signin';
-import { ISiegCountNotesRequest, ISiegDownloadNotesRequest, ISiegDownloadNotesResponse } from '../../interfaces/sieg';
 import { NFMoniotorHealth } from '../../interfaces/health-message';
 import { handleAxiosError } from './error-handle';
 
@@ -25,11 +24,6 @@ const webApi = axios.create({
   timeout: 300000, // 5 minutos
   maxContentLength: 1000 * 1024 * 1024, // 1GB
   maxBodyLength: 1000 * 1024 * 1024, // 1GB
-});
-
-const apiSieg = axios.create({
-  baseURL: import.meta.env.VITE_API_SIEG_URL,
-  timeout: 50000,
 });
 
 const apiHealthBroker = axios.create({
@@ -120,46 +114,6 @@ export async function retryCertificate(
 export async function upload(token: string, filepath: string, invoices: boolean) {
   if (invoices) await retry('upload/importar-arquivo', filepath, token, 5);
   else await retryCertificate('v2/nova-implantacao/importar-arquivo', filepath, token, 5);
-}
-
-export async function retrySieg(
-  url: string,
-  apiKey: string,
-  data: ISiegCountNotesRequest | ISiegDownloadNotesRequest,
-  maximumRetry = 0,
-  attempt = 0,
-  delay = 0
-) {
-  try {
-    await sleep(delay);
-    const resp = await apiSieg.post(url, data, {
-      params: {
-        api_key: apiKey,
-      },
-      headers: {
-        Origin: 'http://app.sittax.com.br',
-      },
-    });
-    if (resp.data) return resp.data;
-    throw new Error('Nenhuma resposta da API');
-  } catch (e) {
-    if (attempt >= maximumRetry) {
-      throw handleAxiosError(e as AxiosError);
-    }
-    console.info('Erro ao baixar notas numero de tentativas: ', attempt, 'delay: ', delay);
-    return retrySieg(url, apiKey, data, maximumRetry, attempt + 1, (delay > 0 ? delay : 1000) * 2);
-  }
-}
-
-export async function getCountNotes(apiKey: string, data: ISiegCountNotesRequest) {
-  return await retrySieg(`/ContarXmls`, apiKey, data, 5);
-}
-
-export async function downloadNotes(
-  apiKey: string,
-  data: ISiegDownloadNotesRequest
-): Promise<ISiegDownloadNotesResponse> {
-  return await retrySieg(`/BaixarXmlsV2`, apiKey, data, 10);
 }
 
 export async function healthBrokerSetHealf(message: NFMoniotorHealth) {

@@ -7,7 +7,9 @@
     "build": "tsc && vite build && electron-builder",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "build:win": "tsc && vite build && electron-builder --win --config", "build:mac": "tsc && vite build && electron-builder --mac --config", "build:linux": "tsc && vite build && electron-builder --linux --config"
+    "build:win": "tsc && vite build && electron-builder --win --config",
+    "build:mac": "tsc && vite build && electron-builder --mac --config",
+    "build:linux": "tsc && vite build && electron-builder --linux --config"
   },
   "dependencies": {
     "@arbs.io/asset-extractor-wasm": "^0.1.2",
@@ -34,6 +36,7 @@
     "form-data": "^4.0.0",
     "lucide-react": "^0.292.0",
     "node-schedule": "^2.1.1",
+    "pdf-parse": "^2.4.5",
     "react": "^18.2.0",
     "react-day-picker": "8.10.1",
     "react-dom": "^18.2.0",

@@ -8,15 +8,12 @@ import { useAuth } from '@hooks/auth';
 import logoMonitor from '@images/logo-monitor.png';
 import grafismo from '@images/grafismo.png';
 import packageJson from '../../../package.json';
-import { useAppState } from '@/hooks/state';
 
 const Menu: React.FC = () => {
   const { theme, setTheme } = useTheme();
   const { signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { state } = useAppState();
-
   const menuItems = useMemo(
     () => [
       {
@@ -53,17 +50,6 @@ const Menu: React.FC = () => {
         visible: true,
       },
       {
-        label: 'SIEG',
-        selected: location.pathname === '/sieg',
-        onClick: () => {
-          navigate('/sieg', {
-            replace: true,
-            state: { from: location },
-          });
-        },
-        visible: state.config.apiKeySieg && state.config.apiKeySieg.length > 0 && false,
-      },
-      {
         label: 'Configurações',
         selected: location.pathname === '/configuration',
         onClick: () => {
@@ -75,7 +61,7 @@ const Menu: React.FC = () => {
         visible: true,
       },
     ],
-    [location, navigate, state.config.apiKeySieg]
+    [location, navigate]
   );
 
   return (

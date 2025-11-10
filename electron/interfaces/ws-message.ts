@@ -29,11 +29,5 @@ export enum WSMessageType {
   ResumeUploadCertificates,
   StopUploadCertificates,
 
-  Sieg,
-  StartSieg,
-  PauseSieg,
-  ResumeSieg,
-  StopSieg,
-
   Discovery,
 }
