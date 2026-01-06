@@ -9,7 +9,6 @@ import { IFile } from '../interfaces/file';
 import { IDirectory } from '../interfaces/directory';
 import { isBefore, addMonths } from 'date-fns';
 import { app } from 'electron';
-import { createDocumentParser } from '@arbs.io/asset-extractor-wasm';
 import { getDataEmissao } from '../lib/nfse-utils';
 import { IDb } from '../interfaces/db';
 import { IConfig } from '../interfaces/config';
@@ -25,11 +24,6 @@ const CHAVE_ACESSO_PATTERNS = [
   /CFe[0-9]{44}/gi,
   /CTe[0-9]{44}/gi,
 ];
-
-const PDF_PATTERNS = {
-  declaracao: /Nº da Declaração:\s+(\d+)/g,
-  extrato: /Informações da Apuração\s+(\d+)/g,
-};
 
 const diretorioCache = new Map<string, IDirectory>();
 const validationCache = new Map<string, { valid: boolean; isNotaFiscal: boolean }>();
@@ -261,24 +255,11 @@ export function getFilesZip(fileInfo: IFileInfo): IFile[] {
   return [];
 }
 
+// TODO - refazer essa validação sem lib externa
 function validatePdf(fileInfo: IFileInfo, certificate: boolean): boolean {
-  try {
-    const buf = fsSync.readFileSync(fileInfo.filepath);
-    const documentParser = createDocumentParser(new Uint8Array(buf));
-    const pdfText = documentParser?.contents?.text;
-    if (!pdfText) return false;
-
-    if (certificate) return true;
-
-    PDF_PATTERNS.declaracao.lastIndex = 0;
-    PDF_PATTERNS.extrato.lastIndex = 0;
-
-    const isDeclaracao = (PDF_PATTERNS.declaracao.exec(pdfText)?.[0].length ?? 0) > 0;
-    const isExtrato = (PDF_PATTERNS.extrato.exec(pdfText)?.[0]?.length ?? 0) > 0;
-    return isDeclaracao || isExtrato;
-  } catch (error) {
-    return false;
-  }
+  console.log(fileInfo)
+  console.log(certificate)
+  return true;
 }
 
 export function validateDiretoryFileExists(fileInfo: IFileInfo): boolean {
@@ -294,52 +275,16 @@ export function validateDFileExists(fileInfo: IFileInfo): boolean {
   return fsSync.existsSync(fileInfo.filepath);
 }
 
-export function acceptStreamsEula() {
-  try {
-    const regCommand = 'reg add "HKCU\\Software\\Sysinternals\\Streams" /v EulaAccepted /t REG_DWORD /d 1 /f';
-    execSync(regCommand, { stdio: 'ignore' });
-  } catch (error) {
-    console.error('Erro ao aceitar termos do streams.exe:', error);
-  }
-}
-
-export function isFileBlocked(filePath: string): boolean {
-  const streamsPath = path.join(
-    process.env['VITE_DEV_SERVER_URL'] ? __dirname : path.dirname(app.getPath('exe')),
-    'streams.exe'
-  );
-  try {
-    const output = execSync(`"${streamsPath}" "${filePath}"`, {
-      stdio: 'pipe',
-      timeout: 5000,
-    }).toString();
-    return output.includes('Zone.Identifier');
-  } catch (error) {
-    console.error('Erro ao verificar arquivo:', error);
-    return false;
-  }
-}
-
-export function unblockFile(filePath: string) {
-  const streamsPath = path.join(
-    process.env['VITE_DEV_SERVER_URL'] ? __dirname : path.dirname(app.getPath('exe')),
-    'streams.exe'
-  );
-  try {
-    execSync(`"${streamsPath}" -d "${filePath}"`, {
-      stdio: 'ignore',
-      timeout: 5000,
-    });
-  } catch (error) {
-    console.error('Erro ao desbloquear arquivo:', error);
-  }
-}
-
 export async function copyMigrations(): Promise<void> {
   try {
     if (!app.isPackaged) return;
+
     const prismaMigrations = path.join(process.resourcesPath, 'prisma');
-    await copyRecursiveAsync(prismaMigrations, app.getPath('userData'));
+    const userDataPath = app.getPath('userData');
+
+    await copyRecursiveAsync(prismaMigrations, userDataPath);
+
+    console.log('Migrations copiadas com sucesso');
   } catch (error) {
     console.error('Erro ao copiar migrations:', error);
   }
@@ -347,20 +292,53 @@ export async function copyMigrations(): Promise<void> {
 
 export async function applyMigrations(): Promise<void> {
   try {
-    if (!app.isPackaged) return;
-    const nodePath = path.join(process.resourcesPath, 'nodejs', 'node.exe');
-    const prismaPath = path.join(process.resourcesPath, 'node_modules', 'prisma', 'build', 'index.js');
-    const prismaSchema = path.join(app.getPath('userData'), 'schema.prisma');
-    let prismaMigrateDeployString = fsSync.readFileSync(prismaSchema, 'utf-8');
-    prismaMigrateDeployString = prismaMigrateDeployString.replace('file:./dev.db', 'file:./nfmonitor.db');
-    fsSync.writeFileSync(prismaSchema, prismaMigrateDeployString, 'utf-8');
+    if (!app.isPackaged) {
+      execSync('npx prisma migrate deploy', {
+        cwd: process.cwd(),
+        stdio: 'pipe',
+      });
+      return;
+    }
 
-    execSync(`"${nodePath}" "${prismaPath}" migrate deploy --schema "${prismaSchema}"`, {
+    const resourcesPath = process.resourcesPath.replace('app.asar', 'app.asar.unpacked');
+
+    const migrationEnginePath = path.join(
+      resourcesPath,
+      'prisma-engines',
+      process.platform === 'win32' ? 'migration-engine.exe' : 'migration-engine'
+    );
+
+    const prismaSchema = path.join(app.getPath('userData'), 'schema.prisma');
+    const dbPath = path.join(app.getPath('userData'), 'nfmonitor.db');
+
+    let schemaContent = fsSync.readFileSync(prismaSchema, 'utf-8');
+    schemaContent = schemaContent.replace('file:./dev.db', `file:${dbPath}`);
+    fsSync.writeFileSync(prismaSchema, schemaContent, 'utf-8');
+
+    if (!fsSync.existsSync(migrationEnginePath)) {
+      throw new Error(`Migration engine não encontrado em: ${migrationEnginePath}`);
+    }
+
+    if (process.platform !== 'win32') {
+      execSync(`chmod +x "${migrationEnginePath}"`, { stdio: 'ignore' });
+    }
+
+    execSync(`"${migrationEnginePath}" cli migrate deploy`, {
       stdio: 'pipe',
-      timeout: 30000,
+      timeout: 60000,
+      env: {
+        ...process.env,
+        DATABASE_URL: `file:${dbPath}`,
+        PRISMA_SCHEMA_PATH: prismaSchema,
+        PRISMA_MIGRATION_TABLE_NAME: '_prisma_migrations',
+      },
+      cwd: app.getPath('userData'),
     });
+
+    console.log('Migrations aplicadas com sucesso');
   } catch (error) {
     console.error('Erro ao aplicar migrations:', error);
+    throw error;
   }
 }
 
@@ -371,12 +349,8 @@ export async function recicleDb() {
   const db: IDb = JSON.parse(fsSync.readFileSync(dbPath, 'utf-8'));
   const config: IConfig = {
     timeForProcessing: db.timeForProcessing ?? '00:00',
-    timeForConsultingSieg: '00:00',
-    directoryDownloadSieg: null,
     viewUploadedFiles: false,
-    apiKeySieg: '',
-    emailSieg: '',
-    senhaSieg: '',
+    removeUploadedFiles: false,
   };
   const directories: IDirectory[] =
     db.directories?.map(x => ({
@@ -549,24 +523,6 @@ async function processDirectoryAsync(diretorio: string): Promise<IFileInfo[]> {
   }
 
   return results;
-}
-
-export function clearCaches(): void {
-  diretorioCache.clear();
-  validationCache.clear();
-  fileStatsCache.clear();
-}
-
-export function getCacheStats(): {
-  directoryCache: number;
-  validationCache: number;
-  fileStatsCache: number;
-} {
-  return {
-    directoryCache: diretorioCache.size,
-    validationCache: validationCache.size,
-    fileStatsCache: fileStatsCache.size,
-  };
 }
 
 function validateTxt(fileInfo: IFileInfo): boolean {

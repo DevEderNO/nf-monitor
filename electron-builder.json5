@@ -1,6 +1,3 @@
-/**
- * @see https://www.electron.build/configuration/configuration
- */
 {
   $schema: "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
   appId: "YourAppID",
@@ -19,31 +16,28 @@
   ],
   extraResources: [
     {
-      from: "prisma",
-      to: "prisma",
-      filter: ["schema.prisma", "migrations"],
+      "from": "node_modules/@arbs.io/asset-extractor-wasm/asset-extractor-wasm_bg.wasm",
+      "to": "dist-electron/asset-extractor-wasm_bg.wasm"
     },
     {
-      from: "node_modules/@prisma",
-      to: "node_modules/@prisma",
+      "from": "prisma",
+      "to": "prisma",
+      "filter": ["schema.prisma", "migrations/**/*"]
     },
     {
-      from: "node_modules/.bin",
-      to: "node_modules/.bin/",
-      filter: ["prisma*"],
+      "from": "node_modules/@prisma/engines",
+      "to": "prisma-engines",
+      "filter": ["migration-engine*", "libquery_engine*", "schema-engine*"]
     },
     {
-      from: "node_modules/.prisma",
-      to: "node_modules/.prisma",
-    },
-    {
-      from: "node_modules/prisma",
-      to: "node_modules/prisma",
-    },
-    {
-      from: "resources/nodejs",
-      to: "nodejs",
-    },
+      "from": "node_modules/.prisma",
+      "to": "node_modules/.prisma"
+    }
+  ],
+  asarUnpack: [
+    "**/node_modules/@arbs.io/asset-extractor-wasm/**",
+    "**/prisma-engines/**",
+    "**/node_modules/.prisma/**"
   ],
   publish: [
     {

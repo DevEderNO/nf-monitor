@@ -3,7 +3,7 @@ import path from 'node:path';
 import { registerListeners } from './listeners';
 import { createWebsocket } from './websocket';
 import { autoUpdater } from 'electron-updater';
-import { acceptStreamsEula, applyMigrations, copyMigrations, recicleDb } from './services/file-operation-service';
+import { applyMigrations, copyMigrations, recicleDb } from './services/file-operation-service';
 import { logError } from './services/error-service';
 import { ErrorType } from '@prisma/client';
 import { powerSaveBlocker } from 'electron';
@@ -52,7 +52,7 @@ function createWindow() {
   } else {
     win.loadFile(path.join(process.env.DIST ?? '', 'index.html'));
     Menu.setApplicationMenu(null);
-    
+
     globalShortcut.register('CommandOrControl+Shift+Alt+I', () => {
       const defaultMenu = Menu.buildFromTemplate([
         { role: 'fileMenu' },
@@ -129,10 +129,13 @@ function createWindow() {
     BrowserWindow.getAllWindows().forEach(window => {
       if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
         try {
-          window.webContents.send('error', JSON.stringify({
-            title: 'Erro não tratado',
-            message: (error as Error).message
-          }));
+          window.webContents.send(
+            'error',
+            JSON.stringify({
+              title: 'Erro não tratado',
+              message: (error as Error).message,
+            })
+          );
         } catch (err) {
           console.error('Erro ao enviar mensagem para renderer:', err);
         }
@@ -147,10 +150,13 @@ function createWindow() {
       BrowserWindow.getAllWindows().forEach(window => {
         if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
           try {
-            window.webContents.send('error', JSON.stringify({
-              title: 'Erro não tratado',
-              message: (reason as Error).message
-            }));
+            window.webContents.send(
+              'error',
+              JSON.stringify({
+                title: 'Erro não tratado',
+                message: (reason as Error).message,
+              })
+            );
           } catch (err) {
             console.error('Erro ao enviar mensagem para renderer:', err);
           }
@@ -161,10 +167,13 @@ function createWindow() {
       BrowserWindow.getAllWindows().forEach(window => {
         if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
           try {
-            window.webContents.send('error', JSON.stringify({
-              title: 'Erro não tratado',
-              message: (reason as Error).message
-            }));
+            window.webContents.send(
+              'error',
+              JSON.stringify({
+                title: 'Erro não tratado',
+                message: (reason as Error).message,
+              })
+            );
           } catch (err) {
             console.error('Erro ao enviar mensagem para renderer:', err);
           }
@@ -177,10 +186,13 @@ function createWindow() {
   app.on('render-process-gone', async (_event, _webContents, details) => {
     await logError(new Error(`Render process gone: ${details.reason}`), ErrorType.RenderProcessGone);
     BrowserWindow.getAllWindows().forEach(window => {
-      window.webContents.send('error', JSON.stringify({
-        title: 'Erro de renderização',
-        message: details.reason
-      }));
+      window.webContents.send(
+        'error',
+        JSON.stringify({
+          title: 'Erro de renderização',
+          message: details.reason,
+        })
+      );
     });
   });
 
@@ -188,10 +200,13 @@ function createWindow() {
   app.on('child-process-gone', async (_event, details) => {
     await logError(new Error(`GPU process gone: ${details.type}`), ErrorType.GPUProcessGone);
     BrowserWindow.getAllWindows().forEach(window => {
-      window.webContents.send('error', JSON.stringify({
-        title: 'Erro de GPU',
-        message: details.type
-      }));
+      window.webContents.send(
+        'error',
+        JSON.stringify({
+          title: 'Erro de GPU',
+          message: details.type,
+        })
+      );
     });
   });
 
@@ -211,10 +226,6 @@ app.on('ready', async () => {
 
   const isSecondInstance = app.requestSingleInstanceLock();
   if (isSecondInstance) {
-    if (process.platform === 'win32') {
-      acceptStreamsEula();
-    }
-
     createWebsocket();
     createWindow();
     registerListeners(win);

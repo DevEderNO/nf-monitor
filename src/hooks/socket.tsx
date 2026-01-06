@@ -88,24 +88,6 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
             },
           });
         }
-
-        if (response.message.type === WSMessageType.Sieg) {
-          const {
-            message: {
-              data: { message: messageProcessamento, progress, value, max, status },
-            },
-          }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
-          dispatch({
-            type: ActionType.SiegLog,
-            payload: {
-              message: messageProcessamento,
-              progress,
-              value,
-              max,
-              status,
-            },
-          });
-        }
       }
     };
   }, [client, dispatch]);

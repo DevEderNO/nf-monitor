@@ -106,16 +106,12 @@ model File {
 }
 
 model Configuration {
-  id                    Int      @id @default(autoincrement())
-  timeForProcessing     String   @default("00:00")
-  timeForConsultingSieg String   @default("00:00")
-  directoryDownloadSieg String?
-  viewUploadedFiles     Boolean  @default(false)
-  apiKeySieg            String   @default("")
-  emailSieg             String?
-  senhaSieg             String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                      Int      @id @default(autoincrement())
+  timeForProcessing       String   @default("00:00")
+  viewUploadedFiles       Boolean  @default(false)
+  removeUploadedFiles     Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }
 
 model Historic {
@@ -141,24 +137,4 @@ enum ErrorType {
   RenderProcessGone
   GPUProcessGone
   Others
-}
-
-model CountedNotes {
-  id         Int          @id @default(autoincrement())
-  dataInicio DateTime
-  dataFim    DateTime
-  nfe        Int          @default(0)
-  nfce       Int          @default(0)
-  cte        Int          @default(0)
-  cfe        Int          @default(0)
-  nfse       Int          @default(0)
-  role       RoleTypeSieg
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-}
-
-enum RoleTypeSieg {
-  Emit
-  Dest
-  Tom
 }

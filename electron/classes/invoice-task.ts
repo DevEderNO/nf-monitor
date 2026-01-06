@@ -1,12 +1,5 @@
 import { IProcessamento, ProcessamentoStatus } from '../interfaces/processamento';
-import {
-  isFileBlocked,
-  listarArquivos,
-  unblockFile,
-  validFile,
-  validZip,
-  validateDFileExists,
-} from '../services/file-operation-service';
+import { listarArquivos, validFile, validZip, validateDFileExists } from '../services/file-operation-service';
 import { connection } from 'websocket';
 import { IFileInfo } from '../interfaces/file-info';
 import { WSMessageType, WSMessageTyped } from '../interfaces/ws-message';
@@ -27,8 +20,6 @@ import {
 } from '../services/database';
 import { IAuth } from '../interfaces/auth';
 import { getTimestamp, timeout } from '../lib/time-utils';
-import { XHealthType } from '../interfaces/health-message';
-import { healthBrokerComunication } from '../services/health-broker-service';
 import * as path from 'path';
 import * as fs from 'fs';
 import AdmZip from 'adm-zip';
@@ -45,6 +36,7 @@ export class InvoiceTask {
   hasError: boolean;
   historic: IDbHistoric;
   viewUploadedFiles: boolean = false;
+  removeUploadedFiles: boolean = false;
   auth: IAuth | null = null;
   max: number = 0;
   maxRetries: number = 3;
@@ -106,11 +98,11 @@ export class InvoiceTask {
       this.initializeProperties(connection);
       const directories = await getDirectories();
       await this.sendMessageClient('🔎 Realizando a descoberta dos arquivos');
-      await healthBrokerComunication(XHealthType.Info, `Iniciado processo de envio de arquivos para o Sittax`);
       await addFiles(await listarArquivos(directories.map(x => x.path)));
       this.files = (await getFiles()).filter(x => !x.wasSend && x.isValid);
       this.filesSendedCount = await getCountFilesSended();
       this.viewUploadedFiles = (await getConfiguration())?.viewUploadedFiles ?? false;
+      this.removeUploadedFiles = (await getConfiguration())?.removeUploadedFiles ?? false;
 
       if (this.viewUploadedFiles && this.filesSendedCount > 0) {
         this.files.push(...(await getFiles()).filter(x => x.wasSend || !x.isValid));
@@ -133,7 +125,6 @@ export class InvoiceTask {
               0
             )} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`;
             await this.sendMessageClient(this.cancelledMessage, 0, index + 1, this.max, ProcessamentoStatus.Stopped);
-            await healthBrokerComunication(XHealthType.Warning, this.cancelledMessage);
             this.isCancelled = false;
             this.isPaused = false;
             this.hasError = false;
@@ -195,19 +186,6 @@ export class InvoiceTask {
                 continue;
               }
 
-              if (process.platform === 'win32') {
-                if (isFileBlocked(element.filepath)) {
-                  await this.sendMessageClient(
-                    `🔓 Desbloqueando o arquivo ${element.filepath}`,
-                    currentProgress,
-                    index + 1,
-                    this.max,
-                    ProcessamentoStatus.Running
-                  );
-                  unblockFile(element.filepath);
-                }
-              }
-
               await this.processFileWithRetry(index, currentProgress);
             }
           }
@@ -220,7 +198,6 @@ export class InvoiceTask {
           this.max,
           ProcessamentoStatus.Concluded
         );
-        await healthBrokerComunication(XHealthType.Success, `Não foram encontrados novos arquivos para o envio`);
       }
 
       const message = this.hasError
@@ -231,7 +208,6 @@ export class InvoiceTask {
         : `😁 Tarefa concluída. Foram enviados ${this.filesSendedCount} arquivos.`;
 
       await this.sendMessageClient(message, 100, this.max, this.max, ProcessamentoStatus.Concluded);
-      await healthBrokerComunication(this.hasError ? XHealthType.Error : XHealthType.Success, message);
     } catch (error) {
       await this.sendMessageClient(
         `❌ Houve um problema ao enviar os arquivos para o Sittax: ${error}`,
@@ -239,11 +215,6 @@ export class InvoiceTask {
         lastProcessedIndex,
         this.max,
         ProcessamentoStatus.Running
-      );
-
-      await healthBrokerComunication(
-        XHealthType.Error,
-        `Houve um problema ao enviar os arquivos para o Sittax. Continuando do arquivo ${lastProcessedIndex + 1}`
       );
 
       await this.continueFromIndex(lastProcessedIndex);
@@ -376,10 +347,7 @@ export class InvoiceTask {
               this.max,
               ProcessamentoStatus.Stopped
             );
-            await healthBrokerComunication(
-              XHealthType.Error,
-              `Não foi possível autenticar no Sittax após ${maxAuthRetries} tentativas`
-            );
+
             return false;
           }
           await timeout(2000);
@@ -503,6 +471,29 @@ export class InvoiceTask {
         this.max,
         ProcessamentoStatus.Running
       );
+
+      if (this.removeUploadedFiles) {
+        try {
+          if (fs.existsSync(this.files[index].filepath)) {
+            fs.unlinkSync(this.files[index].filepath);
+            await this.sendMessageClient(
+              `🗑️ Arquivo removido: ${this.files[index].filepath}`,
+              currentProgress,
+              index + 1,
+              this.max,
+              ProcessamentoStatus.Running
+            );
+          }
+        } catch (removeError) {
+          await this.sendMessageClient(
+            `⚠️ Não foi possível remover o arquivo: ${this.files[index].filepath} - ${removeError}`,
+            currentProgress,
+            index + 1,
+            this.max,
+            ProcessamentoStatus.Running
+          );
+        }
+      }
 
       return true;
     } catch (error: any) {

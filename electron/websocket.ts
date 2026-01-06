@@ -1,14 +1,12 @@
-import { WSMessage, WSMessageType, WSMessageTyped } from './interfaces/ws-message';
+import { WSMessage, WSMessageType } from './interfaces/ws-message';
 import * as http from 'http';
-import { IUtf8Message, server as WebsocketServer, connection } from 'websocket';
+import { server as WebsocketServer, connection } from 'websocket';
 import {
   pauseInvoiceProcess,
   resumeInvoiceProcess,
   startInvoiceProcess,
   stopInvoiceProcess,
 } from './services/invoice-service';
-import { pauseSieg, resumeSieg, startSieg, stopSieg } from './services/sieg-service';
-import { parseISO } from 'date-fns';
 import {
   pauseCertificateProcess,
   resumeCertificateProcess,
@@ -48,19 +46,6 @@ function createWebsocket() {
             stopInvoiceProcess();
             break;
 
-          case WSMessageType.StartSieg:
-            wsStartSieg(wsConnection, message);
-            break;
-          case WSMessageType.PauseSieg:
-            pauseSieg();
-            break;
-          case WSMessageType.ResumeSieg:
-            resumeSieg();
-            break;
-          case WSMessageType.StopSieg:
-            stopSieg();
-            break;
-
           case WSMessageType.StartUploadCertificates:
             wsStartUploadCertificates(wsConnection);
             break;
@@ -84,15 +69,6 @@ function createWebsocket() {
 
       function wsStartUploadCertificates(connection: connection) {
         startCertificateProcess(connection);
-      }
-
-      function wsStartSieg(connection: connection, message: IUtf8Message) {
-        const {
-          message: {
-            data: { dateInitial, dateEnd },
-          },
-        }: WSMessageTyped<{ dateInitial: string; dateEnd: string }> = JSON.parse(message.utf8Data);
-        startSieg(connection, parseISO(dateInitial), parseISO(dateEnd));
       }
     });
   });

@@ -7,7 +7,6 @@ import { Directories } from '@pages/Directories';
 import { Certificates } from '@pages/Certificates';
 import { RequireAuth } from '@components/auth/RequireAuth';
 import { Configuration } from './pages/Configuration';
-import { Sieg } from '@pages/Sieg';
 
 export default function App() {
   return (
@@ -44,14 +43,6 @@ export default function App() {
             element={
               <RequireAuth>
                 <Configuration />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/sieg"
-            element={
-              <RequireAuth>
-                <Sieg />
               </RequireAuth>
             }
           />

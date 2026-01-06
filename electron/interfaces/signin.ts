@@ -1,4 +1,4 @@
-import { ENivel } from "./user";
+import { ENivel } from './user';
 
 export interface IUserSittax {
   Id: string;
@@ -31,9 +31,6 @@ export interface ISignIn {
     Nome: string;
     Usuarios: IUserSittax[];
     Empresas: IEmpresa[];
-    ApiKeySieg: string;
-    EmailSieg: string;
-    SenhaSieg: string;
   };
   Token: string;
 }
