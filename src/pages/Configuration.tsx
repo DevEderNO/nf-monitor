@@ -22,11 +22,13 @@ export function Configuration() {
   const { state, dispatch } = useAppState();
   const [historic, setHistoric] = useState([] as string[]);
   const [viewUploadedFiles, setViewUploadedFiles] = useState(false);
+  const [removeUploadedFiles, setRemoveUploadedFiles] = useState(false);
 
   useEffect(() => {
     setHistoric(state?.historic ?? []);
     setViewUploadedFiles(state?.config?.viewUploadedFiles ?? false);
-  }, [state?.config?.viewUploadedFiles, state?.historic]);
+    setRemoveUploadedFiles(state?.config?.removeUploadedFiles ?? false);
+  }, [state?.config?.viewUploadedFiles, state?.config?.removeUploadedFiles, state?.historic]);
 
   const handleTimeForProcessing = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const config = await window.ipcRenderer.invoke('change-time-for-processing', e.target.value);
@@ -49,11 +51,23 @@ export function Configuration() {
     });
   };
 
+  const changeRemoveUploadedFiles = async () => {
+    const config = await window.ipcRenderer.invoke('change-remove-uploaded-files', !removeUploadedFiles);
+    dispatch({
+      type: ActionType.Config,
+      payload: config,
+    });
+  };
+
   return (
     <div className="p-4 flex flex-col gap-4 border rounded-md h-full overflow-hidden">
       <div className="flex items-center space-x-2">
         <Switch id="airplane-mode" checked={viewUploadedFiles} onClick={changeViewUploadedFiles} />
         <Label htmlFor="airplane-mode">Visualizar arquivos já enviados. (☑️)</Label>
+      </div>
+      <div className="flex items-center space-x-2">
+        <Switch id="airplane-mode" checked={removeUploadedFiles} onClick={changeRemoveUploadedFiles} />
+        <Label htmlFor="airplane-mode">Remover arquivos que já foram enviados para o Sittax do seu computador (recomendado). (🗑️)</Label>
       </div>
       <div className="flex gap-4">
         <div className="flex flex-col gap-2">

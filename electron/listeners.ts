@@ -141,6 +141,14 @@ export async function registerListeners(win: BrowserWindow | null) {
     } as IConfig);
   });
 
+  ipcMain.handle('change-remove-uploaded-files', async (_, removeUploadedFiles: boolean) => {
+    const data = await getConfiguration();
+    return await updateConfiguration({
+      ...data,
+      removeUploadedFiles: removeUploadedFiles,
+    } as IConfig);
+  });
+
   ipcMain.handle('change-time-for-processing', async (_, timeForProcessing: string) => {
     const data = await getConfiguration();
 

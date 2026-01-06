@@ -350,6 +350,7 @@ export async function recicleDb() {
   const config: IConfig = {
     timeForProcessing: db.timeForProcessing ?? '00:00',
     viewUploadedFiles: false,
+    removeUploadedFiles: false,
   };
   const directories: IDirectory[] =
     db.directories?.map(x => ({
