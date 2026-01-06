@@ -525,24 +525,6 @@ async function processDirectoryAsync(diretorio: string): Promise<IFileInfo[]> {
   return results;
 }
 
-export function clearCaches(): void {
-  diretorioCache.clear();
-  validationCache.clear();
-  fileStatsCache.clear();
-}
-
-export function getCacheStats(): {
-  directoryCache: number;
-  validationCache: number;
-  fileStatsCache: number;
-} {
-  return {
-    directoryCache: diretorioCache.size,
-    validationCache: validationCache.size,
-    fileStatsCache: fileStatsCache.size,
-  };
-}
-
 function validateTxt(fileInfo: IFileInfo): boolean {
   try {
     if (!fsSync.existsSync(fileInfo.filepath)) {

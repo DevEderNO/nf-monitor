@@ -36,6 +36,7 @@ export class InvoiceTask {
   hasError: boolean;
   historic: IDbHistoric;
   viewUploadedFiles: boolean = false;
+  removeUploadedFiles: boolean = false;
   auth: IAuth | null = null;
   max: number = 0;
   maxRetries: number = 3;
@@ -101,6 +102,7 @@ export class InvoiceTask {
       this.files = (await getFiles()).filter(x => !x.wasSend && x.isValid);
       this.filesSendedCount = await getCountFilesSended();
       this.viewUploadedFiles = (await getConfiguration())?.viewUploadedFiles ?? false;
+      this.removeUploadedFiles = (await getConfiguration())?.removeUploadedFiles ?? false;
 
       if (this.viewUploadedFiles && this.filesSendedCount > 0) {
         this.files.push(...(await getFiles()).filter(x => x.wasSend || !x.isValid));
@@ -469,6 +471,29 @@ export class InvoiceTask {
         this.max,
         ProcessamentoStatus.Running
       );
+
+      if (this.removeUploadedFiles) {
+        try {
+          if (fs.existsSync(this.files[index].filepath)) {
+            fs.unlinkSync(this.files[index].filepath);
+            await this.sendMessageClient(
+              `🗑️ Arquivo removido: ${this.files[index].filepath}`,
+              currentProgress,
+              index + 1,
+              this.max,
+              ProcessamentoStatus.Running
+            );
+          }
+        } catch (removeError) {
+          await this.sendMessageClient(
+            `⚠️ Não foi possível remover o arquivo: ${this.files[index].filepath} - ${removeError}`,
+            currentProgress,
+            index + 1,
+            this.max,
+            ProcessamentoStatus.Running
+          );
+        }
+      }
 
       return true;
     } catch (error: any) {
