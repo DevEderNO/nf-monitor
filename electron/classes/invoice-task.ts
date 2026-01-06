@@ -20,8 +20,6 @@ import {
 } from '../services/database';
 import { IAuth } from '../interfaces/auth';
 import { getTimestamp, timeout } from '../lib/time-utils';
-import { XHealthType } from '../interfaces/health-message';
-import { healthBrokerComunication } from '../services/health-broker-service';
 import * as path from 'path';
 import * as fs from 'fs';
 import AdmZip from 'adm-zip';
@@ -99,7 +97,6 @@ export class InvoiceTask {
       this.initializeProperties(connection);
       const directories = await getDirectories();
       await this.sendMessageClient('🔎 Realizando a descoberta dos arquivos');
-      await healthBrokerComunication(XHealthType.Info, `Iniciado processo de envio de arquivos para o Sittax`);
       await addFiles(await listarArquivos(directories.map(x => x.path)));
       this.files = (await getFiles()).filter(x => !x.wasSend && x.isValid);
       this.filesSendedCount = await getCountFilesSended();
@@ -126,7 +123,6 @@ export class InvoiceTask {
               0
             )} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`;
             await this.sendMessageClient(this.cancelledMessage, 0, index + 1, this.max, ProcessamentoStatus.Stopped);
-            await healthBrokerComunication(XHealthType.Warning, this.cancelledMessage);
             this.isCancelled = false;
             this.isPaused = false;
             this.hasError = false;
@@ -200,7 +196,6 @@ export class InvoiceTask {
           this.max,
           ProcessamentoStatus.Concluded
         );
-        await healthBrokerComunication(XHealthType.Success, `Não foram encontrados novos arquivos para o envio`);
       }
 
       const message = this.hasError
@@ -211,7 +206,6 @@ export class InvoiceTask {
         : `😁 Tarefa concluída. Foram enviados ${this.filesSendedCount} arquivos.`;
 
       await this.sendMessageClient(message, 100, this.max, this.max, ProcessamentoStatus.Concluded);
-      await healthBrokerComunication(this.hasError ? XHealthType.Error : XHealthType.Success, message);
     } catch (error) {
       await this.sendMessageClient(
         `❌ Houve um problema ao enviar os arquivos para o Sittax: ${error}`,
@@ -219,11 +213,6 @@ export class InvoiceTask {
         lastProcessedIndex,
         this.max,
         ProcessamentoStatus.Running
-      );
-
-      await healthBrokerComunication(
-        XHealthType.Error,
-        `Houve um problema ao enviar os arquivos para o Sittax. Continuando do arquivo ${lastProcessedIndex + 1}`
       );
 
       await this.continueFromIndex(lastProcessedIndex);
@@ -356,10 +345,7 @@ export class InvoiceTask {
               this.max,
               ProcessamentoStatus.Stopped
             );
-            await healthBrokerComunication(
-              XHealthType.Error,
-              `Não foi possível autenticar no Sittax após ${maxAuthRetries} tentativas`
-            );
+
             return false;
           }
           await timeout(2000);

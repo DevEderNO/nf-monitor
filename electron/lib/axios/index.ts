@@ -3,7 +3,6 @@ import { decrypt } from '../cryptography';
 import { createReadStream } from 'fs';
 import FormData from 'form-data';
 import { ISignIn } from '../../interfaces/signin';
-import { NFMoniotorHealth } from '../../interfaces/health-message';
 import { handleAxiosError } from './error-handle';
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -26,11 +25,6 @@ const webApi = axios.create({
   maxBodyLength: 1000 * 1024 * 1024, // 1GB
 });
 
-const apiHealthBroker = axios.create({
-  baseURL: import.meta.env.VITE_API_HEALTH_BROKER_URL,
-  timeout: 20000,
-});
-
 export async function checkRoute(url: string) {
   try {
     await axios.head(url);
@@ -42,15 +36,15 @@ export async function checkRoute(url: string) {
 
 export async function signIn(username: string, password: string, useCryptography?: boolean): Promise<ISignIn> {
   try {
-  const currentPassword = useCryptography ? decrypt(password) : password;
-  const resp = await apiAuth.get<ISignIn>(`auth/logar-nfe-monitor`, {
-    params: {
-      usuario: username,
-      senha: currentPassword,
-    },
-    headers: {
-      Origin: 'https://app.sittax.com.br',
-    },
+    const currentPassword = useCryptography ? decrypt(password) : password;
+    const resp = await apiAuth.get<ISignIn>(`auth/logar-nfe-monitor`, {
+      params: {
+        usuario: username,
+        senha: currentPassword,
+      },
+      headers: {
+        Origin: 'https://app.sittax.com.br',
+      },
     });
     return resp.data;
   } catch (error) {
@@ -114,20 +108,4 @@ export async function retryCertificate(
 export async function upload(token: string, filepath: string, invoices: boolean) {
   if (invoices) await retry('upload/importar-arquivo', filepath, token, 5);
   else await retryCertificate('v2/nova-implantacao/importar-arquivo', filepath, token, 5);
-}
-
-export async function healthBrokerSetHealf(message: NFMoniotorHealth) {
-  try {
-    await apiHealthBroker.post('set-health', message);
-  } catch (error) {
-    if (error instanceof AxiosError) {
-      const errorMessage = handleAxiosError(error as AxiosError);
-      console.error('Erro ao enviar mensagem para o Health Broker', {
-        type: errorMessage.type,
-        message: errorMessage.message,
-      });
-    } else {
-      console.error('Erro ao enviar mensagem para o Health Broker', error);
-    }
-  }
 }
