@@ -1,0 +1,39 @@
+name: Build/release Electron app
+
+on:
+  push:
+    tags:
+      - rc*.*.*
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [windows-latest]
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v3
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install Dependencies
+        run: yarn
+
+      - name: build-win
+        if: matrix.os == 'windows-latest'
+        env:
+          GH_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          VITE_API_AUTH_URL: ${{ vars.VITE_API_AUTH_URL_HOMOLOG }}
+          VITE_API_UPLOAD_URL: ${{ vars.VITE_API_UPLOAD_URL_HOMOLOG }}
+          VITE_GITHUB_TOKEN: ${{ vars.VITE_GITHUB_TOKEN_HOMOLOG }}
+          VITE_PASSWORD_SECRET: ${{ vars.VITE_PASSWORD_SECRET_HOMOLOG }}
+          VITE_API_HEALTH_BROKER_URL: ${{ vars.VITE_API_HEALTH_BROKER_URL_HOMOLOG }}
+          VITE_API_SIEG_URL: ${{ vars.VITE_API_SIEG_URL_HOMOLOG }}
+          VITE_WEB_API_URL: ${{ vars.VITE_WEB_API_URL_HOMOLOG }}
+        run: yarn build:win
