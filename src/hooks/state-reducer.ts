@@ -42,6 +42,7 @@ export const initialState: IState = {
   config: {
     viewUploadedFiles: false,
     timeForProcessing: '00:00',
+    removeUploadedFiles: false,
   },
 };
 
