@@ -9,6 +9,8 @@
   files: [
     "dist",
     "dist-electron",
+    "node_modules/@prisma/client/**/*",
+    "node_modules/.prisma/**/*",
     {
       from: "resources",
       to: "dist-electron",
@@ -26,18 +28,14 @@
     },
     {
       "from": "node_modules/@prisma/engines",
-      "to": "prisma-engines",
-      "filter": ["migration-engine*", "libquery_engine*", "schema-engine*"]
-    },
-    {
-      "from": "node_modules/.prisma",
-      "to": "node_modules/.prisma"
+      "to": "prisma-engines"
     }
   ],
   asarUnpack: [
     "**/node_modules/@arbs.io/asset-extractor-wasm/**",
-    "**/prisma-engines/**",
-    "**/node_modules/.prisma/**"
+    "**/node_modules/@prisma/**",
+    "**/node_modules/.prisma/**",
+    "**/prisma-engines/**"
   ],
   publish: [
     {

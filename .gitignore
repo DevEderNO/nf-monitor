@@ -28,4 +28,5 @@ release
 *.development
 *.production
 *.db
+*db*
 migration_lock.toml
