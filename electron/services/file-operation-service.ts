@@ -8,7 +8,7 @@ import { IFile } from '../interfaces/file';
 import { IDirectory } from '../interfaces/directory';
 import { isBefore, addMonths } from 'date-fns';
 import { getDataEmissao } from '../lib/nfse-utils';
-import prisma from '../lib/prisma';
+import prisma, { recreateDatabase } from '../lib/prisma';
 
 const VALID_EXTENSIONS = new Set(['.xml', '.pdf', '.zip', '.txt', '.pfx']);
 
@@ -270,22 +270,34 @@ export function validateDFileExists(fileInfo: IFileInfo): boolean {
 }
 
 export async function applyMigrations(): Promise<void> {
-  const meta = await prisma.appMeta.findUnique({ where: { id: 1 } });
+  try {
+    const meta = await prisma.appMeta.findUnique({
+      where: { id: 1 },
+    });
 
-  if (!meta) return;
+    // Banco sem metadata = antigo ou inválido
+    if (!meta) {
+      throw new Error('AppMeta inexistente');
+    }
 
-  // Exemplo de migration my friend do futuro:
-  //
-  // if (meta.dbVersion < 20260114) {
-  //   await prisma.$executeRawUnsafe(`
-  //     ALTER TABLE AppMeta ADD COLUMN ColunaTeste TEXT;
-  //   `);
-  //
-  //   await prisma.appMeta.update({
-  //     where: { id: 1 },
-  //     data: { dbVersion: 20260114 },
-  //   });
-  // }
+    // Exemplo de migration futura
+    //
+    // if (meta.dbVersion < 20260114) {
+    //   await prisma.$executeRawUnsafe(`
+    //     ALTER TABLE AppMeta ADD COLUMN ColunaTeste TEXT;
+    //   `);
+    //
+    //   await prisma.appMeta.update({
+    //     where: { id: 1 },
+    //     data: { dbVersion: 20260114 },
+    //   });
+    // }
+
+  } catch (error) {
+    console.error('[DB] Erro ao aplicar migrations, resetando banco:', error);
+
+    recreateDatabase();
+  }
 }
 
 export function createDirectoryFolder(directoryPath: string) {
