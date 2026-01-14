@@ -1,60 +1,30 @@
 import { PrismaClient } from '@prisma/client';
-import path from 'path';
 import { app } from 'electron';
+import path from 'path';
 import fs from 'fs';
+
+const DB_NAME = 'nfmonitor.db';
+
+function ensureDatabaseExists() {
+  if (!app.isPackaged) return;
+
+  const userDbPath = path.join(app.getPath('userData'), DB_NAME);
+  const bundledDbPath = path.join(process.resourcesPath, 'prisma', 'dev.db');
+
+  if (!fs.existsSync(userDbPath)) {
+    fs.copyFileSync(bundledDbPath, userDbPath);
+  }
+}
 
 export function getDatabaseUrl(): string {
   const dbPath = app.isPackaged
-    ? path.join(app.getPath('userData'), 'nfmonitor.db')
+    ? path.join(app.getPath('userData'), DB_NAME)
     : path.join(__dirname, '..', 'prisma', 'dev.db');
+
   return `file:${dbPath}`;
 }
 
-function getPrismaEnginesPath() {
-  if (!app.isPackaged) {
-    return {};
-  }
-
-  const platform = process.platform;
-  const resourcesPath = process.resourcesPath;
-
-  let queryEngineFileName: string;
-  let schemaEngineFileName: string;
-
-  if (platform === 'win32') {
-    queryEngineFileName = 'query_engine-windows.dll.node';
-    schemaEngineFileName = 'schema-engine-windows.exe';
-  } else if (platform === 'darwin') {
-    const arch = process.arch === 'arm64' ? 'darwin-arm64' : 'darwin';
-    queryEngineFileName = `libquery_engine-${arch}.dylib.node`;
-    schemaEngineFileName = 'schema-engine-darwin';
-  } else {
-    queryEngineFileName = 'libquery_engine-debian-openssl-3.0.x.so.node';
-    schemaEngineFileName = 'schema-engine-debian-openssl-3.0.x';
-  }
-
-  const enginesPath = path.join(resourcesPath, 'prisma-engines');
-
-  const queryEnginePath = path.join(enginesPath, queryEngineFileName);
-  const schemaEnginePath = path.join(enginesPath, schemaEngineFileName);
-
-  if (fs.existsSync(queryEnginePath)) {
-    process.env.PRISMA_QUERY_ENGINE_LIBRARY = queryEnginePath;
-  }
-
-  if (fs.existsSync(schemaEnginePath)) {
-    process.env.PRISMA_QUERY_ENGINE_BINARY = queryEnginePath;
-    process.env.PRISMA_MIGRATION_ENGINE_BINARY = schemaEnginePath;
-    process.env.PRISMA_INTROSPECTION_ENGINE_BINARY = schemaEnginePath;
-    process.env.PRISMA_FMT_BINARY = schemaEnginePath;
-  }
-
-  return {};
-}
-
-getPrismaEnginesPath();
-
-process.env.DATABASE_URL = getDatabaseUrl();
+ensureDatabaseExists();
 
 const prisma = new PrismaClient({
   datasources: {
@@ -62,7 +32,7 @@ const prisma = new PrismaClient({
       url: getDatabaseUrl(),
     },
   },
-  log: app.isPackaged ? ['error'] : ['query', 'error', 'warn'],
+  log: app.isPackaged ? ['error'] : ['query', 'warn', 'error'],
 });
 
 export default prisma;

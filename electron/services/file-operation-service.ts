@@ -1,18 +1,13 @@
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as path from 'node:path';
-import { execSync } from 'node:child_process';
 import { BrowserWindow, dialog, OpenDialogOptions } from 'electron';
 import AdmZip from 'adm-zip';
 import { IFileInfo } from '../interfaces/file-info';
 import { IFile } from '../interfaces/file';
 import { IDirectory } from '../interfaces/directory';
 import { isBefore, addMonths } from 'date-fns';
-import { app } from 'electron';
 import { getDataEmissao } from '../lib/nfse-utils';
-import { IDb } from '../interfaces/db';
-import { IConfig } from '../interfaces/config';
-import { signInSittax } from '../listeners';
 import prisma from '../lib/prisma';
 
 const VALID_EXTENSIONS = new Set(['.xml', '.pdf', '.zip', '.txt', '.pfx']);
@@ -30,7 +25,6 @@ const validationCache = new Map<string, { valid: boolean; isNotaFiscal: boolean 
 const fileStatsCache = new Map<string, fsSync.Stats>();
 
 const BATCH_SIZE = 100;
-const MAX_CONCURRENT_OPERATIONS = 10;
 
 export function selectDirectories(
   win: BrowserWindow,
@@ -257,8 +251,8 @@ export function getFilesZip(fileInfo: IFileInfo): IFile[] {
 
 // TODO - refazer essa validação sem lib externa
 function validatePdf(fileInfo: IFileInfo, certificate: boolean): boolean {
-  console.log(fileInfo)
-  console.log(certificate)
+  console.log(fileInfo);
+  console.log(certificate);
   return true;
 }
 
@@ -275,170 +269,23 @@ export function validateDFileExists(fileInfo: IFileInfo): boolean {
   return fsSync.existsSync(fileInfo.filepath);
 }
 
-export async function copyMigrations(): Promise<void> {
-  try {
-    if (!app.isPackaged) return;
-
-    const prismaMigrations = path.join(process.resourcesPath, 'prisma');
-    const userDataPath = app.getPath('userData');
-
-    await copyRecursiveAsync(prismaMigrations, userDataPath);
-
-    console.log('Migrations copiadas com sucesso');
-  } catch (error) {
-    console.error('Erro ao copiar migrations:', error);
-  }
-}
-
 export async function applyMigrations(): Promise<void> {
-  try {
-    if (!app.isPackaged) {
-      execSync('npx prisma migrate deploy', {
-        cwd: process.cwd(),
-        stdio: 'pipe',
-      });
-      return;
-    }
+  const meta = await prisma.appMeta.findUnique({ where: { id: 1 } });
 
-    const resourcesPath = process.resourcesPath.replace('app.asar', 'app.asar.unpacked');
+  if (!meta) return;
 
-    const migrationEnginePath = path.join(
-      resourcesPath,
-      'prisma-engines',
-      process.platform === 'win32' ? 'migration-engine.exe' : 'migration-engine'
-    );
-
-    const prismaSchema = path.join(app.getPath('userData'), 'schema.prisma');
-    const dbPath = path.join(app.getPath('userData'), 'nfmonitor.db');
-
-    let schemaContent = fsSync.readFileSync(prismaSchema, 'utf-8');
-    schemaContent = schemaContent.replace('file:./dev.db', `file:${dbPath}`);
-    fsSync.writeFileSync(prismaSchema, schemaContent, 'utf-8');
-
-    if (!fsSync.existsSync(migrationEnginePath)) {
-      throw new Error(`Migration engine não encontrado em: ${migrationEnginePath}`);
-    }
-
-    if (process.platform !== 'win32') {
-      execSync(`chmod +x "${migrationEnginePath}"`, { stdio: 'ignore' });
-    }
-
-    execSync(`"${migrationEnginePath}" cli migrate deploy`, {
-      stdio: 'pipe',
-      timeout: 60000,
-      env: {
-        ...process.env,
-        DATABASE_URL: `file:${dbPath}`,
-        PRISMA_SCHEMA_PATH: prismaSchema,
-        PRISMA_MIGRATION_TABLE_NAME: '_prisma_migrations',
-      },
-      cwd: app.getPath('userData'),
-    });
-
-    console.log('Migrations aplicadas com sucesso');
-  } catch (error) {
-    console.error('Erro ao aplicar migrations:', error);
-    throw error;
-  }
-}
-
-export async function recicleDb() {
-  if (!app.isPackaged) return;
-  const dbPath = path.join(app.getPath('userData'), 'db.json');
-  if (!fsSync.existsSync(dbPath)) return;
-  const db: IDb = JSON.parse(fsSync.readFileSync(dbPath, 'utf-8'));
-  const config: IConfig = {
-    timeForProcessing: db.timeForProcessing ?? '00:00',
-    viewUploadedFiles: false,
-    removeUploadedFiles: false,
-  };
-  const directories: IDirectory[] =
-    db.directories?.map(x => ({
-      ...x,
-      directories: 0,
-      xmls: 0,
-      pdfs: 0,
-      txts: 0,
-      zips: 0,
-      totalFiles: 0,
-      pfx: 0,
-    })) ?? [];
-
-  const discoredDirecories: IDirectory[] =
-    db.directoriesAndSubDirectories?.map(x => ({
-      ...x,
-      directories: 0,
-      xmls: 0,
-      pdfs: 0,
-      txts: 0,
-      zips: 0,
-      pfx: 0,
-      totalFiles: 0,
-    })) ?? [];
-
-  const files: IFileInfo[] =
-    db.files?.map(x => ({
-      filepath: x.filepath,
-      filename: x.name,
-      extension: x.extension,
-      wasSend: x.wasSend,
-      dataSend: x.dataSend,
-      isValid: x.isValid,
-      isDirectory: x.isDirectory,
-      bloqued: x.bloqued,
-      isFile: x.isFile,
-      modifiedtime: x.modifiedtime,
-      size: x.size,
-    })) ?? [];
-  await prisma.file.createMany({ data: files });
-  await prisma.directory.createMany({ data: directories });
-  await prisma.directoryDiscovery.createMany({ data: discoredDirecories });
-  await prisma.configuration.create({ data: config });
-  await signInSittax(db.auth?.credentials?.user ?? '', db.auth?.credentials?.password ?? '', true);
-  const newDbPath = dbPath.replace('db.json', 'oldDb.json');
-  fsSync.renameSync(dbPath, newDbPath);
-}
-
-async function copyRecursiveAsync(srcDir: string, destDir: string): Promise<void> {
-  await fs.mkdir(destDir, { recursive: true });
-
-  const entries = await fs.readdir(srcDir, { withFileTypes: true });
-
-  const semaphore = new Array(MAX_CONCURRENT_OPERATIONS).fill(null);
-  let index = 0;
-
-  const processEntry = async () => {
-    while (index < entries.length) {
-      const entry = entries[index++];
-      const srcPath = path.join(srcDir, entry.name);
-      const destPath = path.join(destDir, entry.name);
-
-      if (entry.isDirectory()) {
-        await copyRecursiveAsync(srcPath, destPath);
-      } else {
-        await fs.copyFile(srcPath, destPath);
-      }
-    }
-  };
-
-  await Promise.all(semaphore.map(() => processEntry()));
-}
-
-export function copyRecursive(srcDir: string, destDir: string) {
-  fsSync.mkdirSync(destDir, { recursive: true });
-
-  const entries = fsSync.readdirSync(srcDir, { withFileTypes: true });
-
-  for (const entry of entries) {
-    const srcPath = path.join(srcDir, entry.name);
-    const destPath = path.join(destDir, entry.name);
-
-    if (entry.isDirectory()) {
-      copyRecursive(srcPath, destPath);
-    } else {
-      fsSync.copyFileSync(srcPath, destPath);
-    }
-  }
+  // Exemplo de migration my friend do futuro:
+  //
+  // if (meta.dbVersion < 20260114) {
+  //   await prisma.$executeRawUnsafe(`
+  //     ALTER TABLE AppMeta ADD COLUMN ColunaTeste TEXT;
+  //   `);
+  //
+  //   await prisma.appMeta.update({
+  //     where: { id: 1 },
+  //     data: { dbVersion: 20260114 },
+  //   });
+  // }
 }
 
 export function createDirectoryFolder(directoryPath: string) {

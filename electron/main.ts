@@ -3,7 +3,7 @@ import path from 'node:path';
 import { registerListeners } from './listeners';
 import { createWebsocket } from './websocket';
 import { autoUpdater } from 'electron-updater';
-import { applyMigrations, copyMigrations, recicleDb } from './services/file-operation-service';
+import { applyMigrations } from './services/file-operation-service';
 import { logError } from './services/error-service';
 import { ErrorType } from '@prisma/client';
 import { powerSaveBlocker } from 'electron';
@@ -220,9 +220,7 @@ function createWindow() {
 }
 
 app.on('ready', async () => {
-  await copyMigrations();
   await applyMigrations();
-  await recicleDb();
 
   const isSecondInstance = app.requestSingleInstanceLock();
   if (isSecondInstance) {

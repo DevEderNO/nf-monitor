@@ -3,62 +3,62 @@
   appId: "YourAppID",
   asar: true,
   productName: "nf-monitor",
+
   directories: {
     output: "release/${version}",
   },
+
   files: [
     "dist",
     "dist-electron",
-    "node_modules/@prisma/client/**/*",
-    "node_modules/.prisma/**/*",
     {
       from: "resources",
       to: "dist-electron",
     },
+    "!node_modules/@prisma/**",
+    "!node_modules/.prisma/**"
   ],
+
   extraResources: [
     {
-      "from": "node_modules/@arbs.io/asset-extractor-wasm/asset-extractor-wasm_bg.wasm",
-      "to": "dist-electron/asset-extractor-wasm_bg.wasm"
+      from: "node_modules/@arbs.io/asset-extractor-wasm/asset-extractor-wasm_bg.wasm",
+      to: "dist-electron/asset-extractor-wasm_bg.wasm"
     },
     {
-      "from": "prisma",
-      "to": "prisma",
-      "filter": ["schema.prisma", "migrations/**/*"]
+      from: "prisma",
+      to: "prisma",
+      filter: ["dev.db"]
     },
     {
-      "from": "node_modules/@prisma/engines",
-      "to": "prisma-engines"
+      from: "node_modules/.prisma/client",
+      to: "node_modules/.prisma/client"
+    },
+    {
+      from: "node_modules/@prisma/client",
+      to: "node_modules/@prisma/client"
     }
   ],
-  asarUnpack: [
-    "**/node_modules/@arbs.io/asset-extractor-wasm/**",
-    "**/node_modules/@prisma/**",
-    "**/node_modules/.prisma/**",
-    "**/prisma-engines/**"
-  ],
+
   publish: [
     {
       provider: "github",
       owner: "DevEderNO",
       repo: "nf-monitor",
       releaseType: "release",
-    },
+    }
   ],
+
   mac: {
     target: ["dmg"],
     artifactName: "${productName}-Mac-${version}-Installer.${ext}",
   },
+
   win: {
     icon: "dist/sittax.png",
-    target: [
-      {
-        target: "nsis",
-        arch: ["x64"],
-      },
-    ],
+    target: [{ target: "nsis", arch: ["x64"] }],
     artifactName: "${productName}-Windows-${version}-Setup.${ext}",
   },
+
   nsis: {
     oneClick: true,
     perMachine: true,
@@ -69,8 +69,10 @@
     deleteAppDataOnUninstall: false,
     installerLanguages: ["pt_BR"],
   },
+
   linux: {
     target: ["AppImage"],
     artifactName: "${productName}-Linux-${version}.${ext}",
   },
 }
+
