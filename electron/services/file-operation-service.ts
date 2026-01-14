@@ -8,7 +8,7 @@ import { IFile } from '../interfaces/file';
 import { IDirectory } from '../interfaces/directory';
 import { isBefore, addMonths } from 'date-fns';
 import { getDataEmissao } from '../lib/nfse-utils';
-import prisma, { recreateDatabase } from '../lib/prisma';
+import prisma, { resetUserData } from '../lib/prisma';
 
 const VALID_EXTENSIONS = new Set(['.xml', '.pdf', '.zip', '.txt', '.pfx']);
 
@@ -269,18 +269,29 @@ export function validateDFileExists(fileInfo: IFileInfo): boolean {
   return fsSync.existsSync(fileInfo.filepath);
 }
 
+let migrationAttempted = false;
+let migrationRetriedAfterReset = false;
+
 export async function applyMigrations(): Promise<void> {
+  if (migrationRetriedAfterReset) {
+    console.error('[DB] Migração já tentou após reset e falhou. Abortando definitivamente.');
+    return;
+  }
+
   try {
+    migrationAttempted = true;
+
     const meta = await prisma.appMeta.findUnique({
       where: { id: 1 },
     });
 
-    // Banco sem metadata = antigo ou inválido
     if (!meta) {
       throw new Error('AppMeta inexistente');
     }
 
-    // Exemplo de migration futura
+    // ---------------------------
+    // MIGRATIONS FUTURAS
+    // ---------------------------
     //
     // if (meta.dbVersion < 20260114) {
     //   await prisma.$executeRawUnsafe(`
@@ -293,10 +304,22 @@ export async function applyMigrations(): Promise<void> {
     //   });
     // }
 
+    console.log('[DB] Migrações aplicadas com sucesso');
   } catch (error) {
-    console.error('[DB] Erro ao aplicar migrations, resetando banco:', error);
+    console.error('[DB] Erro ao aplicar migrations:', error);
 
-    recreateDatabase();
+    if (migrationAttempted && migrationRetriedAfterReset) {
+      console.error('[DB] Falha definitiva após reset.');
+      return;
+    }
+
+    console.warn('[DB] Resetando ambiente e tentando novamente...');
+
+    migrationRetriedAfterReset = true;
+
+    resetUserData();
+
+    await applyMigrations();
   }
 }
 

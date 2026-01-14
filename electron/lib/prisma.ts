@@ -31,26 +31,34 @@ function getUserDbPath() {
 }
 
 function getBundledDbPath() {
-  return path.join(process.resourcesPath, 'prisma', 'dev.db');
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'prisma', 'dev.db')
+    : path.join(process.cwd(), 'prisma', 'dev.db');
 }
 
-export function recreateDatabase() {
+export function resetUserData(): void {
   const userDataDir = app.getPath('userData');
-  const userDbPath = getUserDbPath();
 
   try {
     prisma.$disconnect().catch(() => {});
 
-    if (fs.existsSync(userDbPath)) {
-      fs.unlinkSync(userDbPath);
+    if (fs.existsSync(userDataDir)) {
+      fs.rmSync(userDataDir, {
+        recursive: true,
+        force: true,
+      });
     }
 
     fs.mkdirSync(userDataDir, { recursive: true });
-    fs.copyFileSync(getBundledDbPath(), userDbPath);
 
-    console.warn('[DB] Banco recriado automaticamente');
+    const bundledDbPath = getBundledDbPath();
+    const userDbPath = getUserDbPath();
+
+    fs.copyFileSync(bundledDbPath, userDbPath);
+
+    console.warn('[APP] userData resetado com sucesso');
   } catch (err) {
-    console.error('[DB] Falha crítica ao recriar banco', err);
+    console.error('[APP] Falha crítica ao resetar userData', err);
   }
 }
 
