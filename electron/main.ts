@@ -235,7 +235,7 @@ app.on('ready', async () => {
 
 autoUpdater.setFeedURL({
   provider: 'github',
-  owner: 'DevEderNO',
+  owner: 'Sittax',
   repo: 'nf-monitor',
   releaseType: 'release',
 });
