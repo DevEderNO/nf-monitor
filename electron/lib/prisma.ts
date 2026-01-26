@@ -26,42 +26,6 @@ export function getDatabaseUrl(): string {
 
 ensureDatabaseExists();
 
-function getUserDbPath() {
-  return path.join(app.getPath('userData'), DB_NAME);
-}
-
-function getBundledDbPath() {
-  return app.isPackaged
-    ? path.join(process.resourcesPath, 'prisma', 'dev.db')
-    : path.join(process.cwd(), 'prisma', 'dev.db');
-}
-
-export function resetUserData(): void {
-  const userDataDir = app.getPath('userData');
-
-  try {
-    prisma.$disconnect().catch(() => {});
-
-    if (fs.existsSync(userDataDir)) {
-      fs.rmSync(userDataDir, {
-        recursive: true,
-        force: true,
-      });
-    }
-
-    fs.mkdirSync(userDataDir, { recursive: true });
-
-    const bundledDbPath = getBundledDbPath();
-    const userDbPath = getUserDbPath();
-
-    fs.copyFileSync(bundledDbPath, userDbPath);
-
-    console.warn('[APP] userData resetado com sucesso');
-  } catch (err) {
-    console.error('[APP] Falha crítica ao resetar userData', err);
-  }
-}
-
 const prisma = new PrismaClient({
   datasources: {
     db: {

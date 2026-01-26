@@ -9,7 +9,6 @@ datasource db {
 
 model AppMeta {
   id        Int      @id @default(1)
-  dbVersion Int
 }
 
 model Auth {
