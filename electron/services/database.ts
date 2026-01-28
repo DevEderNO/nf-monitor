@@ -443,32 +443,3 @@ export async function addError(data: { message: string; stack: string; type: Err
   await prisma.error.create({ data });
 }
 
-async function clearDatabase(): Promise<void> {
-  await prisma.$transaction(async tx => {
-    await tx.error.deleteMany();
-    await tx.historic.deleteMany();
-    await tx.file.deleteMany();
-    await tx.directoryDiscovery.deleteMany();
-    await tx.directory.deleteMany();
-  });
-}
-
-export async function applyMigrations(): Promise<void> {
-  clearDatabase();
-
-  //
-  // Migration 1
-  //
-  await prisma.$transaction(async tx => {
-    await tx.$executeRaw`
-      CREATE TABLE IF NOT EXISTS AppMeta (
-        id INTEGER PRIMARY KEY
-      )
-    `;
-
-    await tx.$executeRaw`
-      INSERT OR IGNORE INTO AppMeta (id)
-      VALUES (1 )
-    `;
-  });
-}

@@ -3,7 +3,6 @@ import path from 'node:path';
 import { registerListeners } from './listeners';
 import { createWebsocket } from './websocket';
 import { autoUpdater } from 'electron-updater';
-import { applyMigrations } from './services/database.ts';
 import { logError } from './services/error-service';
 import { ErrorType } from '@prisma/client';
 import { powerSaveBlocker } from 'electron';
@@ -209,8 +208,6 @@ function createWindow() {
 }
 
 app.on('ready', async () => {
-  await applyMigrations();
-
   const isSecondInstance = app.requestSingleInstanceLock();
   if (isSecondInstance) {
     createWebsocket();
