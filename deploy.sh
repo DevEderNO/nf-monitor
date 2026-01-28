@@ -100,7 +100,7 @@ check_version_tag() {
 
 install_dependencies() {
     print_step "Instalando dependencias..."
-    npm install
+    yarn install
     print_success "Dependencias instaladas."
 }
 
@@ -123,16 +123,16 @@ build_app() {
 
     case $platform in
         win)
-            npm run build:win
+            yarn run build:win
             ;;
         mac)
-            npm run build:mac
+            yarn run build:mac
             ;;
         linux)
-            npm run build:linux
+            yarn run build:linux
             ;;
         all)
-            npm run build
+            yarn run build
             ;;
         *)
             print_error "Plataforma desconhecida: $platform"
