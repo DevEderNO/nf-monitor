@@ -57,7 +57,7 @@ function createWindow() {
     });
   }
 
-  const icon = nativeImage.createFromPath(path.join(envVitePublic, 'sittax.png'));
+  const icon = nativeImage.createFromPath(path.join(envVitePublic, 'sittax.png')).resize({ width: 32, height: 32 });
 
   tray = new Tray(icon);
   tray.setTitle('NFMonitor');
