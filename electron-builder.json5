@@ -1,7 +1,6 @@
 {
   $schema: "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  appId: "YourAppID",
-  asar: true,
+  appId: "com.sittax.nf-monitor",
   productName: "nf-monitor",
 
   directories: {
@@ -11,10 +10,6 @@
   files: [
     "dist",
     "dist-electron",
-    {
-      from: "resources",
-      to: "dist-electron",
-    },
     "!node_modules/@prisma/**",
     "!node_modules/.prisma/**"
   ],
@@ -39,14 +34,12 @@
     }
   ],
 
-  publish: [
-    {
-      provider: "github",
-      owner: "DevEderNO",
-      repo: "nf-monitor",
-      releaseType: "release",
-    }
-  ],
+  publish: {
+    provider: "github",
+    owner: "DevEderNO",
+    repo: "nf-monitor",
+    releaseType: "release",
+  },
 
   mac: {
     target: ["dmg"],
@@ -62,12 +55,10 @@
   nsis: {
     oneClick: true,
     perMachine: true,
-    allowElevation: true,
-    allowToChangeInstallationDirectory: false,
     installerIcon: "dist/sittax.ico",
     installerHeaderIcon: "dist/sittax.ico",
-    deleteAppDataOnUninstall: false,
     installerLanguages: ["pt_BR"],
+    deleteAppDataOnUninstall: true,
   },
 
   linux: {

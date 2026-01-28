@@ -202,7 +202,7 @@ function createWindow() {
   if (!VITE_DEV_SERVER_URL) {
     app.setLoginItemSettings({
       openAtLogin: true,
-      openAsHidden: true, // Mantém oculto no início
+      openAsHidden: false,
       path: app.getPath('exe'),
     });
   }
