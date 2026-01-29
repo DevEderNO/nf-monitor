@@ -223,7 +223,6 @@ autoUpdater.setFeedURL({
   provider: 'github',
   owner: 'DevEderNO',
   repo: 'nf-monitor',
-  releaseType: 'release',
 });
 
 setInterval(() => {
