@@ -8,7 +8,6 @@ import { IFile } from '../interfaces/file';
 import { IDirectory } from '../interfaces/directory';
 import { isBefore, addMonths } from 'date-fns';
 import { getDataEmissao } from '../lib/nfse-utils';
-import prisma, { resetUserData } from '../lib/prisma';
 
 const VALID_EXTENSIONS = new Set(['.xml', '.pdf', '.zip', '.txt', '.pfx']);
 
@@ -267,60 +266,6 @@ export function validateDiretoryFileExists(fileInfo: IFileInfo): boolean {
 
 export function validateDFileExists(fileInfo: IFileInfo): boolean {
   return fsSync.existsSync(fileInfo.filepath);
-}
-
-let migrationAttempted = false;
-let migrationRetriedAfterReset = false;
-
-export async function applyMigrations(): Promise<void> {
-  if (migrationRetriedAfterReset) {
-    console.error('[DB] Migração já tentou após reset e falhou. Abortando definitivamente.');
-    return;
-  }
-
-  try {
-    migrationAttempted = true;
-
-    const meta = await prisma.appMeta.findUnique({
-      where: { id: 1 },
-    });
-
-    if (!meta) {
-      throw new Error('AppMeta inexistente');
-    }
-
-    // ---------------------------
-    // MIGRATIONS FUTURAS
-    // ---------------------------
-    //
-    // if (meta.dbVersion < 20260114) {
-    //   await prisma.$executeRawUnsafe(`
-    //     ALTER TABLE AppMeta ADD COLUMN ColunaTeste TEXT;
-    //   `);
-    //
-    //   await prisma.appMeta.update({
-    //     where: { id: 1 },
-    //     data: { dbVersion: 20260114 },
-    //   });
-    // }
-
-    console.log('[DB] Migrações aplicadas com sucesso');
-  } catch (error) {
-    console.error('[DB] Erro ao aplicar migrations:', error);
-
-    if (migrationAttempted && migrationRetriedAfterReset) {
-      console.error('[DB] Falha definitiva após reset.');
-      return;
-    }
-
-    console.warn('[DB] Resetando ambiente e tentando novamente...');
-
-    migrationRetriedAfterReset = true;
-
-    resetUserData();
-
-    await applyMigrations();
-  }
 }
 
 export function createDirectoryFolder(directoryPath: string) {

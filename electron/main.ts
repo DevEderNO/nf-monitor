@@ -3,32 +3,20 @@ import path from 'node:path';
 import { registerListeners } from './listeners';
 import { createWebsocket } from './websocket';
 import { autoUpdater } from 'electron-updater';
-import { applyMigrations } from './services/file-operation-service';
 import { logError } from './services/error-service';
 import { ErrorType } from '@prisma/client';
 import { powerSaveBlocker } from 'electron';
 
-// The built directory structure
-//
-// ├─┬─┬ dist
-// │ │ └── index.html
-// │ │
-// │ ├─┬ dist-electron
-// │ │ ├── main.js
-// │ │ └── preload.js
-// │
 process.env.DIST = path.join(__dirname, '../dist');
 const envVitePublic = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public');
 process.env.VITE_PUBLIC = envVitePublic;
 
 let win: BrowserWindow | null;
 let tray: Tray;
-// 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 
 app.setAppUserModelId('Monitor');
 
-// Impede que o sistema entre em suspensão
 const id = powerSaveBlocker.start('prevent-app-suspension');
 
 function createWindow() {
@@ -69,7 +57,7 @@ function createWindow() {
     });
   }
 
-  const icon = nativeImage.createFromPath(path.join(envVitePublic, 'sittax.png'));
+  const icon = nativeImage.createFromPath(path.join(envVitePublic, 'sittax.png')).resize({ width: 32, height: 32 });
 
   tray = new Tray(icon);
   tray.setTitle('NFMonitor');
@@ -213,15 +201,13 @@ function createWindow() {
   if (!VITE_DEV_SERVER_URL) {
     app.setLoginItemSettings({
       openAtLogin: true,
-      openAsHidden: true, // Mantém oculto no início
+      openAsHidden: false,
       path: app.getPath('exe'),
     });
   }
 }
 
 app.on('ready', async () => {
-  await applyMigrations();
-
   const isSecondInstance = app.requestSingleInstanceLock();
   if (isSecondInstance) {
     createWebsocket();

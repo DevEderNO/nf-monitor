@@ -442,3 +442,4 @@ export async function clearHistoric(): Promise<void> {
 export async function addError(data: { message: string; stack: string; type: ErrorType }): Promise<void> {
   await prisma.error.create({ data });
 }
+

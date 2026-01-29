@@ -4,16 +4,43 @@ import path from 'path';
 import fs from 'fs';
 
 const DB_NAME = 'nfmonitor.db';
+const SCHEMA_VERSION_FILE = 'schema-version.txt';
+
+const CURRENT_SCHEMA_VERSION = '1';
 
 function ensureDatabaseExists() {
   if (!app.isPackaged) return;
 
-  const userDbPath = path.join(app.getPath('userData'), DB_NAME);
+  const userDataPath = app.getPath('userData');
+  const userDbPath = path.join(userDataPath, DB_NAME);
+  const versionFilePath = path.join(userDataPath, SCHEMA_VERSION_FILE);
   const bundledDbPath = path.join(process.resourcesPath, 'prisma', 'dev.db');
 
+  // Check if schema version changed
+  let needsRecreate = false;
+
+  if (fs.existsSync(versionFilePath)) {
+    const storedVersion = fs.readFileSync(versionFilePath, 'utf-8').trim();
+    if (storedVersion !== CURRENT_SCHEMA_VERSION) {
+      needsRecreate = true;
+    }
+  } else if (fs.existsSync(userDbPath)) {
+    // Database exists but no version file - old installation, needs recreation
+    needsRecreate = true;
+  }
+
+  // Delete old database if schema changed
+  if (needsRecreate && fs.existsSync(userDbPath)) {
+    fs.unlinkSync(userDbPath);
+  }
+
+  // Copy fresh database if needed
   if (!fs.existsSync(userDbPath)) {
     fs.copyFileSync(bundledDbPath, userDbPath);
   }
+
+  // Save current schema version
+  fs.writeFileSync(versionFilePath, CURRENT_SCHEMA_VERSION);
 }
 
 export function getDatabaseUrl(): string {
@@ -25,42 +52,6 @@ export function getDatabaseUrl(): string {
 }
 
 ensureDatabaseExists();
-
-function getUserDbPath() {
-  return path.join(app.getPath('userData'), DB_NAME);
-}
-
-function getBundledDbPath() {
-  return app.isPackaged
-    ? path.join(process.resourcesPath, 'prisma', 'dev.db')
-    : path.join(process.cwd(), 'prisma', 'dev.db');
-}
-
-export function resetUserData(): void {
-  const userDataDir = app.getPath('userData');
-
-  try {
-    prisma.$disconnect().catch(() => {});
-
-    if (fs.existsSync(userDataDir)) {
-      fs.rmSync(userDataDir, {
-        recursive: true,
-        force: true,
-      });
-    }
-
-    fs.mkdirSync(userDataDir, { recursive: true });
-
-    const bundledDbPath = getBundledDbPath();
-    const userDbPath = getUserDbPath();
-
-    fs.copyFileSync(bundledDbPath, userDbPath);
-
-    console.warn('[APP] userData resetado com sucesso');
-  } catch (err) {
-    console.error('[APP] Falha crítica ao resetar userData', err);
-  }
-}
 
 const prisma = new PrismaClient({
   datasources: {

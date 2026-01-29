@@ -5,11 +5,11 @@
     "dev": "vite",
     "prisma:generate": "npx prisma generate",
     "build": "tsc && vite build && electron-builder",
-    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview",
     "build:win": "tsc && vite build && electron-builder --win --config",
     "build:mac": "tsc && vite build && electron-builder --mac --config",
-    "build:linux": "tsc && vite build && electron-builder --linux --config"
+    "build:linux": "tsc && vite build && electron-builder --linux --config",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@arbs.io/asset-extractor-wasm": "^0.1.2",
