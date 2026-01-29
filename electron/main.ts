@@ -235,6 +235,7 @@ autoUpdater.on('update-available', () => {
 
 autoUpdater.on('update-downloaded', () => {
   win?.webContents.send('update-downloaded', '🚀 Atualização começará em 5 segundos');
-  setInterval(() => {}, 5000);
-  autoUpdater.quitAndInstall();
+  setTimeout(() => {
+    autoUpdater.quitAndInstall();
+  }, 5000);
 });

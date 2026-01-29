@@ -13,7 +13,7 @@ export function handleAxiosError(error: AxiosError): IAppError {
       timestamp: new Date()
     };
   }
-  console.log('axiosError: ', axiosError);
+
   const { status, data } = axiosError.response;
   const errorData = data as IApiErrorResponse;
 

@@ -25,20 +25,6 @@ const webApi = axios.create({
   maxBodyLength: 1000 * 1024 * 1024, // 1GB
 });
 
-const logRequest = (config: any) => {
-  const fullUrl = config.baseURL ? `${config.baseURL}/${config.url}` : config.url;
-  console.log('--- HTTP Request ---');
-  console.log('URL:', fullUrl);
-  console.log('Method:', config.method?.toUpperCase());
-  console.log('Params:', config.params || 'N/A');
-  console.log('Payload:', config.data instanceof FormData ? '[FormData]' : config.data || 'N/A');
-  console.log('--------------------');
-  return config;
-};
-
-apiAuth.interceptors.request.use(logRequest);
-api.interceptors.request.use(logRequest);
-webApi.interceptors.request.use(logRequest);
 
 export async function checkRoute(url: string) {
   try {
@@ -116,7 +102,7 @@ export async function retryCertificate(
     if (attempt >= maximumRetry) {
       throw handleAxiosError(e as AxiosError);
     }
-    return retry(url, filepath, token, maximumRetry, attempt + 1, (delay || 500) * 2);
+    return retryCertificate(url, filepath, token, maximumRetry, attempt + 1, (delay || 500) * 2);
   }
 }
 
