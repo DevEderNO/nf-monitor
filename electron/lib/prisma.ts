@@ -4,24 +4,28 @@ import path from 'path';
 import fs from 'fs';
 
 const DB_NAME = 'nfmonitor.db';
-const SCHEMA_VERSION_FILE = 'schema-version.txt';
-
-const CURRENT_SCHEMA_VERSION = '1';
+const VERSION_FILE = 'app-version.txt';
 
 function ensureDatabaseExists() {
   if (!app.isPackaged) return;
 
   const userDataPath = app.getPath('userData');
   const userDbPath = path.join(userDataPath, DB_NAME);
-  const versionFilePath = path.join(userDataPath, SCHEMA_VERSION_FILE);
+  const versionFilePath = path.join(userDataPath, VERSION_FILE);
   const bundledDbPath = path.join(process.resourcesPath, 'prisma', 'dev.db');
+  const currentVersion = app.getVersion();
 
-  // Check if schema version changed
+  // Ensure userData directory exists
+  if (!fs.existsSync(userDataPath)) {
+    fs.mkdirSync(userDataPath, { recursive: true });
+  }
+
+  // Check if app version changed (schema may have changed)
   let needsRecreate = false;
 
   if (fs.existsSync(versionFilePath)) {
     const storedVersion = fs.readFileSync(versionFilePath, 'utf-8').trim();
-    if (storedVersion !== CURRENT_SCHEMA_VERSION) {
+    if (storedVersion !== currentVersion) {
       needsRecreate = true;
     }
   } else if (fs.existsSync(userDbPath)) {
@@ -29,18 +33,24 @@ function ensureDatabaseExists() {
     needsRecreate = true;
   }
 
-  // Delete old database if schema changed
+  // Delete old database if version changed
   if (needsRecreate && fs.existsSync(userDbPath)) {
     fs.unlinkSync(userDbPath);
   }
 
   // Copy fresh database if needed
   if (!fs.existsSync(userDbPath)) {
+    if (!fs.existsSync(bundledDbPath)) {
+      throw new Error(
+        `Arquivo de banco de dados não encontrado em ${bundledDbPath}. ` +
+          'Por favor, reinstale a aplicação ou entre em contato com o suporte.'
+      );
+    }
     fs.copyFileSync(bundledDbPath, userDbPath);
   }
 
-  // Save current schema version
-  fs.writeFileSync(versionFilePath, CURRENT_SCHEMA_VERSION);
+  // Save current app version
+  fs.writeFileSync(versionFilePath, currentVersion);
 }
 
 export function getDatabaseUrl(): string {

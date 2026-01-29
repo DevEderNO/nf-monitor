@@ -442,18 +442,9 @@ export class InvoiceTask {
         return false;
       }
 
-      const uploadPromise = upload(this.auth?.token ?? '', this.files[index].filepath, true);
+      await upload(this.auth?.token ?? '', this.files[index].filepath, true);
 
-      while (true) {
-        if (this.isCancelled || this.isPaused) return false;
-
-        const done = await Promise.race([
-          uploadPromise.then(() => true),
-          new Promise(res => setTimeout(() => res(false), 200)),
-        ]);
-
-        if (done) break;
-      }
+      if (this.isCancelled || this.isPaused) return false;
 
       await updateFile(this.files[index].filepath, {
         wasSend: true,
@@ -498,7 +489,6 @@ export class InvoiceTask {
       return true;
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.warn(`⏹️ Upload abortado: ${this.files[index].filepath}`);
         return false;
       }
 
@@ -758,12 +748,12 @@ export class InvoiceTask {
                 } as any);
               }
             }
-          } catch (statError) {
-            console.warn(`Não foi possível acessar: ${fullPath}`, statError);
+          } catch {
+            // Arquivo inacessível, ignorar
           }
         });
-      } catch (readError) {
-        console.warn(`Não foi possível ler diretório: ${dirPath}`, readError);
+      } catch {
+        // Diretório inacessível, ignorar
       }
     };
 

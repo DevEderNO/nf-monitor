@@ -219,7 +219,6 @@ export async function updateDirectoryByPath(path: string, data: Partial<IDirecto
 }
 
 export async function removeDirectory(path: string, type: 'invoices' | 'certificates'): Promise<number> {
-  console.log('path: ', path);
   return (
     (
       await prisma.directory.deleteMany({

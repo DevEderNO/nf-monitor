@@ -97,19 +97,15 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
 
     cli.onopen = () => {
       setIsConnected(true);
-      console.info('Conectado ao WebSocket');
     };
 
     cli.onclose = () => {
       setIsConnected(false);
-      console.info('Conexão perdida. Tentando reconectar...');
-      // Tenta reconectar após 3 segundos
       setTimeout(connectWebSocket, 3000);
     };
 
-    cli.onerror = error => {
+    cli.onerror = () => {
       setIsConnected(false);
-      console.error('Erro na conexão WebSocket', error);
       setTimeout(connectWebSocket, 3000);
     };
 

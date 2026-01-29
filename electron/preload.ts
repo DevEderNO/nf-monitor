@@ -34,7 +34,7 @@ function domReady(
         if (condition.includes(document.readyState)) {
           resolve(true);
         }
-      });
+      }, { once: true });
     }
   });
 }

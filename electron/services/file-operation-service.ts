@@ -101,8 +101,8 @@ export function validFile(fileInfo: IFileInfo, certificate: boolean): { valid: b
         validationCache.set(cacheKey, validate);
         return validate;
     }
-  } catch (error) {
-    console.error(`Erro de validacao para ${fileInfo.filepath}:`, error);
+  } catch {
+    // Erro de validação, retornar inválido
   }
 
   validationCache.set(cacheKey, validate);
@@ -221,8 +221,7 @@ export function getFileXmlAndPdf(fileInfo: IFileInfo): IFile | null {
         data: data,
         path: fileInfo.filepath,
       };
-    } catch (error) {
-      console.error(`Erro ao ler o arquivo ${fileInfo.filepath}:`, error);
+    } catch {
       return null;
     }
   }
@@ -240,8 +239,7 @@ export function getFilesZip(fileInfo: IFileInfo): IFile[] {
         data: zipEntry.getData().toString('binary'),
         path: fileInfo.filepath,
       }));
-    } catch (error) {
-      console.error(`Erro ao processar ZIP ${fileInfo.filepath}:`, error);
+    } catch {
       return [];
     }
   }
@@ -249,9 +247,7 @@ export function getFilesZip(fileInfo: IFileInfo): IFile[] {
 }
 
 // TODO - refazer essa validação sem lib externa
-function validatePdf(fileInfo: IFileInfo, certificate: boolean): boolean {
-  console.log(fileInfo);
-  console.log(certificate);
+function validatePdf(_fileInfo: IFileInfo, _certificate: boolean): boolean {
   return true;
 }
 
@@ -344,8 +340,8 @@ async function processDirectoryAsync(diretorio: string): Promise<IFileInfo[]> {
 
         results.push(...(paths.filter(p => p !== null) as IFileInfo[]));
       }
-    } catch (error) {
-      console.error(`Erro ao processar diretório ${currentDir}:`, error);
+    } catch {
+      // Erro ao processar diretório, continuar
     }
   }
 
@@ -355,14 +351,12 @@ async function processDirectoryAsync(diretorio: string): Promise<IFileInfo[]> {
 function validateTxt(fileInfo: IFileInfo): boolean {
   try {
     if (!fsSync.existsSync(fileInfo.filepath)) {
-      console.log('Arquivo não encontrado:', fileInfo.filepath);
       return false;
     }
 
     const fileContent = fsSync.readFileSync(fileInfo.filepath, 'utf8');
 
     if (fileContent.length < 28) {
-      console.log('Arquivo muito pequeno. Tamanho:', fileContent.length);
       return false;
     }
 
@@ -377,7 +371,6 @@ function validateTxt(fileInfo: IFileInfo): boolean {
 function validatePfx(fileInfo: IFileInfo): boolean {
   try {
     if (!fsSync.existsSync(fileInfo.filepath)) {
-      console.log('Arquivo não encontrado:', fileInfo.filepath);
       return false;
     }
 
@@ -386,4 +379,3 @@ function validatePfx(fileInfo: IFileInfo): boolean {
     return false;
   }
 }
-('');

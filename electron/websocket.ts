@@ -19,13 +19,10 @@ let wsConnection: connection;
 function createWebsocket() {
   const port = 4444;
   const server = http.createServer();
-  server.listen(port, () => {
-    console.log(`Data stream server started on port ${port}`);
-  });
+  server.listen(port);
   const wss = new WebsocketServer({ httpServer: server });
 
   wss.on('request', request => {
-    console.log(new Date().toLocaleDateString().concat(' Received a new connection from origin ', request.origin, '.'));
 
     wsConnection = request.accept(null, request.origin);
 

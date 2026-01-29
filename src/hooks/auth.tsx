@@ -42,8 +42,7 @@ const AuthProvider = ({ children }: React.PropsWithChildren) => {
           },
         ]);
       } catch (error) {
-        console.error('Erro no login:', error);
-        throw error; // Re-throw para que o componente Signin possa tratar
+        throw error;
       } finally {
         dispatch({ type: ActionType.Loading, payload: false });
       }
