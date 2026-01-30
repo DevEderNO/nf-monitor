@@ -103,3 +103,33 @@ export async function upload(token: string, filepath: string, invoices: boolean)
   if (invoices) await retry('upload/importar-arquivo', filepath, token, 5);
   else await retryCertificate('v2/nova-implantacao/importar-arquivo', filepath, token, 5);
 }
+
+export async function uploadBatch(
+  token: string,
+  filepaths: string[],
+  maximumRetry = 5,
+  attempt = 0,
+  delay = 0
+): Promise<void> {
+  try {
+    await sleep(delay);
+    const form = new FormData();
+    for (const filepath of filepaths) {
+      form.append('arquivos', createReadStream(filepath));
+    }
+    const { data } = await api.post('upload/importar-arquivos', form, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Origin: 'http://app.sittax.com.br',
+      },
+    });
+    form.destroy();
+    if (data) return data;
+    throw new Error('Nenhuma resposta da API');
+  } catch (e) {
+    if (attempt >= maximumRetry) {
+      throw handleAxiosError(e as AxiosError);
+    }
+    return uploadBatch(token, filepaths, maximumRetry, attempt + 1, (delay || 500) * 2);
+  }
+}

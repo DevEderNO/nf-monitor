@@ -174,7 +174,7 @@ autoUpdater.setFeedURL({
 // Verificar atualizações a cada 4 horas
 setInterval(() => {
   autoUpdater.checkForUpdatesAndNotify();
-}, 4 * 60 * 60 * 1000);
+}, 1 * 60 * 60 * 1000);
 
 autoUpdater.on('update-available', () => {
   win?.webContents.send('update-available', '⚙️ Identificada uma nova versão.');

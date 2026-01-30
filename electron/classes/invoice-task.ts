@@ -3,7 +3,7 @@ import { listarArquivos, validFile, validZip, validateDFileExists } from '../ser
 import { connection } from 'websocket';
 import { IFileInfo } from '../interfaces/file-info';
 import { WSMessageType, WSMessageTyped } from '../interfaces/ws-message';
-import { signIn, upload } from '../lib/axios';
+import { signIn, upload, uploadBatch } from '../lib/axios';
 import { IDbHistoric } from '../interfaces/db-historic';
 import {
   addFiles,
@@ -42,10 +42,13 @@ export class InvoiceTask {
   maxRetries: number = 3;
   retryDelay: number = 2000;
   errorCount: number = 0;
+  batchSize: number = 500;
 
   // Tracking de tempo
   private startTime: number = 0;
   private processedCount: number = 0;
+  private batchesCompleted: number = 0;
+  private filesInCompletedBatches: number = 0;
 
   private tokenExpireTime: number = 0;
   private readonly TOKEN_LIFETIME_MS = 2 * 60 * 60 * 1000;
@@ -82,12 +85,17 @@ export class InvoiceTask {
 
   // Calcula velocidade e tempo restante
   private getTimeStats(): { speed: number; estimatedTimeRemaining: number } {
-    if (this.processedCount === 0 || this.startTime === 0) {
+    if (this.startTime === 0 || this.filesInCompletedBatches === 0) {
       return { speed: 0, estimatedTimeRemaining: 0 };
     }
 
     const elapsedSeconds = (Date.now() - this.startTime) / 1000;
-    const speed = this.processedCount / elapsedSeconds;
+    if (elapsedSeconds < 1) {
+      return { speed: 0, estimatedTimeRemaining: 0 };
+    }
+
+    // Usar filesInCompletedBatches para estimativa baseada em uploads reais
+    const speed = this.filesInCompletedBatches / elapsedSeconds;
     const remaining = this.max - this.processedCount;
     const estimatedTimeRemaining = speed > 0 ? remaining / speed : 0;
 
@@ -149,15 +157,39 @@ export class InvoiceTask {
 
       if (!(await this.authenticate())) return;
 
+      // Separar arquivos normais e ZIPs
+      const normalFiles: IFileInfo[] = [];
+      const zipFiles: { index: number; file: IFileInfo }[] = [];
+
       for (let index = 0; index < this.files.length; index++) {
-        lastProcessedIndex = index;
+        const element = this.files[index];
+        if (element.wasSend) {
+          this.processedCount++;
+          continue;
+        }
+        if (!validateDFileExists(element)) {
+          await removeFiles(element.filepath);
+          fileLogger.info(`Arquivo não encontrado: ${element.filepath}`);
+          this.processedCount++;
+          continue;
+        }
+        if (element.extension.toLowerCase() === '.zip') {
+          zipFiles.push({ index, file: element });
+        } else if (['.xml', '.pdf', '.txt'].includes(element.extension.toLowerCase())) {
+          normalFiles.push(element);
+        }
+      }
+
+      // Processar arquivos normais em lotes
+      for (let i = 0; i < normalFiles.length; i += this.batchSize) {
+        lastProcessedIndex = i;
 
         if (this.isCancelled) {
           const sent = this.files.reduce((acc, f) => acc + (f.wasSend ? 1 : 0), 0);
           await this.sendMessage(
             `Cancelado. ${sent} arquivo${sent !== 1 ? 's' : ''} enviado${sent !== 1 ? 's' : ''}`,
             0,
-            index,
+            this.processedCount,
             this.max,
             ProcessamentoStatus.Stopped
           );
@@ -166,36 +198,53 @@ export class InvoiceTask {
         }
 
         if (this.isPaused) {
-          await this.sendMessage('Envio pausado', this.progress, index, this.max, ProcessamentoStatus.Paused);
+          await this.sendMessage('Envio pausado', this.progress, this.processedCount, this.max, ProcessamentoStatus.Paused);
           while (this.isPaused && !this.isCancelled) {
             await timeout(500);
           }
-          if (this.isCancelled) {
-            index--;
-            continue;
-          }
-          await this.sendMessage('Retomando envio...', this.progress, index, this.max);
+          if (this.isCancelled) continue;
+          await this.sendMessage('Retomando envio...', this.progress, this.processedCount, this.max);
         }
 
         if (!(await this.ensureValidToken())) {
           throw new Error('Falha na autenticação');
         }
 
-        const currentProgress = ((index + 1) / this.files.length) * 100;
-        const element = this.files[index];
+        const batch = normalFiles.slice(i, i + this.batchSize);
+        await this.processBatchWithRetry(batch);
+      }
 
-        if (element.wasSend) {
-          this.processedCount++;
-          continue;
+      // Processar ZIPs individualmente
+      for (const { index } of zipFiles) {
+        lastProcessedIndex = index;
+
+        if (this.isCancelled) {
+          const sent = this.files.reduce((acc, f) => acc + (f.wasSend ? 1 : 0), 0);
+          await this.sendMessage(
+            `Cancelado. ${sent} arquivo${sent !== 1 ? 's' : ''} enviado${sent !== 1 ? 's' : ''}`,
+            0,
+            this.processedCount,
+            this.max,
+            ProcessamentoStatus.Stopped
+          );
+          this.reset();
+          return;
         }
 
-        if (!validateDFileExists(element)) {
-          await removeFiles(element.filepath);
-          fileLogger.info(`Arquivo não encontrado: ${element.filepath}`);
-          this.processedCount++;
-          continue;
+        if (this.isPaused) {
+          await this.sendMessage('Envio pausado', this.progress, this.processedCount, this.max, ProcessamentoStatus.Paused);
+          while (this.isPaused && !this.isCancelled) {
+            await timeout(500);
+          }
+          if (this.isCancelled) continue;
+          await this.sendMessage('Retomando envio...', this.progress, this.processedCount, this.max);
         }
 
+        if (!(await this.ensureValidToken())) {
+          throw new Error('Falha na autenticação');
+        }
+
+        const currentProgress = ((this.processedCount + 1) / this.max) * 100;
         await this.processFileWithRetry(index, currentProgress);
         this.processedCount++;
       }
@@ -258,6 +307,126 @@ export class InvoiceTask {
         this.max,
         ProcessamentoStatus.Stopped
       );
+    }
+  }
+
+  async processBatchWithRetry(batch: IFileInfo[]) {
+    if (batch.length === 0) return;
+
+    // Validar arquivos do lote
+    const validFiles: IFileInfo[] = [];
+    for (const file of batch) {
+      const fileValidation = validFile(file, false);
+      if (!fileValidation.valid) {
+        await updateFile(file.filepath, { isValid: false });
+        file.isValid = false;
+        fileLogger.info(`Arquivo inválido: ${file.filepath}`);
+        this.processedCount++;
+        continue;
+      }
+      file.isValid = true;
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) return;
+
+    let attempts = 0;
+    let success = false;
+
+    while (attempts < this.maxRetries && !success && !this.isCancelled && !this.isPaused) {
+      try {
+        attempts++;
+
+        if (attempts > 1) {
+          const currentProgress = (this.processedCount / this.max) * 100;
+          await this.sendMessage(
+            `Tentando novamente... (${attempts}/${this.maxRetries})`,
+            currentProgress,
+            this.processedCount,
+            this.max,
+            ProcessamentoStatus.Running
+          );
+          await timeout(this.retryDelay);
+          if (this.isPaused || this.isCancelled) break;
+        }
+
+        if (!(await this.ensureValidToken())) {
+          throw new Error('Token expirado');
+        }
+
+        const currentProgress = (this.processedCount / this.max) * 100;
+        await this.sendMessage(
+          `Enviando ${validFiles.length} arquivo${validFiles.length > 1 ? 's' : ''}...`,
+          currentProgress,
+          this.processedCount,
+          this.max,
+          ProcessamentoStatus.Running
+        );
+
+        if (this.isPaused || this.isCancelled) break;
+
+        await uploadBatch(this.auth?.token ?? '', validFiles.map(f => f.filepath));
+
+        if (this.isCancelled || this.isPaused) break;
+
+        // Atualizar status de todos os arquivos do lote
+        for (const file of validFiles) {
+          await updateFile(file.filepath, {
+            wasSend: true,
+            dataSend: new Date(),
+          });
+          file.wasSend = true;
+          file.dataSend = new Date();
+          this.filesSendedCount++;
+          this.processedCount++;
+
+          if (this.removeUploadedFiles) {
+            try {
+              if (fs.existsSync(file.filepath)) {
+                fs.unlinkSync(file.filepath);
+              }
+            } catch (removeError) {
+              fileLogger.error(`Erro ao remover arquivo: ${file.filepath}`, removeError);
+            }
+          }
+        }
+
+        // Atualizar contadores de lote para estimativa de tempo
+        this.batchesCompleted++;
+        this.filesInCompletedBatches += validFiles.length;
+
+        const newProgress = (this.processedCount / this.max) * 100;
+        await this.sendMessage(
+          `${validFiles.length} arquivo${validFiles.length > 1 ? 's' : ''} enviado${validFiles.length > 1 ? 's' : ''}`,
+          newProgress,
+          this.processedCount,
+          this.max,
+          ProcessamentoStatus.Running
+        );
+
+        success = true;
+      } catch (error: any) {
+        fileLogger.error(`Erro ao enviar lote de arquivos`, error);
+
+        if (error.response?.status === 401 || error.message?.includes('Unauthorized')) {
+          if (await this.authenticate()) {
+            continue;
+          }
+        }
+
+        if (attempts === this.maxRetries) {
+          this.hasError = true;
+          this.errorCount += validFiles.length;
+          this.processedCount += validFiles.length;
+          await this.sendMessage(
+            `Não foi possível enviar ${validFiles.length} arquivo${validFiles.length > 1 ? 's' : ''}`,
+            (this.processedCount / this.max) * 100,
+            this.processedCount,
+            this.max,
+            ProcessamentoStatus.Running
+          );
+        }
+      }
     }
   }
 
@@ -388,6 +557,8 @@ export class InvoiceTask {
     this.processedCount = 0;
     this.errorCount = 0;
     this.startTime = 0;
+    this.batchesCompleted = 0;
+    this.filesInCompletedBatches = 0;
     this.connection = connection;
     this.tokenExpireTime = 0;
     this.historic = {
@@ -442,6 +613,7 @@ export class InvoiceTask {
       this.files[index].wasSend = true;
       this.files[index].dataSend = new Date();
       this.filesSendedCount++;
+      this.filesInCompletedBatches++;
 
       await this.sendMessage(
         `Enviado: ${fileName}`,
@@ -508,33 +680,45 @@ export class InvoiceTask {
       const extractedFiles = this.getExtractedFiles(extractPath);
 
       if (extractedFiles.length > 0) {
+        // Validar arquivos extraídos
+        const validExtracted: IFileInfo[] = [];
+        for (const extractedFile of extractedFiles) {
+          const validExtractedFile = validFile(extractedFile, false);
+          if (validExtractedFile.valid) {
+            validExtracted.push(extractedFile);
+          }
+        }
+
         let successCount = 0;
 
-        for (const extractedFile of extractedFiles) {
+        // Enviar em lotes
+        for (let i = 0; i < validExtracted.length; i += this.batchSize) {
           if (this.isCancelled || this.isPaused) break;
 
           if (!(await this.ensureValidToken())) {
             throw new Error('Falha na autenticação');
           }
 
+          const batch = validExtracted.slice(i, i + this.batchSize);
+
           try {
             if (this.isPaused || this.isCancelled) break;
 
-            const validExtractedFile = validFile(extractedFile, false);
-            if (validExtractedFile.valid) {
-              await upload(this.auth?.token ?? '', extractedFile.filepath, true);
-              successCount++;
-            }
+            await uploadBatch(this.auth?.token ?? '', batch.map(f => f.filepath));
+            successCount += batch.length;
+            this.filesInCompletedBatches += batch.length;
+            this.batchesCompleted++;
           } catch (error: any) {
-            fileLogger.error(`Erro ao enviar arquivo extraído: ${extractedFile.filepath}`, error);
+            fileLogger.error(`Erro ao enviar lote de arquivos extraídos`, error);
 
             if (error.response?.status === 401 || error.message?.includes('Unauthorized')) {
               if (await this.authenticate()) {
+                i -= this.batchSize; // Retentar o mesmo lote
                 continue;
               }
             }
             this.hasError = true;
-            this.errorCount++;
+            this.errorCount += batch.length;
           }
         }
 
