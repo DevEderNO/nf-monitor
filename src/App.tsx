@@ -3,7 +3,6 @@ import { Signin } from '@pages/Signin';
 import { Invoices } from '@pages/Invoices';
 import { Layout } from '@components/Layout';
 import { AppProvider } from '@hooks/index';
-import { Directories } from '@pages/Directories';
 import { Certificates } from '@pages/Certificates';
 import { RequireAuth } from '@components/auth/RequireAuth';
 import { Configuration } from './pages/Configuration';
@@ -27,14 +26,6 @@ export default function App() {
             element={
               <RequireAuth>
                 <Certificates />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/directories"
-            element={
-              <RequireAuth>
-                <Directories />
               </RequireAuth>
             }
           />

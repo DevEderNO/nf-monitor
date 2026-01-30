@@ -45,9 +45,9 @@ function extractFileName(path: string): string {
 const statusConfig = {
   [ProcessamentoStatus.Running]: {
     icon: Loader2,
-    iconClass: 'animate-spin text-blue-500',
-    barClass: 'bg-blue-500',
-    bgClass: 'bg-blue-500/10',
+    iconClass: 'animate-spin text-orange-500',
+    barClass: 'bg-orange-500',
+    bgClass: 'bg-orange-500/10',
     label: 'Enviando',
   },
   [ProcessamentoStatus.Paused]: {
@@ -90,32 +90,21 @@ export function ProgressCard({
   const fileName = extractFileName(lastFileName || '');
 
   return (
-    <div
-      className={cn(
-        'rounded-lg border p-4 transition-all duration-300 ease-in-out',
-        config.bgClass,
-        className
-      )}
-    >
+    <div className={cn('rounded-lg border p-4 transition-all duration-300 ease-in-out', config.bgClass, className)}>
       {/* Header com status */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Icon className={cn('h-5 w-5 transition-all', config.iconClass)} />
           <span className="font-medium text-sm">{config.label}</span>
         </div>
-        <span className="text-2xl font-bold tabular-nums transition-all duration-300">
-          {percentage}%
-        </span>
+        <span className="text-2xl font-bold tabular-nums transition-all duration-300">{percentage}%</span>
       </div>
 
       {/* Barra de progresso */}
       <div className="mb-3">
         <div className="relative h-3 w-full overflow-hidden rounded-full bg-gray-200/50">
           <div
-            className={cn(
-              'h-full transition-all duration-500 ease-out rounded-full',
-              config.barClass
-            )}
+            className={cn('h-full transition-all duration-500 ease-out rounded-full', config.barClass)}
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -147,11 +136,7 @@ export function ProgressCard({
 
       {/* Mensagem atual */}
       <div className="min-h-[20px]">
-        {message && (
-          <p className="text-sm text-muted-foreground truncate animate-in fade-in duration-300">
-            {message}
-          </p>
-        )}
+        {message && <p className="text-sm text-muted-foreground truncate animate-in fade-in duration-300">{message}</p>}
         {fileName && status === ProcessamentoStatus.Running && (
           <p className="text-xs text-muted-foreground/70 truncate mt-1" title={fileName}>
             {fileName}

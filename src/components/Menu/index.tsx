@@ -39,17 +39,6 @@ const Menu: React.FC = () => {
         visible: true,
       },
       {
-        label: 'Selecionar Diretórios',
-        selected: location.pathname === '/directories',
-        onClick: () => {
-          navigate('/directories', {
-            replace: true,
-            state: { from: location },
-          });
-        },
-        visible: true,
-      },
-      {
         label: 'Configurações',
         selected: location.pathname === '/configuration',
         onClick: () => {

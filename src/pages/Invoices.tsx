@@ -1,4 +1,6 @@
 import { Button } from '@components/ui/button';
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@components/ui/table';
+import { TrashIcon } from '@radix-ui/react-icons';
 import { useCallback } from 'react';
 import { Play, Pause, Square, FolderOpen } from 'lucide-react';
 import { useSocket } from '@hooks/socket';
@@ -41,6 +43,14 @@ export function Invoices() {
         payload: filepaths,
       });
     }
+  };
+
+  const handleRemoveInvoicesDirectory = async (item: string) => {
+    const directories = await window.ipcRenderer.invoke('remove-directory', item, 'invoices');
+    dispatch({
+      type: ActionType.Directories,
+      payload: directories,
+    });
   };
 
   const handleStart = () => {
@@ -108,20 +118,14 @@ export function Invoices() {
             <Button
               onClick={handleSelectDirectories}
               variant="outline"
-              className={cn(
-                'flex gap-2 transition-all duration-200',
-                'hover:scale-105 active:scale-95'
-              )}
+              className={cn('flex gap-2 transition-all duration-200', 'hover:scale-105 active:scale-95')}
             >
               <FolderOpen className="h-4 w-4" />
               Selecionar Diretórios
             </Button>
             <Button
               onClick={handleStart}
-              className={cn(
-                'flex gap-2 transition-all duration-200',
-                'hover:scale-105 active:scale-95'
-              )}
+              className={cn('flex gap-2 transition-all duration-200', 'hover:scale-105 active:scale-95')}
             >
               <Play className="h-4 w-4" />
               {isConcluded ? 'Enviar Novamente' : 'Enviar Notas'}
@@ -132,10 +136,7 @@ export function Invoices() {
         {isRunning && (
           <Button
             onClick={handlePause}
-            className={cn(
-              'flex gap-2 transition-all duration-200',
-              'hover:scale-105 active:scale-95'
-            )}
+            className={cn('flex gap-2 transition-all duration-200', 'hover:scale-105 active:scale-95')}
           >
             <Pause className="h-4 w-4" />
             Enviando...
@@ -146,10 +147,7 @@ export function Invoices() {
           <>
             <Button
               onClick={handleResume}
-              className={cn(
-                'flex gap-2 transition-all duration-200',
-                'hover:scale-105 active:scale-95'
-              )}
+              className={cn('flex gap-2 transition-all duration-200', 'hover:scale-105 active:scale-95')}
             >
               <Play className="h-4 w-4" />
               Continuar
@@ -157,10 +155,7 @@ export function Invoices() {
             <Button
               onClick={handleStop}
               variant="destructive"
-              className={cn(
-                'flex gap-2 transition-all duration-200',
-                'hover:scale-105 active:scale-95'
-              )}
+              className={cn('flex gap-2 transition-all duration-200', 'hover:scale-105 active:scale-95')}
             >
               <Square className="h-4 w-4" />
               Cancelar
@@ -175,6 +170,40 @@ export function Invoices() {
           Selecione os diretórios onde estão os arquivos que você quer enviar.
         </div>
       )}
+
+      <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 190px)' }}>
+        <Table className="overflow-auto">
+          <TableCaption>Lista dos diretórios para envio de notas</TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Diretório</TableHead>
+              <TableHead>Modificação</TableHead>
+              <TableHead>Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {directories.length > 0 &&
+              directories
+                ?.filter(item => item.type === 'invoices')
+                ?.map((item, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="text-sm text-ellipsis overflow-hidden">{item.path}</TableCell>
+                    <TableCell>{new Date(item.modifiedtime).toLocaleDateString()}</TableCell>
+                    <TableCell className="w-8 ">
+                      <Button
+                        variant={'destructive'}
+                        size={'sm'}
+                        className="px-1 py-0.5"
+                        onClick={() => handleRemoveInvoicesDirectory(item.path)}
+                      >
+                        <TrashIcon className="w-5 h-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
