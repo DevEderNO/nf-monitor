@@ -5,7 +5,10 @@ import FormData from 'form-data';
 import { ISignIn } from '../../interfaces/signin';
 import { handleAxiosError } from './error-handle';
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+// Desabilitar verificação SSL apenas em desenvolvimento
+if (process.env.NODE_ENV === 'development') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
 
 const apiAuth = axios.create({
   baseURL: import.meta.env.VITE_API_AUTH_URL,
@@ -24,16 +27,6 @@ const webApi = axios.create({
   maxContentLength: 1000 * 1024 * 1024, // 1GB
   maxBodyLength: 1000 * 1024 * 1024, // 1GB
 });
-
-
-export async function checkRoute(url: string) {
-  try {
-    await axios.head(url);
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
 
 export async function signIn(username: string, password: string, useCryptography?: boolean): Promise<ISignIn> {
   try {

@@ -5,7 +5,7 @@ import { createWebsocket } from './websocket';
 import { autoUpdater } from 'electron-updater';
 import { logError } from './services/error-service';
 import { ErrorType } from '@prisma/client';
-import { powerSaveBlocker } from 'electron';
+import { stopPowerSaveBlocker } from './lib/power-save';
 
 process.env.DIST = path.join(__dirname, '../dist');
 const envVitePublic = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public');
@@ -13,11 +13,23 @@ process.env.VITE_PUBLIC = envVitePublic;
 
 let win: BrowserWindow | null;
 let tray: Tray;
+let menuVisible = false;
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 
 app.setAppUserModelId('Monitor');
 
-const id = powerSaveBlocker.start('prevent-app-suspension');
+// Função utilitária para enviar erros ao renderer
+function sendErrorToRenderer(title: string, message: string) {
+  BrowserWindow.getAllWindows().forEach(window => {
+    if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+      try {
+        window.webContents.send('error', JSON.stringify({ title, message }));
+      } catch (err) {
+        console.error('Erro ao enviar mensagem para renderer:', err);
+      }
+    }
+  });
+}
 
 function createWindow() {
   win = new BrowserWindow({
@@ -29,9 +41,10 @@ function createWindow() {
     show: !VITE_DEV_SERVER_URL ? false : true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      webSecurity: false,
-      backgroundThrottling: false,
-      devTools: true,
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      devTools: !app.isPackaged,
     },
   });
 
@@ -41,19 +54,21 @@ function createWindow() {
     win.loadFile(path.join(process.env.DIST ?? '', 'index.html'));
     Menu.setApplicationMenu(null);
 
+    // Toggle menu com único registro de shortcut
     globalShortcut.register('CommandOrControl+Shift+Alt+I', () => {
-      const defaultMenu = Menu.buildFromTemplate([
-        { role: 'fileMenu' },
-        { role: 'editMenu' },
-        { role: 'viewMenu' },
-        { role: 'windowMenu' },
-        { role: 'help' },
-      ]);
-      Menu.setApplicationMenu(defaultMenu);
-    });
-
-    globalShortcut.register('CommandOrControl+Shift+Alt+I', () => {
-      Menu.setApplicationMenu(null);
+      if (menuVisible) {
+        Menu.setApplicationMenu(null);
+      } else {
+        const defaultMenu = Menu.buildFromTemplate([
+          { role: 'fileMenu' },
+          { role: 'editMenu' },
+          { role: 'viewMenu' },
+          { role: 'windowMenu' },
+          { role: 'help' },
+        ]);
+        Menu.setApplicationMenu(defaultMenu);
+      }
+      menuVisible = !menuVisible;
     });
   }
 
@@ -97,7 +112,7 @@ function createWindow() {
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
-      powerSaveBlocker.stop(id);
+      stopPowerSaveBlocker();
       app.quit();
       win = null;
     }
@@ -114,97 +129,28 @@ function createWindow() {
   // Intercepta erros não tratados
   process.on('uncaughtException', async error => {
     await logError(error, ErrorType.UncaughtException);
-    BrowserWindow.getAllWindows().forEach(window => {
-      if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-        try {
-          window.webContents.send(
-            'error',
-            JSON.stringify({
-              title: 'Erro não tratado',
-              message: (error as Error).message,
-            })
-          );
-        } catch (err) {
-          console.error('Erro ao enviar mensagem para renderer:', err);
-        }
-      }
-    });
+    sendErrorToRenderer('Erro não tratado', error.message);
   });
 
   // Intercepta promessas rejeitadas não tratadas
   process.on('unhandledRejection', async reason => {
-    if (reason instanceof Error) {
-      await logError(reason, ErrorType.UnhandledRejection);
-      BrowserWindow.getAllWindows().forEach(window => {
-        if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-          try {
-            window.webContents.send(
-              'error',
-              JSON.stringify({
-                title: 'Erro não tratado',
-                message: (reason as Error).message,
-              })
-            );
-          } catch (err) {
-            console.error('Erro ao enviar mensagem para renderer:', err);
-          }
-        }
-      });
-    } else {
-      await logError(new Error(String(reason)), ErrorType.UnhandledRejection);
-      BrowserWindow.getAllWindows().forEach(window => {
-        if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-          try {
-            window.webContents.send(
-              'error',
-              JSON.stringify({
-                title: 'Erro não tratado',
-                message: (reason as Error).message,
-              })
-            );
-          } catch (err) {
-            console.error('Erro ao enviar mensagem para renderer:', err);
-          }
-        }
-      });
-    }
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+    await logError(error, ErrorType.UnhandledRejection);
+    sendErrorToRenderer('Erro não tratado', error.message);
   });
 
   // Intercepta erros de renderização
   app.on('render-process-gone', async (_event, _webContents, details) => {
     await logError(new Error(`Render process gone: ${details.reason}`), ErrorType.RenderProcessGone);
-    BrowserWindow.getAllWindows().forEach(window => {
-      window.webContents.send(
-        'error',
-        JSON.stringify({
-          title: 'Erro de renderização',
-          message: details.reason,
-        })
-      );
-    });
+    sendErrorToRenderer('Erro de renderização', details.reason);
   });
 
   // Intercepta erros de GPU
   app.on('child-process-gone', async (_event, details) => {
     await logError(new Error(`GPU process gone: ${details.type}`), ErrorType.GPUProcessGone);
-    BrowserWindow.getAllWindows().forEach(window => {
-      window.webContents.send(
-        'error',
-        JSON.stringify({
-          title: 'Erro de GPU',
-          message: details.type,
-        })
-      );
-    });
+    sendErrorToRenderer('Erro de GPU', details.type);
   });
 
-  if (!VITE_DEV_SERVER_URL) {
-    app.setLoginItemSettings({
-      openAtLogin: true,
-      openAsHidden: false,
-      path: app.getPath('exe'),
-    });
-  }
 }
 
 app.on('ready', async () => {
@@ -225,9 +171,10 @@ autoUpdater.setFeedURL({
   repo: 'nf-monitor',
 });
 
+// Verificar atualizações a cada 4 horas
 setInterval(() => {
   autoUpdater.checkForUpdatesAndNotify();
-}, 60000);
+}, 4 * 60 * 60 * 1000);
 
 autoUpdater.on('update-available', () => {
   win?.webContents.send('update-available', '⚙️ Identificada uma nova versão.');

@@ -6,7 +6,6 @@ import { IDirectory } from '../interfaces/directory';
 import { IConfig } from '../interfaces/config';
 import { IAuth } from '../interfaces/auth';
 import prisma from '../lib/prisma';
-import { endOfDay, startOfDay } from 'date-fns';
 import { IEmpresa } from '../interfaces/empresa';
 
 export async function getConfiguration(): Promise<IConfig | null> {
@@ -125,29 +124,6 @@ export async function updateAuth(data: { id: number; token?: string; username?: 
   });
 }
 
-export async function getUser(): Promise<IUser | null> {
-  const user = await prisma.user.findFirst();
-  if (!user) return null;
-  return {
-    id: user.id,
-    userId: user.userId,
-    nome: user.nome,
-    sobrenome: user.sobrenome,
-    cpf: user.cpf,
-    email: user.email,
-    phoneNumber: user.phoneNumber,
-    ativo: user.ativo,
-    emailConfirmed: user.emailConfirmed,
-    accessFailedCount: user.accessFailedCount,
-    dataDeCriacao: user.dataDeCriacao,
-    lockoutEnd: user.lockoutEnd,
-    eUsuarioEmpresa: user.eUsuarioEmpresa,
-    role: user.role,
-    ePrimeiroAcesso: user.ePrimeiroAcesso,
-    nivel: user.nivel,
-  };
-}
-
 export async function removeAuth(): Promise<void> {
   return await prisma.$transaction(async tx => {
     await tx.empresa.deleteMany();
@@ -156,40 +132,19 @@ export async function removeAuth(): Promise<void> {
   });
 }
 
+// Simplificado: uma única query para buscar diretórios
 export async function getDirectories(): Promise<IDirectory[]> {
   try {
-    const result: IDirectory[] = [];
-
-    const directories = await prisma.directory.findMany({
-      where: {
-        type: 'invoices',
-      },
-    });
-
-    const directoryCertificates = await prisma.directory.findMany({
-      where: {
-        type: 'certificates',
-      },
-    });
-
-    if (directories?.length > 0) {
-      result.push(...directories);
-    }
-
-    if (directoryCertificates?.length > 0) {
-      result.push(...directoryCertificates);
-    }
-
-    return result;
-  } catch (error) {
+    return (
+      (await prisma.directory.findMany({
+        where: {
+          type: { in: ['invoices', 'certificates'] },
+        },
+      })) ?? []
+    );
+  } catch {
     return [];
   }
-}
-
-export async function getDirectory(path: string): Promise<IDirectory | null> {
-  const directory: IDirectory | null = await prisma.directory.findFirst({ where: { path } });
-
-  return directory;
 }
 
 export async function addDirectories(data: IDirectory[]): Promise<number> {
@@ -227,20 +182,6 @@ export async function removeDirectory(path: string, type: 'invoices' | 'certific
             equals: path,
           },
           type: type,
-        },
-      })
-    )?.count ?? 0
-  );
-}
-
-export async function removeDirectoryStartsWith(path: string): Promise<number> {
-  return (
-    (
-      await prisma.directory.deleteMany({
-        where: {
-          path: {
-            startsWith: path,
-          },
         },
       })
     )?.count ?? 0
@@ -307,25 +248,6 @@ export async function removeFiles(path: string): Promise<number> {
       })
     )?.count ?? 0
   );
-}
-
-export async function removeFilesNotSended(path: string): Promise<number> {
-  return (
-    (
-      await prisma.file.deleteMany({
-        where: { filepath: { contains: path }, wasSend: false },
-      })
-    )?.count ?? 0
-  );
-}
-
-export async function countFilesSendedToDay(): Promise<number> {
-  const todayStart = startOfDay(new Date());
-  const todayEnd = endOfDay(new Date());
-
-  return prisma.file.count({
-    where: { wasSend: true, dataSend: { gte: todayStart, lt: todayEnd } },
-  });
 }
 
 export async function getDirectoriesDiscovery(): Promise<IDirectory[]> {
@@ -441,4 +363,3 @@ export async function clearHistoric(): Promise<void> {
 export async function addError(data: { message: string; stack: string; type: ErrorType }): Promise<void> {
   await prisma.error.create({ data });
 }
-

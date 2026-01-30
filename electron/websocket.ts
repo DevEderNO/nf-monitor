@@ -14,7 +14,7 @@ import {
   stopCertificateProcess,
 } from './services/certificate-service';
 
-let wsConnection: connection;
+let wsConnection: connection | null = null;
 
 function createWebsocket() {
   const port = 4444;
@@ -23,15 +23,16 @@ function createWebsocket() {
   const wss = new WebsocketServer({ httpServer: server });
 
   wss.on('request', request => {
-
     wsConnection = request.accept(null, request.origin);
 
     wsConnection.on('message', message => {
-      if (message.type === 'utf8') {
+      if (message.type === 'utf8' && wsConnection) {
         const request: WSMessage = JSON.parse(message.utf8Data);
+
         switch (request.message.type) {
+          // Invoices
           case WSMessageType.StartUploadInvoices:
-            wsStartUploadInvoices(wsConnection);
+            startInvoiceProcess(wsConnection);
             break;
           case WSMessageType.PauseUploadInvoices:
             pauseInvoiceProcess();
@@ -43,8 +44,9 @@ function createWebsocket() {
             stopInvoiceProcess();
             break;
 
+          // Certificates
           case WSMessageType.StartUploadCertificates:
-            wsStartUploadCertificates(wsConnection);
+            startCertificateProcess(wsConnection);
             break;
           case WSMessageType.PauseUploadCertificates:
             pauseCertificateProcess();
@@ -55,18 +57,12 @@ function createWebsocket() {
           case WSMessageType.StopUploadCertificates:
             stopCertificateProcess();
             break;
-          default:
-            break;
         }
       }
+    });
 
-      function wsStartUploadInvoices(connection: connection) {
-        startInvoiceProcess(connection);
-      }
-
-      function wsStartUploadCertificates(connection: connection) {
-        startCertificateProcess(connection);
-      }
+    wsConnection.on('close', () => {
+      wsConnection = null;
     });
   });
 }

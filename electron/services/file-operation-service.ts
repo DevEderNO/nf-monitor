@@ -4,7 +4,6 @@ import * as path from 'node:path';
 import { BrowserWindow, dialog, OpenDialogOptions } from 'electron';
 import AdmZip from 'adm-zip';
 import { IFileInfo } from '../interfaces/file-info';
-import { IFile } from '../interfaces/file';
 import { IDirectory } from '../interfaces/directory';
 import { isBefore, addMonths } from 'date-fns';
 import { getDataEmissao } from '../lib/nfse-utils';
@@ -19,9 +18,51 @@ const CHAVE_ACESSO_PATTERNS = [
   /CTe[0-9]{44}/gi,
 ];
 
-const diretorioCache = new Map<string, IDirectory>();
-const validationCache = new Map<string, { valid: boolean; isNotaFiscal: boolean }>();
-const fileStatsCache = new Map<string, fsSync.Stats>();
+// LRU Cache com limite de tamanho
+const MAX_CACHE_SIZE = 10000;
+
+class LRUCache<K, V> {
+  private cache = new Map<K, V>();
+  private maxSize: number;
+
+  constructor(maxSize: number) {
+    this.maxSize = maxSize;
+  }
+
+  get(key: K): V | undefined {
+    if (!this.cache.has(key)) return undefined;
+    // Move para o final (mais recente)
+    const value = this.cache.get(key)!;
+    this.cache.delete(key);
+    this.cache.set(key, value);
+    return value;
+  }
+
+  set(key: K, value: V): void {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.maxSize) {
+      // Remove o mais antigo (primeiro item)
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey !== undefined) {
+        this.cache.delete(firstKey);
+      }
+    }
+    this.cache.set(key, value);
+  }
+
+  has(key: K): boolean {
+    return this.cache.has(key);
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
+const diretorioCache = new LRUCache<string, IDirectory>(MAX_CACHE_SIZE);
+const validationCache = new LRUCache<string, { valid: boolean; isNotaFiscal: boolean }>(MAX_CACHE_SIZE);
+const fileStatsCache = new LRUCache<string, fsSync.Stats>(MAX_CACHE_SIZE);
 
 const BATCH_SIZE = 100;
 
@@ -43,7 +84,8 @@ export function selectDirectories(
 }
 
 export function getDirectoryData(dirPath: string): IDirectory | null {
-  if (diretorioCache.has(dirPath)) return diretorioCache.get(dirPath)!;
+  const cached = diretorioCache.get(dirPath);
+  if (cached) return cached;
 
   try {
     const diretorio = fsSync.statSync(dirPath);
@@ -63,7 +105,7 @@ export function getDirectoryData(dirPath: string): IDirectory | null {
 
     diretorioCache.set(dirPath, result);
     return result;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -71,7 +113,8 @@ export function getDirectoryData(dirPath: string): IDirectory | null {
 export function validFile(fileInfo: IFileInfo, certificate: boolean): { valid: boolean; isNotaFiscal: boolean } {
   const cacheKey = `${fileInfo.filepath}:${fileInfo.extension}`;
 
-  if (validationCache.has(cacheKey)) return validationCache.get(cacheKey)!;
+  const cached = validationCache.get(cacheKey);
+  if (cached) return cached;
 
   let validate = { valid: false, isNotaFiscal: false };
 
@@ -80,8 +123,11 @@ export function validFile(fileInfo: IFileInfo, certificate: boolean): { valid: b
     switch (fileInfo.extension.toLowerCase()) {
       case '.xml':
         data = fsSync.readFileSync(fileInfo.filepath, 'utf-8')?.trim();
-        if (data.startsWith('<')) return { valid: true, isNotaFiscal: true };
-        return { valid: false, isNotaFiscal: false };
+        if (data.startsWith('<')) {
+          validate = { valid: true, isNotaFiscal: true };
+        }
+        validationCache.set(cacheKey, validate);
+        return validate;
       case '.pdf':
         if (validatePdf(fileInfo, certificate)) {
           validate = { valid: true, isNotaFiscal: false };
@@ -148,7 +194,7 @@ function validateNotaServico(data: string): {
     if (isBefore(date, addMonths(new Date(newDate.getFullYear(), newDate.getMonth(), 1), -3)))
       return { valid: false, isNotaFiscal: true };
     return { valid: true, isNotaFiscal: true };
-  } catch (error) {
+  } catch {
     return { valid: false, isNotaFiscal: false };
   }
 }
@@ -156,7 +202,8 @@ function validateNotaServico(data: string): {
 export function validZip(fileInfo: IFileInfo): { valid: boolean; isNotaFiscal: boolean } {
   const cacheKey = `zip:${fileInfo.filepath}`;
 
-  if (validationCache.has(cacheKey)) return validationCache.get(cacheKey)!;
+  const cached = validationCache.get(cacheKey);
+  if (cached) return cached;
 
   let validate: { valid: boolean; isNotaFiscal: boolean } = { valid: false, isNotaFiscal: false };
 
@@ -199,51 +246,10 @@ export function validZip(fileInfo: IFileInfo): { valid: boolean; isNotaFiscal: b
 
     validationCache.set(cacheKey, validate);
     return validate;
-  } catch (error) {
+  } catch {
     validationCache.set(cacheKey, validate);
     return validate;
   }
-}
-
-export function getFileXmlAndPdf(fileInfo: IFileInfo): IFile | null {
-  const extensionMap: Record<string, 'xml' | 'pdf' | 'txt'> = {
-    '.xml': 'xml',
-    '.pdf': 'pdf',
-    '.txt': 'txt',
-  };
-
-  if (extensionMap[fileInfo.extension]) {
-    try {
-      const data = fsSync.readFileSync(fileInfo.filepath, 'binary');
-      return {
-        name: fileInfo.filename,
-        type: extensionMap[fileInfo.extension],
-        data: data,
-        path: fileInfo.filepath,
-      };
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-export function getFilesZip(fileInfo: IFileInfo): IFile[] {
-  if (fileInfo.extension === '.zip') {
-    try {
-      const zip = new AdmZip(fileInfo.filepath);
-      const zipEntries = zip.getEntries();
-      return zipEntries.map(zipEntry => ({
-        type: 'zip',
-        name: zipEntry.name,
-        data: zipEntry.getData().toString('binary'),
-        path: fileInfo.filepath,
-      }));
-    } catch {
-      return [];
-    }
-  }
-  return [];
 }
 
 // TODO - refazer essa validação sem lib externa
@@ -255,19 +261,13 @@ export function validateDiretoryFileExists(fileInfo: IFileInfo): boolean {
   try {
     const fileDirectory = path.dirname(fileInfo.filepath);
     return fsSync.existsSync(fileDirectory);
-  } catch (error) {
+  } catch {
     return false;
   }
 }
 
 export function validateDFileExists(fileInfo: IFileInfo): boolean {
   return fsSync.existsSync(fileInfo.filepath);
-}
-
-export function createDirectoryFolder(directoryPath: string) {
-  if (!fsSync.existsSync(directoryPath)) {
-    fsSync.mkdirSync(path.resolve(directoryPath), { recursive: true });
-  }
 }
 
 export async function listarArquivos(diretorios: string[]): Promise<IFileInfo[]> {
@@ -313,8 +313,9 @@ async function processDirectoryAsync(diretorio: string): Promise<IFileInfo[]> {
             }
 
             let stats: fsSync.Stats;
-            if (fileStatsCache.has(caminhoCompleto)) {
-              stats = fileStatsCache.get(caminhoCompleto)!;
+            const cachedStats = fileStatsCache.get(caminhoCompleto);
+            if (cachedStats) {
+              stats = cachedStats;
             } else {
               stats = await fs.stat(caminhoCompleto);
               fileStatsCache.set(caminhoCompleto, stats);
@@ -363,7 +364,7 @@ function validateTxt(fileInfo: IFileInfo): boolean {
     const first28Chars = fileContent.substring(0, 28);
 
     return /^.{28}$/.test(first28Chars);
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -375,7 +376,7 @@ function validatePfx(fileInfo: IFileInfo): boolean {
     }
 
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

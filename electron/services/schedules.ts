@@ -10,7 +10,9 @@ export async function initializeJob() {
     const hour = timeForProcessing.slice(0, 2);
     const minute = timeForProcessing.slice(3, 5);
     jobDiscovery = scheduleJob(`${minute} ${hour} * * *`, () => {
-      startInvoiceProcess(wsConnection);
+      if (wsConnection) {
+        startInvoiceProcess(wsConnection);
+      }
     });
   } else {
     jobDiscovery?.cancel();

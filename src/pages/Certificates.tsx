@@ -1,24 +1,15 @@
 import { Button } from '@components/ui/button';
-import { useCallback, useEffect, useState } from 'react';
-import { Textarea } from '@components/ui/textarea';
-import { Progress } from '@components/ui/progress';
-import { Play, Pause } from 'lucide-react';
+import { useCallback } from 'react';
+import { Play, Pause, Square, FolderOpen } from 'lucide-react';
 import { useSocket } from '@hooks/socket';
 import { useAppState } from '@hooks/state';
 import { WSMessageType } from '../interfaces/ws-message';
 import { ProcessamentoStatus } from '@/interfaces/processamento';
-import { StopIcon } from '@radix-ui/react-icons';
 import { ActionType } from '@/hooks/state-reducer';
 import { useToast } from '@/components/ui/use-toast';
-
-interface IStepProcess {
-  [key: string]: {
-    label: string;
-    icon: JSX.Element;
-    onClick: () => void;
-    onCancel?: () => void;
-  };
-}
+import { ProgressCard } from '@/components/ui/progress-card';
+import { cn } from '@/lib/utils';
+import { IDirectory } from '@interfaces/directory';
 
 export function Certificates() {
   const { client } = useSocket();
@@ -27,126 +18,163 @@ export function Certificates() {
     dispatch,
   } = useAppState();
   const { toast } = useToast();
-  const [messages, setMessages] = useState<string[]>([]);
 
-  useEffect(() => {
-      setMessages(prev => [certificatesLog.message, ...prev]);
-  }, [certificatesLog]);
+  const certificateDirectories = directories.filter(d => d.type === 'certificates');
 
-  const hasDerectories = useCallback(() => {
-    if (directories.length <= 0) {
-      const messages = [
-        '😊 Beleza! Só precisa selecionar onde estão os arquivos, tudo certo?',
-        '🤔 Poxa, precisamos que você escolha o diretório onde estão os arquivos que precisamos encontrar.',
-        '😌🔍 Vamos nessa! Escolha o diretório onde estão os arquivos que precisamos achar.',
-      ];
+  const hasDirectories = useCallback(() => {
+    if (certificateDirectories.length <= 0) {
       toast({
-        title: messages[Math.floor(Math.random() * 3)],
-        description: '',
+        title: 'Selecione um diretório',
+        description: 'Escolha onde estão os documentos que você quer enviar.',
         type: 'foreground',
       });
-      return true;
+      return false;
     }
-    return false;
-  }, [directories.length, toast]);
+    return true;
+  }, [certificateDirectories.length, toast]);
 
-  const send: IStepProcess = {
-    Running: {
-      label: 'Enviando...',
-      icon: <Pause />,
-      onClick: () => {
-        client?.send(
-          JSON.stringify({
-            type: 'message',
-            message: {
-              type: WSMessageType.PauseUploadCertificates,
-            },
-          })
-        );
-      },
-    },
-    Paused: {
-      label: 'Continuar',
-      icon: <Play />,
-      onClick: () => {
-        client?.send(
-          JSON.stringify({
-            type: 'message',
-            message: {
-              type: WSMessageType.ResumeUploadCertificates,
-            },
-          })
-        );
-      },
-      onCancel: () => {
-        client?.send(
-          JSON.stringify({
-            type: 'message',
-            message: {
-              type: WSMessageType.StopUploadCertificates,
-            },
-          })
-        );
-      },
-    },
-    Stopped: {
-      label: 'Enviar Documentos',
-      icon: <Play />,
-      onClick: () => {
-        if (hasDerectories()) return;
-        dispatch({ type: ActionType.ClearCertificatesLog });
-        client?.send(
-          JSON.stringify({
-            type: 'message',
-            message: {
-              type: WSMessageType.StartUploadCertificates,
-            },
-          })
-        );
-      },
-    },
-    Concluded: {
-      label: 'Re-enviar',
-      icon: <Play />,
-      onClick: () => {
-        if (hasDerectories()) return;
-        client?.send(
-          JSON.stringify({
-            type: 'message',
-            message: {
-              type: WSMessageType.StartUploadCertificates,
-            },
-          })
-        );
-      },
-    },
+  const handleSelectDirectories = async () => {
+    const filepaths: IDirectory[] = await window.ipcRenderer.invoke('select-directories-certificates');
+    if (filepaths) {
+      dispatch({
+        type: ActionType.Directories,
+        payload: filepaths,
+      });
+    }
   };
 
+  const handleStart = () => {
+    if (!hasDirectories()) return;
+    dispatch({ type: ActionType.ClearCertificatesLog });
+    client?.send(
+      JSON.stringify({
+        type: 'message',
+        message: { type: WSMessageType.StartUploadCertificates },
+      })
+    );
+  };
+
+  const handlePause = () => {
+    client?.send(
+      JSON.stringify({
+        type: 'message',
+        message: { type: WSMessageType.PauseUploadCertificates },
+      })
+    );
+  };
+
+  const handleResume = () => {
+    client?.send(
+      JSON.stringify({
+        type: 'message',
+        message: { type: WSMessageType.ResumeUploadCertificates },
+      })
+    );
+  };
+
+  const handleStop = () => {
+    client?.send(
+      JSON.stringify({
+        type: 'message',
+        message: { type: WSMessageType.StopUploadCertificates },
+      })
+    );
+  };
+
+  const isRunning = certificatesLog.status === ProcessamentoStatus.Running;
+  const isPaused = certificatesLog.status === ProcessamentoStatus.Paused;
+  const isStopped = certificatesLog.status === ProcessamentoStatus.Stopped;
+  const isConcluded = certificatesLog.status === ProcessamentoStatus.Concluded;
+
   return (
-    <div className="p-4 flex flex-col gap-4 border rounded-md h-full overflow-hidden">
+    <div className="p-4 flex flex-col gap-4 h-full overflow-hidden">
+      {/* Card de Progresso */}
+      <ProgressCard
+        progress={certificatesLog.progress}
+        value={certificatesLog.value}
+        max={certificatesLog.max}
+        status={certificatesLog.status}
+        message={certificatesLog.message}
+        estimatedTimeRemaining={certificatesLog.estimatedTimeRemaining}
+        speed={certificatesLog.speed}
+        lastFileName={certificatesLog.lastFileName}
+        className="transition-all duration-300"
+      />
+
+      {/* Botões de Controle */}
       <div className="flex gap-3">
-        <Button className="flex gap-1" onClick={send[certificatesLog.status].onClick}>
-          {send[certificatesLog.status].icon}
-          {send[certificatesLog.status].label}
-        </Button>
-        {certificatesLog.status === ProcessamentoStatus.Paused && (
-          <Button className="flex gap-1" variant={'destructive'} onClick={send[certificatesLog.status].onCancel}>
-            <StopIcon />
-            Parar
+        {(isStopped || isConcluded) && (
+          <>
+            <Button
+              onClick={handleSelectDirectories}
+              variant="outline"
+              className={cn(
+                'flex gap-2 transition-all duration-200',
+                'hover:scale-105 active:scale-95'
+              )}
+            >
+              <FolderOpen className="h-4 w-4" />
+              Selecionar Diretórios
+            </Button>
+            <Button
+              onClick={handleStart}
+              className={cn(
+                'flex gap-2 transition-all duration-200',
+                'hover:scale-105 active:scale-95'
+              )}
+            >
+              <Play className="h-4 w-4" />
+              {isConcluded ? 'Enviar Novamente' : 'Enviar Documentos'}
+            </Button>
+          </>
+        )}
+
+        {isRunning && (
+          <Button
+            onClick={handlePause}
+            className={cn(
+              'flex gap-2 transition-all duration-200',
+              'hover:scale-105 active:scale-95'
+            )}
+          >
+            <Pause className="h-4 w-4" />
+            Enviando...
           </Button>
         )}
+
+        {isPaused && (
+          <>
+            <Button
+              onClick={handleResume}
+              className={cn(
+                'flex gap-2 transition-all duration-200',
+                'hover:scale-105 active:scale-95'
+              )}
+            >
+              <Play className="h-4 w-4" />
+              Continuar
+            </Button>
+            <Button
+              onClick={handleStop}
+              variant="destructive"
+              className={cn(
+                'flex gap-2 transition-all duration-200',
+                'hover:scale-105 active:scale-95'
+              )}
+            >
+              <Square className="h-4 w-4" />
+              Cancelar
+            </Button>
+          </>
+        )}
       </div>
-      <div className="flex flex-1 flex-col gap-1 min-h-0 overflow-hidden">
-        <Textarea
-          className="flex flex-1 h-full cursor-default resize-none"
-          readOnly
-          value={messages.join('\n')}
-        />
-        <Progress value={certificatesLog?.progress} />
-        <span className="text-xs text-muted-foreground text-right">
-          {certificatesLog?.value} / {certificatesLog?.max}
-        </span>
-      </div>
+
+      {/* Dica quando não há diretórios */}
+      {certificateDirectories.length === 0 && (isStopped || isConcluded) && (
+        <div className="text-sm text-muted-foreground animate-in fade-in slide-in-from-bottom-2 duration-300">
+          Selecione os diretórios onde estão os documentos que você quer enviar.
+        </div>
+      )}
     </div>
   );
 }

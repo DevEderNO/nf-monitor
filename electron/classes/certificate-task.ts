@@ -18,15 +18,13 @@ import {
   updateHistoric,
 } from '../services/database';
 import { IAuth } from '../interfaces/auth';
-import { getTimestamp, timeout } from '../lib/time-utils';
-import * as path from 'path';
-import * as fs from 'fs';
+import { timeout } from '../lib/time-utils';
+import { startPowerSaveBlocker, stopPowerSaveBlocker } from '../lib/power-save';
+import { fileLogger } from '../lib/file-logger';
 
 export class CertificateTask {
   isPaused: boolean;
-  pausedMessage: string | null;
   isCancelled: boolean;
-  cancelledMessage: string | null;
   connection: connection | null;
   progress: number;
   files: IFileInfo[];
@@ -38,6 +36,13 @@ export class CertificateTask {
   max: number = 0;
   maxRetries: number = 3;
   retryDelay: number = 2000;
+
+  // Campos para controle de tempo e velocidade
+  private startTime: number = 0;
+  private processedCount: number = 0;
+  private lastSpeedUpdate: number = 0;
+  private recentProcessingTimes: number[] = [];
+  private currentFileName: string = '';
 
   constructor() {
     this.isPaused = false;
@@ -52,8 +57,6 @@ export class CertificateTask {
       endDate: null,
       log: [],
     } as IDbHistoric;
-    this.pausedMessage = null;
-    this.cancelledMessage = null;
     this.max = 0;
   }
 
@@ -63,155 +66,198 @@ export class CertificateTask {
 
   resume() {
     this.isPaused = false;
-    this.pausedMessage = null;
   }
 
   cancel() {
     this.isCancelled = true;
   }
 
+  private calculateSpeed(): number {
+    if (this.recentProcessingTimes.length < 2) return 0;
+    const avgTime =
+      this.recentProcessingTimes.reduce((a, b) => a + b, 0) / this.recentProcessingTimes.length;
+    return avgTime > 0 ? 1000 / avgTime : 0;
+  }
+
+  private calculateETA(): number {
+    const speed = this.calculateSpeed();
+    if (speed <= 0) return 0;
+    const remaining = this.max - this.processedCount;
+    return remaining / speed;
+  }
+
+  private recordProcessingTime() {
+    const now = Date.now();
+    if (this.lastSpeedUpdate > 0) {
+      const timeTaken = now - this.lastSpeedUpdate;
+      this.recentProcessingTimes.push(timeTaken);
+      if (this.recentProcessingTimes.length > 10) {
+        this.recentProcessingTimes.shift();
+      }
+    }
+    this.lastSpeedUpdate = now;
+    this.processedCount++;
+  }
+
   async run(connection: connection) {
     let lastProcessedIndex = 0;
 
     try {
+      startPowerSaveBlocker();
       this.initializeProperties(connection);
+      this.startTime = Date.now();
+
       const directories = await getDirectories();
-      await this.sendMessageClient('🔎 Realizando a descoberta dos arquivos');
+      await this.sendProgress('Buscando arquivos...', 0, 0, 0, ProcessamentoStatus.Running);
+
       await addFiles(await listarArquivos(directories.map(x => x.path)));
       this.files = (await getFiles()).filter(x => !x.wasSend && x.isValid);
       this.filesSended = await getCountFilesSendedPfx();
-      this.viewUploadedFiles = (await getConfiguration())?.viewUploadedFiles ?? false;
+
+      const config = await getConfiguration();
+      this.viewUploadedFiles = config?.viewUploadedFiles ?? false;
+
       if (this.viewUploadedFiles && this.filesSended > 0) {
         this.files.push(...(await getFiles()).filter(x => x.wasSend || !x.isValid));
       }
-      if (this.files.length > 0) {
-        await this.sendMessageClient('⚡ Iniciando o envio dos arquivos para o Sittax');
-        const progressIncrement = 100 / this.files.length;
-        this.max = this.files.length;
-        let currentProgress = 0;
 
-        if (!(await this.authenticate())) return;
-
-        for (let index = 0; index < this.files.length; index++) {
-          lastProcessedIndex = index;
-
-          if (this.isCancelled) {
-            this.cancelledMessage ??= `Tarefa de envio de arquivo para o Sittax foi cancelada. Foram enviados ${this.files.reduce(
-              (acc, file) => acc + (file.wasSend ? 1 : 0),
-              0
-            )} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`;
-            await this.sendMessageClient(this.cancelledMessage, 0, index + 1, this.max, ProcessamentoStatus.Stopped);
-            this.isCancelled = false;
-            this.isPaused = false;
-            this.hasError = false;
-            this.progress = 0;
-            return;
-          }
-
-          if (this.isPaused) {
-            if (this.pausedMessage === null) {
-              this.pausedMessage = 'Tarefa de envio de arquivo para o Sittax foi pausada.';
-              await this.sendMessageClient(
-                this.pausedMessage,
-                currentProgress,
-                index + 1,
-                this.max,
-                ProcessamentoStatus.Paused
-              );
-            }
-            await timeout(500);
-            index--;
-          } else {
-            currentProgress = this.progress + progressIncrement * (index + 1);
-            const element = this.files[index];
-
-            if (element.wasSend) {
-              if (!element.isValid) {
-                await this.sendMessageClient(
-                  `⚠️ Arquivo não e válido para o envio ${element.filepath}`,
-                  currentProgress,
-                  index + 1,
-                  this.max,
-                  ProcessamentoStatus.Running
-                );
-                await updateFile(element.filepath, {
-                  isValid: false,
-                });
-                this.files[index].isValid = false;
-                continue;
-              }
-              await this.sendMessageClient(
-                `☑️ Já foi enviando ${element.filepath}`,
-                currentProgress,
-                index + 1,
-                this.max,
-                ProcessamentoStatus.Running
-              );
-            } else {
-              if (!validateDFileExists(element)) {
-                await this.sendMessageClient(
-                  `🗑️ O arquivo ${element.filepath} não existe, será removido da lista de arquivos`,
-                  currentProgress,
-                  index + 1,
-                  this.max,
-                  ProcessamentoStatus.Running
-                );
-                await removeFiles(element.filepath);
-                continue;
-              }
-
-              await this.processFileWithRetry(index, currentProgress);
-            }
-          }
-        }
-      } else {
-        await this.sendMessageClient(
-          '🥲 Não foram encontrados novos arquivos para o envio',
+      if (this.files.length === 0) {
+        await this.sendProgress(
+          'Nenhum documento novo encontrado',
           100,
           0,
-          this.max,
+          0,
           ProcessamentoStatus.Concluded
         );
+        return;
       }
 
-      const message = this.hasError
-        ? `😨 Tarefa concluída com erros. Foram enviados ${this.files.reduce(
-            (acc, file) => acc + (file.wasSend ? 1 : 0),
-            0
-          )} arquivos e ${this.files.reduce((acc, file) => acc + (file.isValid ? 0 : 1), 0)} arquivos inválidos.`
-        : `😁 Tarefa concluída. Foram enviados ${this.filesSended} arquivos.`;
+      this.max = this.files.length;
+      await this.sendProgress(
+        `${this.max} documento${this.max !== 1 ? 's' : ''} encontrado${this.max !== 1 ? 's' : ''}`,
+        0,
+        0,
+        this.max,
+        ProcessamentoStatus.Running
+      );
 
-      await this.sendMessageClient(message, 100, this.max, this.max, ProcessamentoStatus.Concluded);
+      if (!(await this.authenticate())) return;
+
+      await this.sendProgress('Iniciando envio...', 0, 0, this.max, ProcessamentoStatus.Running);
+
+      for (let index = 0; index < this.files.length; index++) {
+        lastProcessedIndex = index;
+
+        if (this.isCancelled) {
+          const enviados = this.files.filter(f => f.wasSend).length;
+          await this.sendProgress(
+            `Cancelado. ${enviados} documento${enviados !== 1 ? 's' : ''} enviado${enviados !== 1 ? 's' : ''}`,
+            0,
+            index,
+            this.max,
+            ProcessamentoStatus.Stopped
+          );
+          this.resetState();
+          return;
+        }
+
+        if (this.isPaused) {
+          await this.sendProgress(
+            'Envio pausado',
+            this.calculateCurrentProgress(index),
+            index,
+            this.max,
+            ProcessamentoStatus.Paused
+          );
+          await timeout(500);
+          index--;
+          continue;
+        }
+
+        const element = this.files[index];
+        this.currentFileName = element.filepath;
+        const currentProgress = this.calculateCurrentProgress(index + 1);
+
+        if (element.wasSend) {
+          if (!element.isValid) {
+            await updateFile(element.filepath, { isValid: false });
+            this.files[index].isValid = false;
+            this.recordProcessingTime();
+            continue;
+          }
+          this.recordProcessingTime();
+          await this.sendProgress(
+            'Verificando documentos já enviados...',
+            currentProgress,
+            index + 1,
+            this.max,
+            ProcessamentoStatus.Running
+          );
+          continue;
+        }
+
+        if (!validateDFileExists(element)) {
+          fileLogger.info('Arquivo não encontrado, removido da lista', { filepath: element.filepath });
+          await removeFiles(element.filepath);
+          this.recordProcessingTime();
+          continue;
+        }
+
+        await this.processFileWithRetry(index, currentProgress);
+      }
+
+      const enviados = this.filesSended;
+      const mensagem = this.hasError
+        ? `Concluído com alguns erros. ${enviados} documento${enviados !== 1 ? 's' : ''} enviado${enviados !== 1 ? 's' : ''}`
+        : `Concluído! ${enviados} documento${enviados !== 1 ? 's' : ''} enviado${enviados !== 1 ? 's' : ''}`;
+
+      await this.sendProgress(mensagem, 100, this.max, this.max, ProcessamentoStatus.Concluded);
     } catch (error) {
-      await this.sendMessageClient(
-        '❌ Houve um problema ao enviar os arquivos para o Sittax',
+      fileLogger.error('Erro durante o processamento de documentos', { error, lastProcessedIndex });
+      await this.sendProgress(
+        'Ocorreu um erro. Tentando continuar...',
         0,
         lastProcessedIndex,
         this.max,
         ProcessamentoStatus.Running
       );
-
       await this.continueFromIndex(lastProcessedIndex);
     }
+  }
+
+  private calculateCurrentProgress(processedIndex: number): number {
+    if (this.max === 0) return 0;
+    return (processedIndex / this.max) * 100;
+  }
+
+  private resetState() {
+    this.isCancelled = false;
+    this.isPaused = false;
+    this.hasError = false;
+    this.progress = 0;
   }
 
   async continueFromIndex(startIndex: number) {
     try {
       if (this.files.length === 0) return;
 
-      await this.sendMessageClient(`🔄 Continuando o processo do arquivo ${startIndex + 1}`);
-
-      const progressIncrement = 100 / this.files.length;
+      await this.sendProgress(
+        'Retomando envio...',
+        this.calculateCurrentProgress(startIndex),
+        startIndex,
+        this.max,
+        ProcessamentoStatus.Running
+      );
 
       for (let index = startIndex; index < this.files.length; index++) {
         if (this.isCancelled || this.isPaused) break;
-
-        const currentProgress = this.progress + progressIncrement * (index + 1);
+        const currentProgress = this.calculateCurrentProgress(index + 1);
         await this.processFileWithRetry(index, currentProgress);
       }
     } catch (error) {
-      await this.sendMessageClient(
-        '❌ houve um problema ao enviar os arquivos para o Sittax',
+      fileLogger.error('Erro ao continuar processamento de documentos', { error, startIndex });
+      await this.sendProgress(
+        'Erro ao continuar o envio',
         0,
         startIndex,
         this.max,
@@ -232,8 +278,8 @@ export class CertificateTask {
         attempts++;
 
         if (attempts > 1) {
-          await this.sendMessageClient(
-            `🔄 Tentativa ${attempts}/${this.maxRetries} para ${element.filepath}`,
+          await this.sendProgress(
+            `Tentando novamente (${attempts}/${this.maxRetries})...`,
             currentProgress,
             index + 1,
             this.max,
@@ -251,15 +297,24 @@ export class CertificateTask {
             success = true;
             break;
         }
+
+        if (success) {
+          this.recordProcessingTime();
+        }
       } catch (error) {
         if (attempts === this.maxRetries) {
           this.hasError = true;
-          await this.sendMessageClient(
-            `❌ Falha definitiva após ${this.maxRetries} tentativas: ${element.filepath}`,
+          fileLogger.error('Falha definitiva ao enviar documento', {
+            filepath: element.filepath,
+            attempts,
+            error,
+          });
+          await this.sendProgress(
+            `Não foi possível enviar o documento`,
             currentProgress,
             index + 1,
             this.max,
-            ProcessamentoStatus.Stopped
+            ProcessamentoStatus.Running
           );
         }
       }
@@ -274,21 +329,30 @@ export class CertificateTask {
       try {
         attempts++;
         this.auth = await getAuth();
-        if (!this.auth?.id) return false;
+        if (!this.auth?.id) {
+          await this.sendProgress(
+            'Configure suas credenciais para continuar',
+            0,
+            0,
+            this.max,
+            ProcessamentoStatus.Stopped
+          );
+          return false;
+        }
 
         const resp = await signIn(this.auth.username ?? '', this.auth.password ?? '', true);
 
         if (!resp.Token) {
           if (attempts === maxAuthRetries) {
             this.hasError = true;
-            await this.sendMessageClient(
-              '❌ Não foi possível autenticar no Sittax após múltiplas tentativas',
+            fileLogger.error('Falha na autenticação após múltiplas tentativas', { attempts });
+            await this.sendProgress(
+              'Não foi possível conectar. Verifique suas credenciais',
               0,
               0,
               this.max,
               ProcessamentoStatus.Stopped
             );
-
             return false;
           }
           await timeout(2000);
@@ -304,10 +368,11 @@ export class CertificateTask {
         });
         return true;
       } catch (error) {
+        fileLogger.error('Erro durante autenticação', { error, attempt: attempts });
         if (attempts === maxAuthRetries) {
           this.hasError = true;
-          await this.sendMessageClient(
-            '❌ Erro na autenticação no Sittax',
+          await this.sendProgress(
+            'Erro de conexão. Tente novamente mais tarde',
             0,
             0,
             this.max,
@@ -323,13 +388,16 @@ export class CertificateTask {
 
   private initializeProperties(connection: connection) {
     this.isCancelled = false;
-    this.cancelledMessage = null;
     this.isPaused = false;
-    this.pausedMessage = null;
     this.hasError = false;
     this.progress = 0;
     this.filesSended = 0;
     this.connection = connection;
+    this.startTime = 0;
+    this.processedCount = 0;
+    this.lastSpeedUpdate = 0;
+    this.recentProcessingTimes = [];
+    this.currentFileName = '';
   }
 
   private async sendCertificatesToSittax(index: number, currentProgress: number): Promise<boolean> {
@@ -338,8 +406,10 @@ export class CertificateTask {
     if (file.valid) {
       this.files[index].isValid = true;
       try {
-        await this.sendMessageClient(
-          `🚀 Enviando ${this.files[index].filepath}`,
+        this.currentFileName = this.files[index].filepath;
+
+        await this.sendProgress(
+          `Enviando documento...`,
           currentProgress,
           index + 1,
           this.max,
@@ -349,11 +419,7 @@ export class CertificateTask {
         const uploadPromise = upload(this.auth?.token ?? '', this.files[index].filepath, true);
 
         while (true) {
-          if (this.isCancelled) {
-            return false;
-          }
-
-          if (this.isPaused) {
+          if (this.isCancelled || this.isPaused) {
             return false;
           }
 
@@ -372,8 +438,9 @@ export class CertificateTask {
         this.files[index].wasSend = true;
         this.files[index].dataSend = new Date();
         this.filesSended++;
-        await this.sendMessageClient(
-          `✅ Enviado com sucesso ${this.files[index].filepath}`,
+
+        await this.sendProgress(
+          `Documento enviado`,
           currentProgress,
           index + 1,
           this.max,
@@ -382,73 +449,65 @@ export class CertificateTask {
         return true;
       } catch (error: any) {
         this.hasError = true;
-        let errorMessage = `❌ Erro ao enviar ${this.files[index].filepath} \n Erro: ${error}`;
+
+        let logMessage = 'Erro ao enviar documento';
+        const logDetails: Record<string, unknown> = {
+          filepath: this.files[index].filepath,
+          error: error.message || error,
+        };
 
         if (error.code === 'ERR_BAD_RESPONSE') {
           if (error.config?.headers?.['Content-Length']) {
             const sizeInMB = (parseInt(error.config.headers['Content-Length']) / (1024 * 1024)).toFixed(2);
-            errorMessage = `❌ Arquivo muito grande (${sizeInMB}MB): ${this.files[index].filepath}`;
+            logDetails.size = `${sizeInMB}MB`;
+            logMessage = 'Arquivo muito grande para envio';
           } else if (error.response?.status === 400) {
-            errorMessage = `❌ Servidor rejeitou o arquivo: ${this.files[index].filepath}`;
+            logMessage = 'Servidor rejeitou o arquivo';
           }
         }
-        await this.sendMessageClient(errorMessage, currentProgress, index + 1, this.max, ProcessamentoStatus.Running);
+
+        fileLogger.error(logMessage, logDetails);
+
+        await this.sendProgress(
+          'Erro ao enviar documento',
+          currentProgress,
+          index + 1,
+          this.max,
+          ProcessamentoStatus.Running
+        );
         throw error;
       }
     } else {
-      await this.sendMessageClient(
-        file.isNotaFiscal
-          ? `⚠️ Arquivo não é válido por que a data de emissão e anterior 3️⃣ messes ${this.files[index].filepath}`
-          : `⚠️ Arquivo não e válido para o envio ${this.files[index].filepath}`,
+      const logDetails = {
+        filepath: this.files[index].filepath,
+        isNotaFiscal: file.isNotaFiscal,
+        reason: file.isNotaFiscal ? 'Data de emissão anterior a 3 meses' : 'Arquivo inválido',
+      };
+      fileLogger.info('Documento ignorado', logDetails);
 
-        currentProgress,
-        index + 1,
-        this.max,
-        ProcessamentoStatus.Running
-      );
-      await updateFile(this.files[index].filepath, {
-        isValid: false,
-      });
+      await updateFile(this.files[index].filepath, { isValid: false });
       this.files[index].isValid = false;
       return true;
     }
   }
 
-  private removeDirectory(dirPath: string) {
-    if (fs.existsSync(dirPath)) {
-      const files = fs.readdirSync(dirPath);
-
-      files.forEach(file => {
-        const filePath = path.join(dirPath, file);
-        const stat = fs.statSync(filePath);
-
-        if (stat.isDirectory()) {
-          this.removeDirectory(filePath);
-        } else {
-          fs.unlinkSync(filePath);
-        }
-      });
-
-      fs.rmdirSync(dirPath);
-    }
-  }
-
-  private async sendMessageClient(
+  private async sendProgress(
     message: string,
     progress = 0,
     value = 0,
     max = 0,
-    status = ProcessamentoStatus.Running,
-    replace = false
+    status = ProcessamentoStatus.Running
   ) {
-    await timeout();
-
     if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
+      stopPowerSaveBlocker();
       this.historic.endDate = new Date();
       if (this.historic.id) {
         await updateHistoric(this.historic);
       }
     }
+
+    const speed = this.calculateSpeed();
+    const estimatedTimeRemaining = this.calculateETA();
 
     this.connection?.sendUTF(
       JSON.stringify({
@@ -456,13 +515,17 @@ export class CertificateTask {
         message: {
           type: WSMessageType.Certificates,
           data: {
-            message: `${getTimestamp()} - ${message}`,
+            message,
             progress,
             value,
             max,
             status,
-            replace,
+            replace: false,
             id: this.historic?.id,
+            startTime: this.startTime,
+            estimatedTimeRemaining,
+            speed,
+            lastFileName: this.currentFileName,
           },
         },
       } as WSMessageTyped<IProcessamento>)

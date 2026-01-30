@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useAppState } from './state';
 import { w3cwebsocket } from 'websocket';
-import { WSMessage, WSMessageType, WSMessageTyped } from '@interfaces/ws-message';
+import { WSMessageType, WSMessageTyped } from '@interfaces/ws-message';
 import { ActionType } from './state-reducer';
 import { IProcessamento, ProcessamentoStatus } from '@interfaces/processamento';
 import { format } from 'date-fns';
@@ -13,99 +13,72 @@ interface SocketContextData {
 
 export const SocketContext = createContext<SocketContextData>({} as SocketContextData);
 
+// Função auxiliar para formatar histórico
+const formatHistoric = (x: IDbHistoric) =>
+  `${format(x.startDate, 'dd/MM/yyyy HH:mm:ss')}${
+    x.endDate ? format(x.endDate, ' - dd/MM/yyyy HH:mm:ss') : ' - Não finalizado ou interrompido'
+  }`;
+
 const SocketProvider = ({ children }: React.PropsWithChildren) => {
   const { dispatch } = useAppState();
   const [client, setClient] = useState<w3cwebsocket>();
-  const [, setIsConnected] = useState(false);
+
+  // Handler genérico para mensagens de processamento
+  const handleProcessamentoMessage = useCallback(
+    (actionType: ActionType.InvoicesLog | ActionType.CertificatesLog, data: IProcessamento) => {
+      if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(data.status)) {
+        window.ipcRenderer.invoke('get-historic').then((historic: IDbHistoric[]) => {
+          if (historic.length > 0) {
+            dispatch({
+              type: ActionType.Historic,
+              payload: historic.map(formatHistoric),
+            });
+          }
+        });
+      }
+      dispatch({
+        type: actionType,
+        payload: {
+          message: data.message,
+          progress: data.progress,
+          value: data.value,
+          max: data.max,
+          status: data.status,
+        },
+      });
+    },
+    [dispatch]
+  );
 
   useEffect(() => {
     if (!client) return;
     client.onmessage = message => {
       if (typeof message.data === 'string') {
-        const response: WSMessage = JSON.parse(message.data);
+        const response: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
+
         if (response.message.type === WSMessageType.Invoice) {
-          const {
-            message: {
-              data: { message: messageProcessamento, progress, value, max, status },
-            },
-          }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
-          if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
-            window.ipcRenderer.invoke('get-historic').then((historic: IDbHistoric[]) => {
-              if (historic.length > 0) {
-                dispatch({
-                  type: ActionType.Historic,
-                  payload: historic.map(
-                    x =>
-                      `${format(x.startDate, 'dd/MM/yyyy HH:mm:ss')}${
-                        x.endDate ? format(x.endDate, ' - dd/MM/yyyy HH:mm:ss') : ' - Não finalizado ou interrompido'
-                      }`
-                  ),
-                });
-              }
-            });
-          }
-          dispatch({
-            type: ActionType.InvoicesLog,
-            payload: {
-              message: messageProcessamento,
-              progress,
-              value,
-              max,
-              status,
-            },
-          });
+          handleProcessamentoMessage(ActionType.InvoicesLog, response.message.data);
         }
 
         if (response.message.type === WSMessageType.Certificates) {
-          const {
-            message: {
-              data: { message: messageProcessamento, progress, value, max, status },
-            },
-          }: WSMessageTyped<IProcessamento> = JSON.parse(message.data);
-          if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
-            window.ipcRenderer.invoke('get-historic').then((historic: IDbHistoric[]) => {
-              if (historic.length > 0) {
-                dispatch({
-                  type: ActionType.Historic,
-                  payload: historic.map(
-                    x =>
-                      `${format(x.startDate, 'dd/MM/yyyy HH:mm:ss')}${
-                        x.endDate ? format(x.endDate, ' - dd/MM/yyyy HH:mm:ss') : ' - Não finalizado ou interrompido'
-                      }`
-                  ),
-                });
-              }
-            });
-          }
-          dispatch({
-            type: ActionType.CertificatesLog,
-            payload: {
-              message: messageProcessamento,
-              progress,
-              value,
-              max,
-              status,
-            },
-          });
+          handleProcessamentoMessage(ActionType.CertificatesLog, response.message.data);
         }
       }
     };
-  }, [client, dispatch]);
+  }, [client, handleProcessamentoMessage]);
 
   const connectWebSocket = useCallback(() => {
     const cli = new w3cwebsocket('ws://127.0.0.1:4444');
 
     cli.onopen = () => {
-      setIsConnected(true);
+      // Conectado
     };
 
     cli.onclose = () => {
-      setIsConnected(false);
       setTimeout(connectWebSocket, 3000);
     };
 
     cli.onerror = () => {
-      setIsConnected(false);
       setTimeout(connectWebSocket, 3000);
     };
 
@@ -113,7 +86,6 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
   }, []);
 
   useEffect(() => {
-    // Inicia a conexão WebSocket
     connectWebSocket();
 
     return () => {
