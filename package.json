@@ -6,9 +6,9 @@
     "prisma:generate": "prisma generate",
     "prisma:reset-db": "node -e \"try{require('fs').unlinkSync('prisma/dev.db')}catch(e){}\" && prisma db push --skip-generate --accept-data-loss",
     "build": "prisma generate && npm run prisma:reset-db && tsc && vite build && electron-builder",
-    "build:win": "prisma generate && npm run prisma:reset-db && tsc && vite build && electron-builder --win --config",
-    "build:mac": "prisma generate && npm run prisma:reset-db && tsc && vite build && electron-builder --mac --config",
-    "build:linux": "prisma generate && npm run prisma:reset-db && tsc && vite build && electron-builder --linux --config",
+    "build:win": "prisma generate && npm run prisma:reset-db && tsc && vite build && electron-builder --win --publish always",
+    "build:mac": "prisma generate && npm run prisma:reset-db && tsc && vite build && electron-builder --mac --publish always",
+    "build:linux": "prisma generate && npm run prisma:reset-db && tsc && vite build && electron-builder --linux --publish always",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
