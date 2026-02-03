@@ -15,8 +15,7 @@ export const SocketContext = createContext<SocketContextData>({} as SocketContex
 
 // Função auxiliar para formatar histórico
 const formatHistoric = (x: IDbHistoric) =>
-  `${format(x.startDate, 'dd/MM/yyyy HH:mm:ss')}${
-    x.endDate ? format(x.endDate, ' - dd/MM/yyyy HH:mm:ss') : ' - Não finalizado ou interrompido'
+  `${format(x.startDate, 'dd/MM/yyyy HH:mm:ss')}${x.endDate ? format(x.endDate, ' - dd/MM/yyyy HH:mm:ss') : ' - Não finalizado ou interrompido'
   }`;
 
 const SocketProvider = ({ children }: React.PropsWithChildren) => {
@@ -38,13 +37,7 @@ const SocketProvider = ({ children }: React.PropsWithChildren) => {
       }
       dispatch({
         type: actionType,
-        payload: {
-          message: data.message,
-          progress: data.progress,
-          value: data.value,
-          max: data.max,
-          status: data.status,
-        },
+        payload: data,
       });
     },
     [dispatch]

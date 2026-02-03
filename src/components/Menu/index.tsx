@@ -54,8 +54,8 @@ const Menu: React.FC = () => {
   );
 
   return (
-    <div className="flex p-3 w-full justify-between h-fit">
-      <div className="flex gap-3.5 items-baseline mb-3">
+    <div className="flex px-6 py-4 justify-between h-fit items-center bg-background border-b z-10">
+      <div className="flex gap-4 items-center">
         <img src={logoMonitor} alt="logo" className="rounded-md object-cover h-7" />
         <Separator orientation="vertical" className="h-7" />
         <div className="flex items-center h-7">

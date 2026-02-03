@@ -403,6 +403,10 @@ export class InvoiceTask {
         this.filesSendedCount += validFiles.length;
         this.processedCount += validFiles.length;
 
+        // Atualizar contadores de lote para estimativa de tempo (MOVIDO PARA CÁ)
+        this.batchesCompleted++;
+        this.filesInCompletedBatches += validFiles.length;
+
         // Mostrar progresso visual (UM evento por lote em vez de 300+)
         const lastFileName = this.getFileName(validFiles[validFiles.length - 1].filepath);
         const newProgress = (this.processedCount / this.max) * 100;
@@ -431,9 +435,7 @@ export class InvoiceTask {
           await removeFilesBatch(fileIds);
         }
 
-        // Atualizar contadores de lote para estimativa de tempo
-        this.batchesCompleted++;
-        this.filesInCompletedBatches += validFiles.length;
+
 
         success = true;
       } catch (error: any) {
