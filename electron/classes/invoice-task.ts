@@ -128,7 +128,7 @@ export class InvoiceTask {
 
       await this.sendMessage('Buscando arquivos...');
 
-      const directories = await getDirectories();
+      const directories = (await getDirectories()).filter(d => d.type === 'invoices');
       await addFiles(await listarArquivos(directories.map(x => x.path)));
       this.files = (await getFiles()).filter(x => !x.wasSend && x.isValid);
       this.filesSendedCount = await getCountFilesSended();

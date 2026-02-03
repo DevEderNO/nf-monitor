@@ -107,7 +107,7 @@ export class CertificateTask {
       this.initializeProperties(connection);
       this.startTime = Date.now();
 
-      const directories = await getDirectories();
+      const directories = (await getDirectories()).filter(d => d.type === 'certificates');
       await this.sendProgress('Buscando arquivos...', 0, 0, 0, ProcessamentoStatus.Running);
 
       await addFiles(await listarArquivos(directories.map(x => x.path)));
