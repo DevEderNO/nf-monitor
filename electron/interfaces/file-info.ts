@@ -1,6 +1,8 @@
 export interface IFileInfo {
   id?: number;
-  filepath: string;
+  basePathId?: number;
+  basePath?: string;
+  filepath: string; // Computed: basePath + filename
   filename: string;
   extension: string;
   wasSend: boolean;

@@ -7,6 +7,7 @@ import { IConfig } from '../interfaces/config';
 import { IAuth } from '../interfaces/auth';
 import prisma from '../lib/prisma';
 import { IEmpresa } from '../interfaces/empresa';
+import * as path from 'path';
 
 export async function getConfiguration(): Promise<IConfig | null> {
   return (await prisma.configuration.findFirst()) ?? null;
@@ -188,8 +189,61 @@ export async function removeDirectory(path: string, type: 'invoices' | 'certific
   );
 }
 
+// BasePath functions
+
+async function getBasePathsMap(basePathIds: number[]): Promise<Map<number, string>> {
+  const uniqueIds = [...new Set(basePathIds)];
+  const basePaths = await prisma.basePath.findMany({
+    where: { id: { in: uniqueIds } },
+  });
+  return new Map(basePaths.map(bp => [bp.id, bp.path]));
+}
+
+function fileToFileInfo(
+  file: {
+    id: number;
+    basePathId: number;
+    filename: string;
+    extension: string;
+    wasSend: boolean;
+    dataSend: Date | null;
+    isValid: boolean;
+    bloqued: boolean;
+    isDirectory: boolean;
+    isFile: boolean;
+    modifiedtime: Date | null;
+    size: number;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  basePath: string
+): IFileInfo {
+  return {
+    id: file.id,
+    basePathId: file.basePathId,
+    basePath: basePath,
+    filepath: path.join(basePath, file.filename),
+    filename: file.filename,
+    extension: file.extension,
+    wasSend: file.wasSend,
+    dataSend: file.dataSend,
+    isValid: file.isValid,
+    bloqued: file.bloqued,
+    isDirectory: file.isDirectory,
+    isFile: file.isFile,
+    modifiedtime: file.modifiedtime,
+    size: file.size,
+    createdAt: file.createdAt,
+    updatedAt: file.updatedAt,
+  };
+}
+
 export async function getFiles(): Promise<IFileInfo[]> {
-  return (await prisma.file.findMany()) ?? [];
+  const files = (await prisma.file.findMany()) ?? [];
+  if (files.length === 0) return [];
+
+  const basePathsMap = await getBasePathsMap(files.map(f => f.basePathId));
+  return files.map(file => fileToFileInfo(file, basePathsMap.get(file.basePathId) ?? ''));
 }
 
 export async function getCountFilesSended(): Promise<number> {
@@ -210,15 +264,64 @@ export async function addFiles(
     filename: string;
     extension: string;
     size: number;
+    isDirectory: boolean;
+    isFile: boolean;
+    modifiedtime: Date | null;
   }[]
 ): Promise<number> {
-  const existingPaths =
+  if (data.length === 0) return 0;
+
+  // Get or create basePaths for all unique directories (batch query to avoid N+1)
+  const uniqueDirs = [...new Set(data.map(d => path.dirname(d.filepath)))];
+
+  // Fetch all existing basePaths in a single query
+  const existingBasePaths = await prisma.basePath.findMany({
+    where: { path: { in: uniqueDirs } },
+  });
+
+  const basePathMap = new Map<string, number>(existingBasePaths.map(bp => [bp.path, bp.id]));
+
+  // Create only the missing basePaths
+  const newDirs = uniqueDirs.filter(dir => !basePathMap.has(dir));
+  if (newDirs.length > 0) {
+    await prisma.basePath.createMany({
+      data: newDirs.map(dir => ({ path: dir })),
+    });
+    // Fetch the newly created basePaths
+    const newBasePaths = await prisma.basePath.findMany({
+      where: { path: { in: newDirs } },
+    });
+    newBasePaths.forEach(bp => basePathMap.set(bp.path, bp.id));
+  }
+
+  // Check existing files by basePathId + filename combination
+  const existingFiles =
     (await prisma.file.findMany({
-      select: { filepath: true },
+      select: { basePathId: true, filename: true },
     })) ?? [];
-  const existingPathSet = new Set(existingPaths.map(d => d.filepath));
-  const newDirectories = data.filter(d => !existingPathSet.has(d.filepath));
-  return (await prisma.file.createMany({ data: newDirectories }))?.count ?? 0;
+  const existingSet = new Set(existingFiles.map(f => `${f.basePathId}:${f.filename}`));
+
+  const newFiles = data
+    .map(d => {
+      const dir = path.dirname(d.filepath);
+      const basePathId = basePathMap.get(dir)!;
+      return {
+        basePathId,
+        filename: d.filename,
+        extension: d.extension,
+        wasSend: d.wasSend,
+        dataSend: d.dataSend,
+        isValid: d.isValid,
+        bloqued: d.bloqued,
+        size: d.size,
+        isDirectory: d.isDirectory,
+        isFile: d.isFile,
+        modifiedtime: d.modifiedtime,
+      };
+    })
+    .filter(d => !existingSet.has(`${d.basePathId}:${d.filename}`));
+
+  return (await prisma.file.createMany({ data: newFiles }))?.count ?? 0;
 }
 
 export async function updateFile(
@@ -230,24 +333,123 @@ export async function updateFile(
     bloqued?: boolean;
   }
 ): Promise<number> {
+  const dir = path.dirname(filepath);
+  const filename = path.basename(filepath);
+
+  const basePath = await prisma.basePath.findUnique({ where: { path: dir } });
+  if (!basePath) return 0;
+
   return (
     (
       await prisma.file.updateMany({
-        where: { filepath },
+        where: { basePathId: basePath.id, filename },
         data,
       })
     )?.count ?? 0
   );
 }
 
-export async function removeFiles(path: string): Promise<number> {
-  return (
-    (
-      await prisma.file.deleteMany({
-        where: { filepath: { contains: path } },
-      })
-    )?.count ?? 0
-  );
+export async function removeFiles(filepath: string): Promise<number> {
+  const dir = path.dirname(filepath);
+  const filename = path.basename(filepath);
+
+  // Try exact match first (specific file)
+  const basePath = await prisma.basePath.findUnique({ where: { path: dir } });
+  if (basePath) {
+    const deleted = await prisma.file.deleteMany({
+      where: { basePathId: basePath.id, filename },
+    });
+    if (deleted.count > 0) return deleted.count;
+  }
+
+  // If no exact match, search for files in directories that start with the given directory
+  const matchingBasePaths = await prisma.basePath.findMany({
+    where: { path: { startsWith: dir } },
+  });
+
+  if (matchingBasePaths.length === 0) return 0;
+
+  const deleted = await prisma.file.deleteMany({
+    where: { basePathId: { in: matchingBasePaths.map(bp => bp.id) } },
+  });
+
+  return deleted.count;
+}
+
+export async function cleanupOldFiles(): Promise<number> {
+  const config = await getConfiguration();
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  if (config?.lastCleanup && new Date(config.lastCleanup) > thirtyDaysAgo) {
+    return 0;
+  }
+
+  const deleted = await prisma.file.deleteMany({
+    where: { wasSend: true },
+  });
+
+  // Cleanup all old data
+  await cleanupOrphanedBasePaths();
+  await cleanupOldHistoric(30);
+  await cleanupOldErrors(30);
+  await vacuumDatabase();
+
+  await updateConfiguration({ ...config, lastCleanup: now } as IConfig);
+  return deleted?.count ?? 0;
+}
+
+async function cleanupOrphanedBasePaths(): Promise<number> {
+  // Find basePaths with no files
+  const orphanedBasePaths = await prisma.basePath.findMany({
+    where: {
+      files: { none: {} },
+    },
+    select: { id: true },
+  });
+
+  if (orphanedBasePaths.length === 0) return 0;
+
+  const deleted = await prisma.basePath.deleteMany({
+    where: { id: { in: orphanedBasePaths.map(bp => bp.id) } },
+  });
+
+  return deleted.count;
+}
+
+/**
+ * Cleanup historic records older than specified days
+ */
+export async function cleanupOldHistoric(daysToKeep = 30): Promise<number> {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+
+  const deleted = await prisma.historic.deleteMany({
+    where: { startDate: { lt: cutoffDate } },
+  });
+
+  return deleted.count;
+}
+
+/**
+ * Cleanup error records older than specified days
+ */
+export async function cleanupOldErrors(daysToKeep = 30): Promise<number> {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+
+  const deleted = await prisma.error.deleteMany({
+    where: { date: { lt: cutoffDate } },
+  });
+
+  return deleted.count;
+}
+
+/**
+ * Run VACUUM to reclaim disk space after deletions
+ */
+export async function vacuumDatabase(): Promise<void> {
+  await prisma.$executeRawUnsafe('VACUUM');
 }
 
 export async function getDirectoriesDiscovery(): Promise<IDirectory[]> {

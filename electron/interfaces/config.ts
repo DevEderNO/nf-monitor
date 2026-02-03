@@ -3,6 +3,7 @@ export interface IConfig {
   timeForProcessing: string;
   viewUploadedFiles: boolean;
   removeUploadedFiles: boolean;
+  lastCleanup?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
 }

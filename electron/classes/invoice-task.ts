@@ -42,7 +42,7 @@ export class InvoiceTask {
   maxRetries: number = 3;
   retryDelay: number = 2000;
   errorCount: number = 0;
-  batchSize: number = 500;
+  batchSize: number = 50;
 
   // Tracking de tempo
   private startTime: number = 0;
@@ -198,7 +198,13 @@ export class InvoiceTask {
         }
 
         if (this.isPaused) {
-          await this.sendMessage('Envio pausado', this.progress, this.processedCount, this.max, ProcessamentoStatus.Paused);
+          await this.sendMessage(
+            'Envio pausado',
+            this.progress,
+            this.processedCount,
+            this.max,
+            ProcessamentoStatus.Paused
+          );
           while (this.isPaused && !this.isCancelled) {
             await timeout(500);
           }
@@ -232,7 +238,13 @@ export class InvoiceTask {
         }
 
         if (this.isPaused) {
-          await this.sendMessage('Envio pausado', this.progress, this.processedCount, this.max, ProcessamentoStatus.Paused);
+          await this.sendMessage(
+            'Envio pausado',
+            this.progress,
+            this.processedCount,
+            this.max,
+            ProcessamentoStatus.Paused
+          );
           while (this.isPaused && !this.isCancelled) {
             await timeout(500);
           }
@@ -300,13 +312,7 @@ export class InvoiceTask {
       }
     } catch (error) {
       fileLogger.error('Erro ao continuar processamento', error);
-      await this.sendMessage(
-        'Erro no envio',
-        0,
-        startIndex,
-        this.max,
-        ProcessamentoStatus.Stopped
-      );
+      await this.sendMessage('Erro no envio', 0, startIndex, this.max, ProcessamentoStatus.Stopped);
     }
   }
 
@@ -354,22 +360,29 @@ export class InvoiceTask {
           throw new Error('Token expirado');
         }
 
-        const currentProgress = (this.processedCount / this.max) * 100;
-        await this.sendMessage(
-          `Enviando ${validFiles.length} arquivo${validFiles.length > 1 ? 's' : ''}...`,
-          currentProgress,
-          this.processedCount,
-          this.max,
-          ProcessamentoStatus.Running
-        );
 
         if (this.isPaused || this.isCancelled) break;
 
-        await uploadBatch(this.auth?.token ?? '', validFiles.map(f => f.filepath));
+        // Mostrar que está iniciando o envio (primeiro arquivo do lote)
+        const firstFileName = this.getFileName(validFiles[0].filepath);
+        const currentProgress = (this.processedCount / this.max) * 100;
+        await this.sendMessage(
+          `Enviando: ${firstFileName}`,
+          currentProgress,
+          this.processedCount,
+          this.max,
+          ProcessamentoStatus.Running,
+          validFiles[0].filepath
+        );
+
+        await uploadBatch(
+          this.auth?.token ?? '',
+          validFiles.map(f => f.filepath)
+        );
 
         if (this.isCancelled || this.isPaused) break;
 
-        // Atualizar status de todos os arquivos do lote
+        // Atualizar status e mostrar progresso visual (arquivo por arquivo)
         for (const file of validFiles) {
           await updateFile(file.filepath, {
             wasSend: true,
@@ -380,11 +393,24 @@ export class InvoiceTask {
           this.filesSendedCount++;
           this.processedCount++;
 
+          // Mostrar visualmente cada arquivo enviado
+          const fileName = this.getFileName(file.filepath);
+          const newProgress = (this.processedCount / this.max) * 100;
+          await this.sendMessage(
+            `Enviado: ${fileName}`,
+            newProgress,
+            this.processedCount,
+            this.max,
+            ProcessamentoStatus.Running,
+            file.filepath
+          );
+
           if (this.removeUploadedFiles) {
             try {
               if (fs.existsSync(file.filepath)) {
                 fs.unlinkSync(file.filepath);
               }
+              await removeFiles(file.filepath);
             } catch (removeError) {
               fileLogger.error(`Erro ao remover arquivo: ${file.filepath}`, removeError);
             }
@@ -394,15 +420,6 @@ export class InvoiceTask {
         // Atualizar contadores de lote para estimativa de tempo
         this.batchesCompleted++;
         this.filesInCompletedBatches += validFiles.length;
-
-        const newProgress = (this.processedCount / this.max) * 100;
-        await this.sendMessage(
-          `${validFiles.length} arquivo${validFiles.length > 1 ? 's' : ''} enviado${validFiles.length > 1 ? 's' : ''}`,
-          newProgress,
-          this.processedCount,
-          this.max,
-          ProcessamentoStatus.Running
-        );
 
         success = true;
       } catch (error: any) {
@@ -511,13 +528,7 @@ export class InvoiceTask {
         if (!resp.Token) {
           if (attempts === maxAuthRetries) {
             this.hasError = true;
-            await this.sendMessage(
-              'Falha na autenticação',
-              0,
-              0,
-              this.max,
-              ProcessamentoStatus.Stopped
-            );
+            await this.sendMessage('Falha na autenticação', 0, 0, this.max, ProcessamentoStatus.Stopped);
             return false;
           }
           await timeout(2000);
@@ -629,6 +640,7 @@ export class InvoiceTask {
           if (fs.existsSync(this.files[index].filepath)) {
             fs.unlinkSync(this.files[index].filepath);
           }
+          await removeFiles(this.files[index].filepath);
         } catch (removeError) {
           fileLogger.error(`Erro ao remover arquivo: ${this.files[index].filepath}`, removeError);
         }
@@ -704,7 +716,10 @@ export class InvoiceTask {
           try {
             if (this.isPaused || this.isCancelled) break;
 
-            await uploadBatch(this.auth?.token ?? '', batch.map(f => f.filepath));
+            await uploadBatch(
+              this.auth?.token ?? '',
+              batch.map(f => f.filepath)
+            );
             successCount += batch.length;
             this.filesInCompletedBatches += batch.length;
             this.batchesCompleted++;
@@ -837,7 +852,9 @@ export class InvoiceTask {
     }
 
     // Log interno com detalhes técnicos
-    this.historic.log.push(`[${new Date().toLocaleString('pt-BR')}] ${message}${lastFileName ? ` (${lastFileName})` : ''}`);
+    this.historic.log.push(
+      `[${new Date().toLocaleString('pt-BR')}] ${message}${lastFileName ? ` (${lastFileName})` : ''}`
+    );
 
     // Mensagem limpa para o usuário
     this.connection?.sendUTF(

@@ -54,6 +54,13 @@ enum DirectoryType {
   certificates
 }
 
+model BasePath {
+  id        Int      @id @default(autoincrement())
+  path      String   @unique
+  files     File[]
+  createdAt DateTime @default(now())
+}
+
 model Directory {
   id           Int      @id @default(autoincrement())
   path         String
@@ -90,7 +97,8 @@ model DirectoryDiscovery {
 
 model File {
   id           Int       @id @default(autoincrement())
-  filepath     String
+  basePathId   Int
+  basePath     BasePath  @relation(fields: [basePathId], references: [id])
   filename     String
   extension    String
   wasSend      Boolean   @default(false)
@@ -103,15 +111,21 @@ model File {
   isFile       Boolean   @default(false)
   modifiedtime DateTime?
   size         Int
+
+  @@unique([basePathId, filename])
+  @@index([wasSend])
+  @@index([extension])
+  @@index([wasSend, extension])
 }
 
 model Configuration {
-  id                      Int      @id @default(autoincrement())
-  timeForProcessing       String   @default("00:00")
-  viewUploadedFiles       Boolean  @default(false)
-  removeUploadedFiles     Boolean  @default(false)
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  id                      Int       @id @default(autoincrement())
+  timeForProcessing       String    @default("00:00")
+  viewUploadedFiles       Boolean   @default(false)
+  removeUploadedFiles     Boolean   @default(false)
+  lastCleanup             DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 }
 
 model Historic {

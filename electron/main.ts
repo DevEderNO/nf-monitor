@@ -6,6 +6,7 @@ import { autoUpdater } from 'electron-updater';
 import { logError } from './services/error-service';
 import { ErrorType } from '@prisma/client';
 import { stopPowerSaveBlocker } from './lib/power-save';
+import { cleanupOldFiles } from './services/database';
 
 process.env.DIST = path.join(__dirname, '../dist');
 const envVitePublic = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public');
@@ -160,6 +161,7 @@ app.on('ready', async () => {
     createWindow();
     registerListeners(win);
     autoUpdater.checkForUpdatesAndNotify();
+    cleanupOldFiles();
   } else {
     app.quit();
   }
