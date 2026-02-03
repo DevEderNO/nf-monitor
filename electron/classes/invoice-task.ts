@@ -24,6 +24,7 @@ import { IAuth } from '../interfaces/auth';
 import { timeout } from '../lib/time-utils';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import AdmZip from 'adm-zip';
 import { startPowerSaveBlocker, stopPowerSaveBlocker } from '../lib/power-save';
 import { fileLogger } from '../lib/file-logger';
@@ -132,15 +133,40 @@ export class InvoiceTask {
       await this.sendMessage('Buscando arquivos...');
 
       const directories = (await getDirectories()).filter(d => d.type === 'invoices');
-      await addFiles(await listarArquivos(directories.map(x => x.path)));
-      this.files = (await getFiles()).filter(x => !x.wasSend && x.isValid);
+      const diskFiles = await listarArquivos(directories.map(x => x.path));
+      await addFiles(diskFiles);
+
       this.filesSendedCount = await getCountFilesSended();
       const config = await getConfiguration();
       this.viewUploadedFiles = config?.viewUploadedFiles ?? false;
       this.removeUploadedFiles = config?.removeUploadedFiles ?? false;
 
-      if (this.viewUploadedFiles && this.filesSendedCount > 0) {
-        this.files.push(...(await getFiles()).filter(x => x.wasSend || !x.isValid));
+      const dbFiles = await getFiles();
+
+      this.files = [];
+      const viewLocalMethod = this.viewUploadedFiles; // Avoid checking inside loop
+
+      for (const diskFile of diskFiles) {
+        // Compute hash to find in DB
+        const hash = crypto.createHash('md5').update(diskFile.filename).digest('base64url');
+
+        // Find matching DB entry
+        const dbEntry = dbFiles.find(
+          db => db.filename === hash && db.basePath === path.dirname(diskFile.filepath)
+        );
+
+        if (dbEntry) {
+          // Check if we should process it
+          if ((!dbEntry.wasSend && dbEntry.isValid) || (viewLocalMethod && dbEntry.wasSend)) {
+            this.files.push({
+              ...diskFile, // Use REAL filepath and filename from disk
+              id: dbEntry.id,
+              wasSend: dbEntry.wasSend,
+              isValid: dbEntry.isValid,
+              dataSend: dbEntry.dataSend
+            });
+          }
+        }
       }
 
       if (this.files.length === 0) {
@@ -166,10 +192,7 @@ export class InvoiceTask {
 
       for (let index = 0; index < this.files.length; index++) {
         const element = this.files[index];
-        if (element.wasSend) {
-          this.processedCount++;
-          continue;
-        }
+
         if (!validateDFileExists(element)) {
           await removeFiles(element.filepath);
           fileLogger.info(`Arquivo não encontrado: ${element.filepath}`);
@@ -185,7 +208,9 @@ export class InvoiceTask {
 
       // Processar arquivos normais em lotes
       for (let i = 0; i < normalFiles.length; i += this.batchSize) {
-        lastProcessedIndex = i;
+        const batch = normalFiles.slice(i, i + this.batchSize);
+        // Usar o índice do PRIMEIRO arquivo do lote na lista original this.files para referência em caso de erro
+        lastProcessedIndex = this.files.indexOf(batch[0]);
 
         if (this.isCancelled) {
           const sent = this.files.reduce((acc, f) => acc + (f.wasSend ? 1 : 0), 0);
@@ -219,7 +244,6 @@ export class InvoiceTask {
           throw new Error('Falha na autenticação');
         }
 
-        const batch = normalFiles.slice(i, i + this.batchSize);
         await this.processBatchWithRetry(batch);
       }
 
@@ -302,20 +326,67 @@ export class InvoiceTask {
 
       await this.sendMessage('Retomando envio...', 0, startIndex, this.max);
 
-      for (let index = startIndex; index < this.files.length; index++) {
+      // Re-categorizar o que resta para processar em lotes
+      const remainingFiles = this.files.slice(startIndex);
+      const normalFiles: IFileInfo[] = [];
+      const zipFiles: { index: number; file: IFileInfo }[] = [];
+
+      for (let i = 0; i < remainingFiles.length; i++) {
+        const element = remainingFiles[i];
+        const originalIndex = startIndex + i;
+
+        if (!validateDFileExists(element)) {
+          await removeFiles(element.filepath);
+          this.processedCount++;
+          continue;
+        }
+
+        if (element.extension.toLowerCase() === '.zip') {
+          zipFiles.push({ index: originalIndex, file: element });
+        } else if (['.xml', '.pdf', '.txt'].includes(element.extension.toLowerCase())) {
+          normalFiles.push(element);
+        }
+      }
+
+      // Processar arquivos normais em lotes
+      for (let i = 0; i < normalFiles.length; i += this.batchSize) {
         if (this.isCancelled || this.isPaused) break;
 
         if (!(await this.ensureValidToken())) {
           throw new Error('Falha na autenticação');
         }
 
-        const currentProgress = ((index + 1) / this.files.length) * 100;
+        const batch = normalFiles.slice(i, i + this.batchSize);
+        await this.processBatchWithRetry(batch);
+      }
+
+      // Processar ZIPs individualmente
+      for (const { index } of zipFiles) {
+        if (this.isCancelled || this.isPaused) break;
+
+        if (!(await this.ensureValidToken())) {
+          throw new Error('Falha na autenticação');
+        }
+
+        const currentProgress = ((this.processedCount + 1) / this.max) * 100;
         await this.processFileWithRetry(index, currentProgress);
         this.processedCount++;
       }
+
+      // Se concluiu tudo com sucesso (ou acabou a lista)
+      if (this.processedCount >= this.max) {
+        const sent = this.files.reduce((acc, f) => acc + (f.wasSend ? 1 : 0), 0);
+        await this.sendMessage(
+          `Concluído! ${sent} arquivo${sent !== 1 ? 's' : ''} enviado${sent !== 1 ? 's' : ''}`,
+          100,
+          this.max,
+          this.max,
+          ProcessamentoStatus.Concluded
+        );
+      }
     } catch (error) {
       fileLogger.error('Erro ao continuar processamento', error);
-      await this.sendMessage('Erro no envio', 0, startIndex, this.max, ProcessamentoStatus.Stopped);
+      await this.sendMessage('Erro no envio', 0, this.processedCount, this.max, ProcessamentoStatus.Stopped);
     }
   }
 

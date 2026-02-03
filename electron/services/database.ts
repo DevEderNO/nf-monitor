@@ -8,6 +8,13 @@ import { IAuth } from '../interfaces/auth';
 import prisma from '../lib/prisma';
 import { IEmpresa } from '../interfaces/empresa';
 import * as path from 'path';
+import * as crypto from 'crypto';
+
+let addFilesQueue = Promise.resolve();
+
+function hashFilename(filename: string): string {
+  return crypto.createHash('md5').update(filename).digest('base64url');
+}
 
 export async function getConfiguration(): Promise<IConfig | null> {
   return (await prisma.configuration.findFirst()) ?? null;
@@ -269,59 +276,83 @@ export async function addFiles(
     modifiedtime: Date | null;
   }[]
 ): Promise<number> {
-  if (data.length === 0) return 0;
+  const task = addFilesQueue.then(async () => {
+    if (data.length === 0) return 0;
 
-  // Get or create basePaths for all unique directories (batch query to avoid N+1)
-  const uniqueDirs = [...new Set(data.map(d => path.dirname(d.filepath)))];
+    // Get or create basePaths for all unique directories (batch query to avoid N+1)
+    const uniqueDirs = [...new Set(data.map(d => path.dirname(d.filepath)))];
 
-  // Fetch all existing basePaths in a single query
-  const existingBasePaths = await prisma.basePath.findMany({
-    where: { path: { in: uniqueDirs } },
-  });
-
-  const basePathMap = new Map<string, number>(existingBasePaths.map(bp => [bp.path, bp.id]));
-
-  // Create only the missing basePaths
-  const newDirs = uniqueDirs.filter(dir => !basePathMap.has(dir));
-  if (newDirs.length > 0) {
-    await prisma.basePath.createMany({
-      data: newDirs.map(dir => ({ path: dir })),
+    // Fetch all existing basePaths in a single query
+    const existingBasePaths = await prisma.basePath.findMany({
+      where: { path: { in: uniqueDirs } },
     });
-    // Fetch the newly created basePaths
-    const newBasePaths = await prisma.basePath.findMany({
-      where: { path: { in: newDirs } },
-    });
-    newBasePaths.forEach(bp => basePathMap.set(bp.path, bp.id));
-  }
 
-  // Check existing files by basePathId + filename combination
-  const existingFiles =
-    (await prisma.file.findMany({
+    const basePathMap = new Map<string, number>(existingBasePaths.map(bp => [bp.path, bp.id]));
+
+    // Create only the missing basePaths
+    const newDirs = uniqueDirs.filter(dir => !basePathMap.has(dir));
+    if (newDirs.length > 0) {
+      await prisma.basePath.createMany({
+        data: newDirs.map(dir => ({ path: dir })),
+      });
+      // Fetch the newly created basePaths
+      const newBasePaths = await prisma.basePath.findMany({
+        where: { path: { in: newDirs } },
+      });
+      newBasePaths.forEach(bp => basePathMap.set(bp.path, bp.id));
+    }
+
+    // Create map of files to insert, preventing duplicates within the batch
+    const newFilesMap = new Map();
+    const existingFiles = (await prisma.file.findMany({
       select: { basePathId: true, filename: true },
     })) ?? [];
-  const existingSet = new Set(existingFiles.map(f => `${f.basePathId}:${f.filename}`));
+    const existingSet = new Set(existingFiles.map(f => `${f.basePathId}:${f.filename}`));
 
-  const newFiles = data
-    .map(d => {
+    for (const d of data) {
       const dir = path.dirname(d.filepath);
       const basePathId = basePathMap.get(dir)!;
-      return {
-        basePathId,
-        filename: d.filename,
-        extension: d.extension,
-        wasSend: d.wasSend,
-        dataSend: d.dataSend,
-        isValid: d.isValid,
-        bloqued: d.bloqued,
-        size: d.size,
-        isDirectory: d.isDirectory,
-        isFile: d.isFile,
-        modifiedtime: d.modifiedtime,
-      };
-    })
-    .filter(d => !existingSet.has(`${d.basePathId}:${d.filename}`));
+      const hashedName = hashFilename(d.filename);
+      const key = `${basePathId}:${hashedName}`;
 
-  return (await prisma.file.createMany({ data: newFiles }))?.count ?? 0;
+      if (!existingSet.has(key) && !newFilesMap.has(key)) {
+        newFilesMap.set(key, {
+          basePathId,
+          filename: hashedName,
+          extension: d.extension,
+          wasSend: d.wasSend,
+          dataSend: d.dataSend,
+          isValid: d.isValid,
+          bloqued: d.bloqued,
+          size: d.size,
+          isDirectory: d.isDirectory,
+          isFile: d.isFile,
+          modifiedtime: d.modifiedtime,
+        });
+      }
+    }
+
+    const filesToInsert = Array.from(newFilesMap.values());
+    if (filesToInsert.length === 0) return 0;
+
+    try {
+      return (await prisma.file.createMany({ data: filesToInsert }))?.count ?? 0;
+    } catch (error) {
+      let count = 0;
+      for (const file of filesToInsert) {
+        try {
+          await prisma.file.create({ data: file });
+          count++;
+        } catch (e) {
+          // Skip duplicates or log them
+        }
+      }
+      return count;
+    }
+  });
+
+  addFilesQueue = task.then(() => { }).catch(() => { });
+  return task;
 }
 
 export async function updateFile(
@@ -334,7 +365,7 @@ export async function updateFile(
   }
 ): Promise<number> {
   const dir = path.dirname(filepath);
-  const filename = path.basename(filepath);
+  const filename = hashFilename(path.basename(filepath));
 
   const basePath = await prisma.basePath.findUnique({ where: { path: dir } });
   if (!basePath) return 0;
@@ -351,7 +382,7 @@ export async function updateFile(
 
 export async function removeFiles(filepath: string): Promise<number> {
   const dir = path.dirname(filepath);
-  const filename = path.basename(filepath);
+  const filename = hashFilename(path.basename(filepath));
 
   // Try exact match first (specific file)
   const basePath = await prisma.basePath.findUnique({ where: { path: dir } });

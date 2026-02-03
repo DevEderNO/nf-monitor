@@ -21,6 +21,8 @@ import { IAuth } from '../interfaces/auth';
 import { timeout } from '../lib/time-utils';
 import { startPowerSaveBlocker, stopPowerSaveBlocker } from '../lib/power-save';
 import { fileLogger } from '../lib/file-logger';
+import * as path from 'path';
+import * as crypto from 'crypto';
 
 export class CertificateTask {
   isPaused: boolean;
@@ -111,15 +113,35 @@ export class CertificateTask {
       const directories = (await getDirectories()).filter(d => d.type === 'certificates');
       await this.sendProgress('Buscando arquivos...', 0, 0, 0, ProcessamentoStatus.Running);
 
-      await addFiles(await listarArquivos(directories.map(x => x.path)));
-      this.files = (await getFiles()).filter(x => !x.wasSend && x.isValid);
-      this.filesSended = await getCountFilesSendedPfx();
+      const diskFiles = await listarArquivos(directories.map(x => x.path));
+      await addFiles(diskFiles);
 
+      this.filesSended = await getCountFilesSendedPfx();
       const config = await getConfiguration();
       this.viewUploadedFiles = config?.viewUploadedFiles ?? false;
+      const dbFiles = await getFiles();
 
-      if (this.viewUploadedFiles && this.filesSended > 0) {
-        this.files.push(...(await getFiles()).filter(x => x.wasSend || !x.isValid));
+      this.files = [];
+      const viewLocalMethod = this.viewUploadedFiles;
+
+      for (const diskFile of diskFiles) {
+        const hash = crypto.createHash('md5').update(diskFile.filename).digest('base64url');
+
+        const dbEntry = dbFiles.find(
+          db => db.filename === hash && db.basePath === path.dirname(diskFile.filepath)
+        );
+
+        if (dbEntry) {
+          if ((!dbEntry.wasSend && dbEntry.isValid) || (viewLocalMethod && dbEntry.wasSend)) {
+            this.files.push({
+              ...diskFile,
+              id: dbEntry.id,
+              wasSend: dbEntry.wasSend,
+              isValid: dbEntry.isValid,
+              dataSend: dbEntry.dataSend
+            });
+          }
+        }
       }
 
       if (this.files.length === 0) {
@@ -179,7 +201,7 @@ export class CertificateTask {
         this.currentFileName = element.filepath;
         const currentProgress = this.calculateCurrentProgress(index + 1);
 
-        if (element.wasSend) {
+        if (element.wasSend && !this.viewUploadedFiles) {
           if (!element.isValid) {
             await updateFile(element.filepath, { isValid: false });
             this.files[index].isValid = false;
