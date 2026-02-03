@@ -17,6 +17,8 @@ import {
   updateAuth,
   updateFile,
   updateHistoric,
+  updateFilesBatch,
+  removeFilesBatch,
 } from '../services/database';
 import { IAuth } from '../interfaces/auth';
 import { timeout } from '../lib/time-utils';
@@ -42,7 +44,7 @@ export class InvoiceTask {
   maxRetries: number = 3;
   retryDelay: number = 2000;
   errorCount: number = 0;
-  batchSize: number = 50;
+  batchSize: number = 500;
 
   // Tracking de tempo
   private startTime: number = 0;
@@ -66,6 +68,7 @@ export class InvoiceTask {
     this.historic = {
       startDate: new Date(),
       endDate: null,
+      filesSent: 0,
       log: [],
     } as IDbHistoric;
     this.max = 0;
@@ -382,39 +385,50 @@ export class InvoiceTask {
 
         if (this.isCancelled || this.isPaused) break;
 
-        // Atualizar status e mostrar progresso visual (arquivo por arquivo)
+
+        // Atualizar status no banco em LOTE (Aceleração absurda)
+        const fileIds: number[] = validFiles.map(f => f.id).filter((id): id is number => id !== undefined);
+
+        await updateFilesBatch(fileIds, {
+          wasSend: true,
+          dataSend: new Date(),
+        });
+
+        // Atualizar memória local
         for (const file of validFiles) {
-          await updateFile(file.filepath, {
-            wasSend: true,
-            dataSend: new Date(),
-          });
           file.wasSend = true;
           file.dataSend = new Date();
-          this.filesSendedCount++;
-          this.processedCount++;
+        }
 
-          // Mostrar visualmente cada arquivo enviado
-          const fileName = this.getFileName(file.filepath);
-          const newProgress = (this.processedCount / this.max) * 100;
-          await this.sendMessage(
-            `Enviado: ${fileName}`,
-            newProgress,
-            this.processedCount,
-            this.max,
-            ProcessamentoStatus.Running,
-            file.filepath
-          );
+        this.filesSendedCount += validFiles.length;
+        this.processedCount += validFiles.length;
 
-          if (this.removeUploadedFiles) {
+        // Mostrar progresso visual (UM evento por lote em vez de 300+)
+        const lastFileName = this.getFileName(validFiles[validFiles.length - 1].filepath);
+        const newProgress = (this.processedCount / this.max) * 100;
+
+        await this.sendMessage(
+          `Lote de ${validFiles.length} arquivos enviado. Último: ${lastFileName}`,
+          newProgress,
+          this.processedCount,
+          this.max,
+          ProcessamentoStatus.Running,
+          validFiles[0].filepath
+        );
+
+        if (this.removeUploadedFiles) {
+          // Remover do disco (ainda precisa ser loop pois unlink é arquivo por arquivo)
+          for (const file of validFiles) {
             try {
               if (fs.existsSync(file.filepath)) {
                 fs.unlinkSync(file.filepath);
               }
-              await removeFiles(file.filepath);
             } catch (removeError) {
-              fileLogger.error(`Erro ao remover arquivo: ${file.filepath}`, removeError);
+              fileLogger.error(`Erro ao remover arquivo físico: ${file.filepath}`, removeError);
             }
           }
+          // Remover do banco EM LOTE
+          await removeFilesBatch(fileIds);
         }
 
         // Atualizar contadores de lote para estimativa de tempo
@@ -423,6 +437,7 @@ export class InvoiceTask {
 
         success = true;
       } catch (error: any) {
+
         fileLogger.error(`Erro ao enviar lote de arquivos`, error);
 
         if (error.response?.status === 401 || error.message?.includes('Unauthorized')) {
@@ -575,6 +590,7 @@ export class InvoiceTask {
     this.historic = {
       startDate: new Date(),
       endDate: null,
+      filesSent: 0,
       log: [],
     } as IDbHistoric;
   }
@@ -844,6 +860,7 @@ export class InvoiceTask {
     if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
       stopPowerSaveBlocker();
       this.historic.endDate = new Date();
+      this.historic.filesSent = this.filesSendedCount;
       if (this.historic.id && this.historic.id > 0) {
         await updateHistoric(this.historic);
       } else {
@@ -851,10 +868,16 @@ export class InvoiceTask {
       }
     }
 
-    // Log interno com detalhes técnicos
-    this.historic.log.push(
-      `[${new Date().toLocaleString('pt-BR')}] ${message}${lastFileName ? ` (${lastFileName})` : ''}`
-    );
+    // Log inteligente: ignora mensagens de progresso arquivo a arquivo, mantém o resto
+    const ignoreLog =
+      status === ProcessamentoStatus.Running &&
+      (message.startsWith('Enviando:') || message.startsWith('Enviado:'));
+
+    if (!ignoreLog) {
+      this.historic.log.push(
+        `[${new Date().toLocaleString('pt-BR')}] ${message}${lastFileName ? ` (${lastFileName})` : ''}`
+      );
+    }
 
     // Mensagem limpa para o usuário
     this.connection?.sendUTF(

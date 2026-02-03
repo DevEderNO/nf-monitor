@@ -55,6 +55,7 @@ export class CertificateTask {
     this.historic = {
       startDate: new Date(),
       endDate: null,
+      filesSent: 0,
       log: [],
     } as IDbHistoric;
     this.max = 0;
@@ -501,9 +502,21 @@ export class CertificateTask {
     if ([ProcessamentoStatus.Concluded, ProcessamentoStatus.Stopped].includes(status)) {
       stopPowerSaveBlocker();
       this.historic.endDate = new Date();
+      this.historic.filesSent = this.filesSended;
       if (this.historic.id) {
         await updateHistoric(this.historic);
       }
+    }
+
+    // Log inteligente: ignora mensagens de progresso arquivo a arquivo, mantém o resto
+    const ignoreLog =
+      status === ProcessamentoStatus.Running &&
+      (message.startsWith('Enviando') || message.startsWith('Documento enviado') || message.startsWith('ZIP processado'));
+
+    if (!ignoreLog) {
+      this.historic.log.push(
+        `[${new Date().toLocaleString('pt-BR')}] ${message}`
+      );
     }
 
     const speed = this.calculateSpeed();

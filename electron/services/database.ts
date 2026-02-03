@@ -1,4 +1,4 @@
-import { ErrorType } from '@prisma/client';
+import { ErrorType, Prisma } from '@prisma/client';
 import { IUser } from '../interfaces/user';
 import { IDbHistoric } from '../interfaces/db-historic';
 import { IFileInfo } from '../interfaces/file-info';
@@ -515,6 +515,7 @@ export async function removeDirectoryDiscoveryStartsWith(path: string): Promise<
 export async function addHistoric(data: {
   startDate: Date;
   endDate: Date | null;
+  filesSent: number;
   log: string[];
 }): Promise<IDbHistoric> {
   const historic = await prisma.historic.create({
@@ -547,6 +548,7 @@ export async function getHistoric(): Promise<IDbHistoric[]> {
     (record: {
       id: number;
       log: string;
+      filesSent: number;
       createdAt: Date;
       updatedAt: Date;
       startDate: Date;
@@ -564,4 +566,20 @@ export async function clearHistoric(): Promise<void> {
 
 export async function addError(data: { message: string; stack: string; type: ErrorType }): Promise<void> {
   await prisma.error.create({ data });
+}
+
+export async function updateFilesBatch(ids: number[], data: Prisma.FileUpdateInput): Promise<void> {
+  if (ids.length === 0) return;
+  await prisma.file.updateMany({
+    where: { id: { in: ids } },
+    data: data as any, // Cast to any to avoid strict type mismatch with UpdateManyMutationInput
+  });
+}
+
+export async function removeFilesBatch(ids: number[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const result = await prisma.file.deleteMany({
+    where: { id: { in: ids } },
+  });
+  return result.count;
 }
