@@ -62,12 +62,16 @@ export function Configuration() {
   return (
     <div className="p-4 flex flex-col gap-4 border rounded-md h-full overflow-hidden">
       <div className="flex items-center space-x-2">
-        <Switch id="airplane-mode" checked={viewUploadedFiles} onClick={changeViewUploadedFiles} />
-        <Label htmlFor="airplane-mode">Visualizar arquivos já enviados. (☑️)</Label>
+        <Switch id="view-uploaded" checked={viewUploadedFiles} onClick={changeViewUploadedFiles} />
+        <Label htmlFor="view-uploaded">
+          Incluir arquivos já enviados na fila de processamento (permite reenviar ao Sittax)
+        </Label>
       </div>
       <div className="flex items-center space-x-2">
-        <Switch id="airplane-mode" checked={removeUploadedFiles} onClick={changeRemoveUploadedFiles} />
-        <Label htmlFor="airplane-mode">Remover arquivos que já foram enviados para o Sittax do seu computador (recomendado). (🗑️)</Label>
+        <Switch id="remove-uploaded" checked={removeUploadedFiles} onClick={changeRemoveUploadedFiles} />
+        <Label htmlFor="remove-uploaded">
+          Remover arquivos do computador após envio ao Sittax (recomendado)
+        </Label>
       </div>
       <div className="flex gap-4">
         <div className="flex flex-col gap-2">

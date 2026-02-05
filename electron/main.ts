@@ -45,6 +45,7 @@ function createWindow() {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      webviewTag: true,
       devTools: !app.isPackaged,
     },
   });

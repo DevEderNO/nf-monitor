@@ -11,3 +11,18 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+declare namespace JSX {
+  interface IntrinsicElements {
+    webview: React.DetailedHTMLProps<
+      React.HTMLAttributes<Electron.WebviewTag> & {
+        src?: string;
+        partition?: string;
+        preload?: string;
+        allowpopups?: boolean;
+        webpreferences?: string;
+      },
+      Electron.WebviewTag
+    >;
+  }
+}

@@ -46,12 +46,33 @@ const StateProvider = ({ children }: React.PropsWithChildren) => {
       },
       {
         type: ActionType.Historic,
-        payload: historic.map(
-          x =>
-            `${format(x.startDate, 'dd/MM/yyyy HH:mm:ss')}${
-              x.endDate ? format(x.endDate, ' - dd/MM/yyyy HH:mm:ss') : ' - Não finalizado ou interrompido'
-            }`
-        ),
+        payload: historic.map(x => {
+          const startFormatted = format(x.startDate, 'dd/MM/yyyy HH:mm:ss');
+          const endFormatted = x.endDate ? format(x.endDate, 'HH:mm:ss') : null;
+
+          let duration = '';
+          if (x.endDate) {
+            const diffMs = new Date(x.endDate).getTime() - new Date(x.startDate).getTime();
+            const diffSecs = Math.floor(diffMs / 1000);
+            const hours = Math.floor(diffSecs / 3600);
+            const minutes = Math.floor((diffSecs % 3600) / 60);
+            const seconds = diffSecs % 60;
+            if (hours > 0) {
+              duration = `${hours}h ${minutes}m ${seconds}s`;
+            } else if (minutes > 0) {
+              duration = `${minutes}m ${seconds}s`;
+            } else {
+              duration = `${seconds}s`;
+            }
+          }
+
+          const status = x.endDate ? '✓' : '⏸';
+          const filesInfo = x.filesSent > 0 ? `${x.filesSent} arquivo(s)` : 'Nenhum arquivo';
+          const durationInfo = duration ? ` | Duração: ${duration}` : '';
+          const endInfo = endFormatted ? ` → ${endFormatted}` : '';
+
+          return `${status} ${startFormatted}${endInfo} | ${filesInfo}${durationInfo}`;
+        }),
       },
     ]);
     if (auth?.token && auth?.user) {
