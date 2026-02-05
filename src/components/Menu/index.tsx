@@ -1,7 +1,7 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { Button } from '../ui/button';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { SunDim, Moon, LogOut, ExternalLink } from 'lucide-react';
+import { SunDim, Moon, LogOut } from 'lucide-react';
 import { Separator } from '@components/ui/separator';
 import { useTheme } from '@hooks/theme';
 import { useAuth } from '@hooks/auth';
@@ -15,18 +15,18 @@ const Menu: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const openSittaxWeb = useCallback(async () => {
-    await window.ipcRenderer.invoke('open-sittax-web');
-  }, []);
-
   const menuItems = useMemo(
     () => [
       {
-        label: 'Acessar Sittax',
-        selected: false,
-        onClick: openSittaxWeb,
+        label: 'Sittax',
+        selected: location.pathname === '/sittax',
+        onClick: () => {
+          navigate('/sittax', {
+            replace: true,
+            state: { from: location },
+          });
+        },
         visible: true,
-        isExternal: true,
       },
       {
         label: 'Envio de Notas',
@@ -38,7 +38,6 @@ const Menu: React.FC = () => {
           });
         },
         visible: true,
-        isExternal: false,
       },
       {
         label: 'Envio de Documentos',
@@ -50,7 +49,6 @@ const Menu: React.FC = () => {
           });
         },
         visible: true,
-        isExternal: false,
       },
       {
         label: 'Configurações',
@@ -62,10 +60,9 @@ const Menu: React.FC = () => {
           });
         },
         visible: true,
-        isExternal: false,
       },
     ],
-    [location, navigate, openSittaxWeb]
+    [location, navigate]
   );
 
   return (
@@ -95,12 +92,10 @@ function menuItemRender(
     label,
     selected,
     onClick,
-    isExternal,
   }: {
     label: string;
     selected: boolean;
     onClick: () => void;
-    isExternal?: boolean;
   },
   key: string | number
 ) {
@@ -112,9 +107,7 @@ function menuItemRender(
         <div className="h-5 w-2"></div>
       )}
       {label}
-      {isExternal ? (
-        <ExternalLink className="h-4 w-4 ml-1" />
-      ) : selected ? (
+      {selected ? (
         <img src={grafismo} alt="logo" className="rounded-md object-cover h-5" />
       ) : (
         <div className="h-5 w-2"></div>

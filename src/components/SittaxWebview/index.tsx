@@ -1,4 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTheme } from '@/hooks/theme';
+
+// CSS para forçar dark mode em sites que não suportam
+const darkModeCSS = `
+  html {
+    filter: invert(1) hue-rotate(180deg) !important;
+    background: #111 !important;
+  }
+  img, video, picture, canvas, iframe, svg, [style*="background-image"] {
+    filter: invert(1) hue-rotate(180deg) !important;
+  }
+  .dark-mode-ignore {
+    filter: invert(1) hue-rotate(180deg) !important;
+  }
+`;
 
 interface SittaxWebviewProps {
   visible: boolean;
@@ -11,6 +26,18 @@ export function SittaxWebview({ visible }: SittaxWebviewProps) {
   const [error, setError] = useState<string | null>(null);
   const webviewRef = useRef<Electron.WebviewTag>(null);
   const hasLoadedOnce = useRef(false);
+  const darkModeCssKey = useRef<string | null>(null);
+  const { theme } = useTheme();
+
+  // Determina o tema efetivo (considerando "system")
+  const getEffectiveTheme = () => {
+    if (theme === 'system') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return theme;
+  };
+
+  const effectiveTheme = getEffectiveTheme();
 
   useEffect(() => {
     // Só carrega o token quando ficar visível pela primeira vez
@@ -36,6 +63,41 @@ export function SittaxWebview({ visible }: SittaxWebviewProps) {
       getSittaxToken();
     }
   }, [visible, url]);
+
+  // Aplica/remove dark mode CSS no webview
+  useEffect(() => {
+    const webview = webviewRef.current;
+    if (!webview || !url) return;
+
+    const applyDarkMode = async () => {
+      try {
+        if (effectiveTheme === 'dark') {
+          if (!darkModeCssKey.current) {
+            const key = await webview.insertCSS(darkModeCSS);
+            darkModeCssKey.current = key;
+          }
+        } else {
+          if (darkModeCssKey.current) {
+            await webview.removeInsertedCSS(darkModeCssKey.current);
+            darkModeCssKey.current = null;
+          }
+        }
+      } catch (err) {
+        // Webview pode não estar pronto ainda
+      }
+    };
+
+    // Aplica quando o tema muda
+    applyDarkMode();
+
+    // Também aplica quando a página terminar de carregar
+    const handleDomReady = () => applyDarkMode();
+    webview.addEventListener('dom-ready', handleDomReady);
+
+    return () => {
+      webview.removeEventListener('dom-ready', handleDomReady);
+    };
+  }, [effectiveTheme, url]);
 
   useEffect(() => {
     const webview = webviewRef.current;

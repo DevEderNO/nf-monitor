@@ -6,6 +6,7 @@ import { AppProvider } from '@hooks/index';
 import { Certificates } from '@pages/Certificates';
 import { RequireAuth } from '@components/auth/RequireAuth';
 import { Configuration } from './pages/Configuration';
+import { SittaxWeb } from './pages/SittaxWeb';
 
 export default function App() {
   return (
@@ -34,6 +35,14 @@ export default function App() {
             element={
               <RequireAuth>
                 <Configuration />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/sittax"
+            element={
+              <RequireAuth>
+                <SittaxWeb />
               </RequireAuth>
             }
           />

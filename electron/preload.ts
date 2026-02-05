@@ -13,7 +13,7 @@ const ALLOWED_INVOKE_CHANNELS = [
   'change-view-uploaded-files',
   'change-remove-uploaded-files',
   'change-time-for-processing',
-  'open-sittax-web',
+  'get-sittax-token',
 ] as const;
 
 const ALLOWED_SEND_CHANNELS = [

@@ -1,7 +1,7 @@
-import { BrowserWindow, ipcMain, Notification, shell } from 'electron';
+import { BrowserWindow, ipcMain, Notification } from 'electron';
 import { selectDirectories } from './services/file-operation-service';
 import { encrypt } from './lib/cryptography';
-import { signIn } from './lib/axios';
+import { signIn, loginSittaxWeb } from './lib/axios';
 import {
   addAuth,
   addDirectories,
@@ -102,6 +102,20 @@ export async function registerListeners(win: BrowserWindow | null) {
     return await signInSittax(user, password, false);
   });
 
+  ipcMain.handle('get-sittax-token', async () => {
+    try {
+      const auth = await getAuth();
+      if (!auth?.username || !auth?.password) {
+        throw new Error('Credenciais não encontradas');
+      }
+      const token = await loginSittaxWeb(auth.username, auth.password, true);
+      return token;
+    } catch (error) {
+      console.error('Erro ao obter token do Sittax:', error);
+      return null;
+    }
+  });
+
   ipcMain.on('remove-auth', async () => {
     await removeAuth();
   });
@@ -188,15 +202,5 @@ export async function registerListeners(win: BrowserWindow | null) {
 
   ipcMain.on('show-notification', async (_, { title, body }) => {
     new Notification({ title, body }).show();
-  });
-
-  ipcMain.handle('open-sittax-web', async () => {
-    const auth = await getAuth();
-    if (auth?.token) {
-      const url = `https://app.sittax.com.br/autologin?token=${encodeURIComponent(auth.token)}`;
-      await shell.openExternal(url);
-      return true;
-    }
-    return false;
   });
 }

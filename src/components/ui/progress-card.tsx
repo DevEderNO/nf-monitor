@@ -59,9 +59,9 @@ const statusConfig = {
   },
   [ProcessamentoStatus.Stopped]: {
     icon: XCircle,
-    iconClass: 'text-gray-400',
-    barClass: 'bg-gray-400',
-    bgClass: 'bg-gray-100',
+    iconClass: 'text-gray-400 dark:text-gray-500',
+    barClass: 'bg-gray-400 dark:bg-gray-500',
+    bgClass: 'bg-gray-100 dark:bg-gray-800',
     label: 'Parado',
   },
   [ProcessamentoStatus.Concluded]: {
@@ -102,7 +102,7 @@ export function ProgressCard({
 
       {/* Barra de progresso */}
       <div className="mb-3">
-        <div className="relative h-3 w-full overflow-hidden rounded-full bg-gray-200/50">
+        <div className="relative h-3 w-full overflow-hidden rounded-full bg-gray-200/50 dark:bg-gray-700/50">
           <div
             className={cn('h-full transition-all duration-500 ease-out rounded-full', config.barClass)}
             style={{ width: `${progress}%` }}

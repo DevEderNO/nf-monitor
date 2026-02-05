@@ -46,6 +46,25 @@ export async function signIn(username: string, password: string, useCryptography
   }
 }
 
+export async function loginSittaxWeb(username: string, password: string, useCryptography?: boolean): Promise<string> {
+  try {
+    const currentPassword = useCryptography ? decrypt(password) : password;
+    const resp = await apiAuth.post<{ token: string }>(`auth/login`, {
+      usuario: username,
+      senha: currentPassword,
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': 'https://app.sittax.com.br',
+        'Referer': 'https://app.sittax.com.br/',
+      },
+    });
+    return resp.data.token;
+  } catch (error) {
+    throw handleAxiosError(error as AxiosError);
+  }
+}
+
 const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 export async function retry(url: string, filepath: string, token: string, maximumRetry = 0, attempt = 0, delay = 0) {
