@@ -119,12 +119,18 @@ export function validFile(fileInfo: IFileInfo, certificate: boolean): { valid: b
   let validate = { valid: false, isNotaFiscal: false };
 
   try {
-    let data = '';
     switch (fileInfo.extension.toLowerCase()) {
       case '.xml':
-        data = fsSync.readFileSync(fileInfo.filepath, 'utf-8')?.trim();
-        if (data.startsWith('<')) {
-          validate = { valid: true, isNotaFiscal: true };
+        // Ler apenas os primeiros bytes para verificar se é XML válido
+        const fd = fsSync.openSync(fileInfo.filepath, 'r');
+        const buffer = Buffer.alloc(64);
+        const bytesRead = fsSync.readSync(fd, buffer, 0, 64, 0);
+        fsSync.closeSync(fd);
+        if (bytesRead > 0) {
+          const start = buffer.toString('utf-8', 0, bytesRead).trim();
+          if (start.startsWith('<')) {
+            validate = { valid: true, isNotaFiscal: true };
+          }
         }
         validationCache.set(cacheKey, validate);
         return validate;
@@ -355,14 +361,17 @@ function validateTxt(fileInfo: IFileInfo): boolean {
       return false;
     }
 
-    const fileContent = fsSync.readFileSync(fileInfo.filepath, 'utf8');
+    // Ler apenas os primeiros 28 bytes em vez do arquivo inteiro
+    const fd = fsSync.openSync(fileInfo.filepath, 'r');
+    const buffer = Buffer.alloc(28);
+    const bytesRead = fsSync.readSync(fd, buffer, 0, 28, 0);
+    fsSync.closeSync(fd);
 
-    if (fileContent.length < 28) {
+    if (bytesRead < 28) {
       return false;
     }
 
-    const first28Chars = fileContent.substring(0, 28);
-
+    const first28Chars = buffer.toString('utf8', 0, 28);
     return /^.{28}$/.test(first28Chars);
   } catch {
     return false;

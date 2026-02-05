@@ -24,10 +24,14 @@ import { IAuth } from '../interfaces/auth';
 import { timeout } from '../lib/time-utils';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
 import * as crypto from 'crypto';
 import AdmZip from 'adm-zip';
 import { startPowerSaveBlocker, stopPowerSaveBlocker } from '../lib/power-save';
 import { fileLogger } from '../lib/file-logger';
+
+// Yield para não bloquear o event loop
+const yieldToEventLoop = () => new Promise<void>(resolve => setImmediate(resolve));
 
 export class InvoiceTask {
   isPaused: boolean;
@@ -146,26 +150,44 @@ export class InvoiceTask {
       this.files = [];
       const viewLocalMethod = this.viewUploadedFiles; // Avoid checking inside loop
 
-      for (const diskFile of diskFiles) {
-        // Compute hash to find in DB
-        const hash = crypto.createHash('md5').update(diskFile.filename).digest('base64url');
+      // Criar Map para busca O(1) em vez de O(n) com find()
+      const dbFilesMap = new Map<string, typeof dbFiles[0]>();
+      for (const dbFile of dbFiles) {
+        const key = `${dbFile.basePath}:${dbFile.filename}`;
+        dbFilesMap.set(key, dbFile);
+      }
 
-        // Find matching DB entry
-        const dbEntry = dbFiles.find(
-          db => db.filename === hash && db.basePath === path.dirname(diskFile.filepath)
-        );
+      // Processar em chunks para não bloquear o event loop
+      const CHUNK_SIZE = 1000;
+      for (let i = 0; i < diskFiles.length; i += CHUNK_SIZE) {
+        const chunk = diskFiles.slice(i, i + CHUNK_SIZE);
 
-        if (dbEntry) {
-          // Check if we should process it
-          if ((!dbEntry.wasSend && dbEntry.isValid) || (viewLocalMethod && dbEntry.wasSend)) {
-            this.files.push({
-              ...diskFile, // Use REAL filepath and filename from disk
-              id: dbEntry.id,
-              wasSend: dbEntry.wasSend,
-              isValid: dbEntry.isValid,
-              dataSend: dbEntry.dataSend
-            });
+        for (const diskFile of chunk) {
+          // Compute hash to find in DB
+          const hash = crypto.createHash('md5').update(diskFile.filename).digest('base64url');
+          const basePath = path.dirname(diskFile.filepath);
+
+          // Busca O(1) usando Map
+          const key = `${basePath}:${hash}`;
+          const dbEntry = dbFilesMap.get(key);
+
+          if (dbEntry) {
+            // Check if we should process it
+            if ((!dbEntry.wasSend && dbEntry.isValid) || (viewLocalMethod && dbEntry.wasSend)) {
+              this.files.push({
+                ...diskFile, // Use REAL filepath and filename from disk
+                id: dbEntry.id,
+                wasSend: dbEntry.wasSend,
+                isValid: dbEntry.isValid,
+                dataSend: dbEntry.dataSend
+              });
+            }
           }
+        }
+
+        // Yield para não bloquear a UI em diretórios grandes
+        if (i + CHUNK_SIZE < diskFiles.length) {
+          await yieldToEventLoop();
         }
       }
 
@@ -778,7 +800,7 @@ export class InvoiceTask {
 
       zip.extractAllTo(extractPath, true);
 
-      const extractedFiles = this.getExtractedFiles(extractPath);
+      const extractedFiles = await this.getExtractedFiles(extractPath);
 
       if (extractedFiles.length > 0) {
         // Validar arquivos extraídos
@@ -837,11 +859,7 @@ export class InvoiceTask {
       }
 
       // Cleanup
-      try {
-        this.removeDirectory(extractPath);
-      } catch {
-        // Ignorar erro de cleanup
-      }
+      await this.removeDirectory(extractPath);
 
       await updateFile(this.files[index].filepath, {
         wasSend: true,
@@ -858,26 +876,29 @@ export class InvoiceTask {
     }
   }
 
-  private getExtractedFiles(extractPath: string): IFileInfo[] {
+  private async getExtractedFiles(extractPath: string): Promise<IFileInfo[]> {
     const files: IFileInfo[] = [];
+    const dirQueue: string[] = [extractPath];
 
-    const scanDirectory = (dirPath: string) => {
+    while (dirQueue.length > 0) {
+      const dirPath = dirQueue.shift()!;
+
       try {
-        const items = fs.readdirSync(dirPath);
+        const items = await fsPromises.readdir(dirPath, { withFileTypes: true });
 
-        items.forEach(item => {
-          const fullPath = path.join(dirPath, item);
+        for (const item of items) {
+          const fullPath = path.join(dirPath, item.name);
+
           try {
-            const stat = fs.statSync(fullPath);
-
-            if (stat.isDirectory()) {
-              scanDirectory(fullPath);
+            if (item.isDirectory()) {
+              dirQueue.push(fullPath);
             } else {
-              const ext = path.extname(item).toLowerCase();
+              const ext = path.extname(item.name).toLowerCase();
               if (['.xml', '.pdf', '.txt'].includes(ext)) {
+                const stat = await fsPromises.stat(fullPath);
                 files.push({
                   filepath: fullPath,
-                  filename: item,
+                  filename: item.name,
                   extension: ext,
                   size: stat.size,
                   dateCreated: stat.birthtime,
@@ -891,32 +912,23 @@ export class InvoiceTask {
           } catch {
             // Arquivo inacessível
           }
-        });
+        }
+
+        // Yield a cada diretório para não bloquear o event loop
+        await yieldToEventLoop();
       } catch {
         // Diretório inacessível
       }
-    };
+    }
 
-    scanDirectory(extractPath);
     return files;
   }
 
-  private removeDirectory(dirPath: string) {
-    if (fs.existsSync(dirPath)) {
-      const files = fs.readdirSync(dirPath);
-
-      files.forEach(file => {
-        const filePath = path.join(dirPath, file);
-        const stat = fs.statSync(filePath);
-
-        if (stat.isDirectory()) {
-          this.removeDirectory(filePath);
-        } else {
-          fs.unlinkSync(filePath);
-        }
-      });
-
-      fs.rmdirSync(dirPath);
+  private async removeDirectory(dirPath: string): Promise<void> {
+    try {
+      await fsPromises.rm(dirPath, { recursive: true, force: true });
+    } catch {
+      // Ignorar erro de remoção
     }
   }
 
