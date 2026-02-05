@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SunDim, Moon, LogOut } from 'lucide-react';
@@ -9,11 +9,46 @@ import logoMonitor from '@images/logo-monitor.png';
 import grafismo from '@images/grafismo.png';
 import packageJson from '../../../package.json';
 
+const SITTAX_UNLOCK_KEY = 'sittax-unlocked';
+
 const Menu: React.FC = () => {
   const { theme, setTheme } = useTheme();
   const { signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [clickCount, setClickCount] = useState(0);
+  const [sittaxUnlocked, setSittaxUnlocked] = useState(() => {
+    return localStorage.getItem(SITTAX_UNLOCK_KEY) === 'true';
+  });
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem(SITTAX_UNLOCK_KEY, String(sittaxUnlocked));
+  }, [sittaxUnlocked]);
+
+  useEffect(() => {
+    if (!sittaxUnlocked && location.pathname === '/sittax') {
+      navigate('/invoices', { replace: true });
+    }
+  }, [sittaxUnlocked, location.pathname, navigate]);
+
+  const handleVersionClick = useCallback(() => {
+    const newCount = clickCount + 1;
+    setClickCount(newCount);
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    if (newCount >= 5) {
+      setSittaxUnlocked(prev => !prev);
+      setClickCount(0);
+    } else {
+      timeoutRef.current = setTimeout(() => {
+        setClickCount(0);
+      }, 2000);
+    }
+  }, [clickCount]);
 
   const menuItems = useMemo(
     () => [
@@ -26,7 +61,7 @@ const Menu: React.FC = () => {
             state: { from: location },
           });
         },
-        visible: true,
+        visible: sittaxUnlocked,
       },
       {
         label: 'Envio de Notas',
@@ -62,7 +97,7 @@ const Menu: React.FC = () => {
         visible: true,
       },
     ],
-    [location, navigate]
+    [location, navigate, sittaxUnlocked]
   );
 
   return (
@@ -75,7 +110,12 @@ const Menu: React.FC = () => {
         </div>
       </div>
       <div className="flex gap-2 items-center">
-        <span className="text-sm text-muted-foreground font-semibold">v{packageJson.version}</span>
+        <span
+          className="text-sm text-muted-foreground font-semibold cursor-pointer select-none"
+          onClick={handleVersionClick}
+        >
+          v{packageJson.version}
+        </span>
         <Button variant="outline" size="icon" onClick={() => (theme === 'dark' ? setTheme('light') : setTheme('dark'))}>
           {theme === 'dark' ? <SunDim /> : <Moon />}
         </Button>
