@@ -1,24 +1,31 @@
 import { IProcessamento, ProcessamentoStatus } from '../interfaces/processamento';
-import { listarArquivos, validFile, validZip, validateDFileExists } from '../services/file-operation-service';
+import {
+  validFile,
+  validZip,
+  validateDFileExists,
+  listFilesInDirectory,
+  listSubdirectories,
+} from '../services/file-operation-service';
 import { connection } from 'websocket';
 import { IFileInfo } from '../interfaces/file-info';
 import { WSMessageType, WSMessageTyped } from '../interfaces/ws-message';
 import { signIn, upload, uploadBatch } from '../lib/axios';
 import { IDbHistoric } from '../interfaces/db-historic';
 import {
-  addFiles,
   addHistoric,
   getAuth,
   getConfiguration,
   getCountFilesSended,
   getDirectories,
-  getFiles,
   removeFiles,
   updateAuth,
   updateFile,
   updateHistoric,
   updateFilesBatch,
   removeFilesBatch,
+  getFilesByBasePath,
+  addFilesForBasePath,
+  getPendingFilesCount,
 } from '../services/database';
 import { IAuth } from '../interfaces/auth';
 import { timeout } from '../lib/time-utils';
@@ -60,6 +67,10 @@ export class InvoiceTask {
   private tokenExpireTime: number = 0;
   private readonly TOKEN_LIFETIME_MS = 2 * 60 * 60 * 1000;
   private readonly TOKEN_REFRESH_BEFORE_MS = 10 * 60 * 1000;
+
+  // Para processamento incremental
+  private totalFilesEstimate: number = 0;
+  private directoriesProcessed: number = 0;
 
   constructor() {
     this.isPaused = false;
@@ -128,8 +139,6 @@ export class InvoiceTask {
   }
 
   async run(connection: connection) {
-    let lastProcessedIndex = 0;
-
     try {
       startPowerSaveBlocker();
       this.initializeProperties(connection);
@@ -137,280 +146,244 @@ export class InvoiceTask {
       await this.sendMessage('Buscando arquivos...');
 
       const directories = (await getDirectories()).filter(d => d.type === 'invoices');
-      const diskFiles = await listarArquivos(directories.map(x => x.path));
-      await addFiles(diskFiles);
 
       this.filesSendedCount = await getCountFilesSended();
       const config = await getConfiguration();
       this.viewUploadedFiles = config?.viewUploadedFiles ?? false;
       this.removeUploadedFiles = config?.removeUploadedFiles ?? false;
 
-      const dbFiles = await getFiles();
-
-      this.files = [];
-      const viewLocalMethod = this.viewUploadedFiles; // Avoid checking inside loop
-
-      // Criar Map para busca O(1) em vez de O(n) com find()
-      const dbFilesMap = new Map<string, typeof dbFiles[0]>();
-      for (const dbFile of dbFiles) {
-        const key = `${dbFile.basePath}:${dbFile.filename}`;
-        dbFilesMap.set(key, dbFile);
-      }
-
-      // Processar em chunks para não bloquear o event loop
-      const CHUNK_SIZE = 1000;
-      for (let i = 0; i < diskFiles.length; i += CHUNK_SIZE) {
-        const chunk = diskFiles.slice(i, i + CHUNK_SIZE);
-
-        for (const diskFile of chunk) {
-          // Compute hash to find in DB
-          const hash = crypto.createHash('md5').update(diskFile.filename).digest('base64url');
-          const basePath = path.dirname(diskFile.filepath);
-
-          // Busca O(1) usando Map
-          const key = `${basePath}:${hash}`;
-          const dbEntry = dbFilesMap.get(key);
-
-          if (dbEntry) {
-            // Check if we should process it
-            if ((!dbEntry.wasSend && dbEntry.isValid) || (viewLocalMethod && dbEntry.wasSend)) {
-              this.files.push({
-                ...diskFile, // Use REAL filepath and filename from disk
-                id: dbEntry.id,
-                wasSend: dbEntry.wasSend,
-                isValid: dbEntry.isValid,
-                dataSend: dbEntry.dataSend
-              });
-            }
-          }
-        }
-
-        // Yield para não bloquear a UI em diretórios grandes
-        if (i + CHUNK_SIZE < diskFiles.length) {
-          await yieldToEventLoop();
-        }
-      }
-
-      if (this.files.length === 0) {
-        await this.sendMessage('Nenhum arquivo novo encontrado', 100, 0, 0, ProcessamentoStatus.Concluded);
+      if (directories.length === 0) {
+        await this.sendMessage('Nenhum diretório configurado', 100, 0, 0, ProcessamentoStatus.Concluded);
         return;
       }
 
-      this.max = this.files.length;
+      // Estimar total de arquivos pendentes para mostrar progresso
+      this.totalFilesEstimate = await getPendingFilesCount();
       this.startTime = Date.now();
-
-      await this.sendMessage(
-        `${this.max} arquivo${this.max > 1 ? 's' : ''} encontrado${this.max > 1 ? 's' : ''}`,
-        0,
-        0,
-        this.max
-      );
 
       if (!(await this.authenticate())) return;
 
-      // Separar arquivos normais e ZIPs
-      const normalFiles: IFileInfo[] = [];
-      const zipFiles: { index: number; file: IFileInfo }[] = [];
-
-      for (let index = 0; index < this.files.length; index++) {
-        const element = this.files[index];
-
-        if (!validateDFileExists(element)) {
-          await removeFiles(element.filepath);
-          fileLogger.info(`Arquivo não encontrado: ${element.filepath}`);
-          this.processedCount++;
-          continue;
-        }
-        if (element.extension.toLowerCase() === '.zip') {
-          zipFiles.push({ index, file: element });
-        } else if (['.xml', '.pdf', '.txt'].includes(element.extension.toLowerCase())) {
-          normalFiles.push(element);
-        }
-      }
-
-      // Processar arquivos normais em lotes
-      for (let i = 0; i < normalFiles.length; i += this.batchSize) {
-        const batch = normalFiles.slice(i, i + this.batchSize);
-        // Usar o índice do PRIMEIRO arquivo do lote na lista original this.files para referência em caso de erro
-        lastProcessedIndex = this.files.indexOf(batch[0]);
-
-        if (this.isCancelled) {
-          const sent = this.files.reduce((acc, f) => acc + (f.wasSend ? 1 : 0), 0);
-          await this.sendMessage(
-            `Cancelado. ${sent} arquivo${sent !== 1 ? 's' : ''} enviado${sent !== 1 ? 's' : ''}`,
-            0,
-            this.processedCount,
-            this.max,
-            ProcessamentoStatus.Stopped
-          );
-          this.reset();
-          return;
-        }
-
-        if (this.isPaused) {
-          await this.sendMessage(
-            'Envio pausado',
-            this.progress,
-            this.processedCount,
-            this.max,
-            ProcessamentoStatus.Paused
-          );
-          while (this.isPaused && !this.isCancelled) {
-            await timeout(500);
-          }
-          if (this.isCancelled) continue;
-          await this.sendMessage('Retomando envio...', this.progress, this.processedCount, this.max);
-        }
-
-        if (!(await this.ensureValidToken())) {
-          throw new Error('Falha na autenticação');
-        }
-
-        await this.processBatchWithRetry(batch);
-      }
-
-      // Processar ZIPs individualmente
-      for (const { index } of zipFiles) {
-        lastProcessedIndex = index;
-
-        if (this.isCancelled) {
-          const sent = this.files.reduce((acc, f) => acc + (f.wasSend ? 1 : 0), 0);
-          await this.sendMessage(
-            `Cancelado. ${sent} arquivo${sent !== 1 ? 's' : ''} enviado${sent !== 1 ? 's' : ''}`,
-            0,
-            this.processedCount,
-            this.max,
-            ProcessamentoStatus.Stopped
-          );
-          this.reset();
-          return;
-        }
-
-        if (this.isPaused) {
-          await this.sendMessage(
-            'Envio pausado',
-            this.progress,
-            this.processedCount,
-            this.max,
-            ProcessamentoStatus.Paused
-          );
-          while (this.isPaused && !this.isCancelled) {
-            await timeout(500);
-          }
-          if (this.isCancelled) continue;
-          await this.sendMessage('Retomando envio...', this.progress, this.processedCount, this.max);
-        }
-
-        if (!(await this.ensureValidToken())) {
-          throw new Error('Falha na autenticação');
-        }
-
-        const currentProgress = ((this.processedCount + 1) / this.max) * 100;
-        await this.processFileWithRetry(index, currentProgress);
-        this.processedCount++;
+      // Processar cada diretório raiz de forma incremental
+      for (const directory of directories) {
+        if (this.isCancelled) break;
+        await this.processDirectoryIncremental(directory.path);
       }
 
       // Mensagem final
-      if (this.hasError) {
-        const sent = this.files.reduce((acc, f) => acc + (f.wasSend ? 1 : 0), 0);
+      if (this.isCancelled) {
         await this.sendMessage(
-          `Concluído com alertas: ${sent} enviado${sent !== 1 ? 's' : ''}, ${this.errorCount} não enviado${this.errorCount !== 1 ? 's' : ''}`,
+          `Cancelado. ${this.filesSendedCount} arquivo${this.filesSendedCount !== 1 ? 's' : ''} enviado${this.filesSendedCount !== 1 ? 's' : ''}`,
+          0,
+          this.processedCount,
+          this.max || this.processedCount,
+          ProcessamentoStatus.Stopped
+        );
+        this.reset();
+        return;
+      }
+
+      if (this.hasError) {
+        await this.sendMessage(
+          `Concluído com alertas: ${this.filesSendedCount} enviado${this.filesSendedCount !== 1 ? 's' : ''}, ${this.errorCount} não enviado${this.errorCount !== 1 ? 's' : ''}`,
           100,
-          this.max,
-          this.max,
+          this.processedCount,
+          this.max || this.processedCount,
           ProcessamentoStatus.Concluded
         );
+      } else if (this.filesSendedCount === 0 && this.processedCount === 0) {
+        await this.sendMessage('Nenhum arquivo novo encontrado', 100, 0, 0, ProcessamentoStatus.Concluded);
       } else {
         await this.sendMessage(
           `Concluído! ${this.filesSendedCount} arquivo${this.filesSendedCount !== 1 ? 's' : ''} enviado${this.filesSendedCount !== 1 ? 's' : ''}`,
           100,
-          this.max,
-          this.max,
+          this.processedCount,
+          this.max || this.processedCount,
           ProcessamentoStatus.Concluded
         );
       }
     } catch (error) {
       fileLogger.error('Erro no processamento de invoices', error);
       await this.sendMessage(
-        'Erro no envio. Tentando novamente...',
+        'Erro no envio',
         0,
-        lastProcessedIndex,
+        this.processedCount,
         this.max,
-        ProcessamentoStatus.Running
+        ProcessamentoStatus.Stopped
       );
-      await this.continueFromIndex(lastProcessedIndex);
     }
   }
 
-  async continueFromIndex(startIndex: number) {
+  /**
+   * Processa um diretório de forma incremental (recursivo)
+   * Memória constante - processa um diretório por vez
+   */
+  private async processDirectoryIncremental(dirPath: string): Promise<void> {
+    if (this.isCancelled) return;
+
+    // Handle pause
+    if (this.isPaused) {
+      await this.sendMessage(
+        'Envio pausado',
+        this.progress,
+        this.processedCount,
+        this.max || this.totalFilesEstimate,
+        ProcessamentoStatus.Paused
+      );
+      while (this.isPaused && !this.isCancelled) {
+        await timeout(500);
+      }
+      if (this.isCancelled) return;
+      await this.sendMessage('Retomando envio...', this.progress, this.processedCount, this.max || this.totalFilesEstimate);
+    }
+
     try {
-      if (startIndex < 0 || startIndex >= this.files.length || this.files.length === 0) return;
+      // 1. Lista arquivos APENAS deste diretório (não recursivo)
+      const diskFiles = await listFilesInDirectory(dirPath);
 
-      await this.sendMessage('Retomando envio...', 0, startIndex, this.max);
+      if (diskFiles.length > 0) {
+        // 2. Busca no banco APENAS arquivos deste basePath
+        const dbFilesMap = await getFilesByBasePath(dirPath);
+        const existingHashes = new Set(dbFilesMap.keys());
 
-      // Re-categorizar o que resta para processar em lotes
-      const remainingFiles = this.files.slice(startIndex);
-      const normalFiles: IFileInfo[] = [];
-      const zipFiles: { index: number; file: IFileInfo }[] = [];
+        // 3. Adiciona novos arquivos ao banco (apenas os que não existem)
+        await addFilesForBasePath(diskFiles, dirPath, existingHashes);
 
-      for (let i = 0; i < remainingFiles.length; i++) {
-        const element = remainingFiles[i];
-        const originalIndex = startIndex + i;
+        // 4. Recarrega o map com os novos arquivos adicionados
+        const updatedDbFilesMap = await getFilesByBasePath(dirPath);
 
-        if (!validateDFileExists(element)) {
-          await removeFiles(element.filepath);
-          this.processedCount++;
-          continue;
+        // 5. Filtra arquivos a processar
+        const filesToProcess: IFileInfo[] = [];
+
+        for (const diskFile of diskFiles) {
+          const hash = crypto.createHash('md5').update(diskFile.filename).digest('base64url');
+          const dbEntry = updatedDbFilesMap.get(hash);
+
+          if (dbEntry) {
+            const shouldProcess =
+              (!dbEntry.wasSend && dbEntry.isValid) ||
+              (this.viewUploadedFiles && dbEntry.wasSend);
+
+            if (shouldProcess) {
+              filesToProcess.push({
+                filepath: diskFile.filepath,
+                filename: diskFile.filename,
+                extension: diskFile.extension,
+                size: diskFile.size,
+                modifiedtime: diskFile.modifiedtime,
+                isDirectory: false,
+                isFile: true,
+                id: dbEntry.id,
+                wasSend: dbEntry.wasSend,
+                isValid: dbEntry.isValid,
+                dataSend: dbEntry.dataSend,
+                bloqued: false,
+              });
+            }
+          }
         }
 
-        if (element.extension.toLowerCase() === '.zip') {
-          zipFiles.push({ index: originalIndex, file: element });
-        } else if (['.xml', '.pdf', '.txt'].includes(element.extension.toLowerCase())) {
-          normalFiles.push(element);
+        // 6. Processa os arquivos deste diretório
+        if (filesToProcess.length > 0) {
+          this.max += filesToProcess.length;
+          await this.processFilesInDirectory(filesToProcess);
         }
       }
 
-      // Processar arquivos normais em lotes
-      for (let i = 0; i < normalFiles.length; i += this.batchSize) {
-        if (this.isCancelled || this.isPaused) break;
+      this.directoriesProcessed++;
 
-        if (!(await this.ensureValidToken())) {
-          throw new Error('Falha na autenticação');
-        }
-
-        const batch = normalFiles.slice(i, i + this.batchSize);
-        await this.processBatchWithRetry(batch);
-      }
-
-      // Processar ZIPs individualmente
-      for (const { index } of zipFiles) {
-        if (this.isCancelled || this.isPaused) break;
-
-        if (!(await this.ensureValidToken())) {
-          throw new Error('Falha na autenticação');
-        }
-
-        const currentProgress = ((this.processedCount + 1) / this.max) * 100;
-        await this.processFileWithRetry(index, currentProgress);
-        this.processedCount++;
-      }
-
-      // Se concluiu tudo com sucesso (ou acabou a lista)
-      if (this.processedCount >= this.max) {
-        const sent = this.files.reduce((acc, f) => acc + (f.wasSend ? 1 : 0), 0);
-        await this.sendMessage(
-          `Concluído! ${sent} arquivo${sent !== 1 ? 's' : ''} enviado${sent !== 1 ? 's' : ''}`,
-          100,
-          this.max,
-          this.max,
-          ProcessamentoStatus.Concluded
-        );
+      // 7. Lista subdiretórios e processa recursivamente
+      const subdirs = await listSubdirectories(dirPath);
+      for (const subdir of subdirs) {
+        if (this.isCancelled) break;
+        await this.processDirectoryIncremental(subdir);
       }
     } catch (error) {
-      fileLogger.error('Erro ao continuar processamento', error);
-      await this.sendMessage('Erro no envio', 0, this.processedCount, this.max, ProcessamentoStatus.Stopped);
+      fileLogger.error(`Erro ao processar diretório: ${dirPath}`, error);
     }
   }
+
+  /**
+   * Processa arquivos de um diretório específico
+   */
+  private async processFilesInDirectory(files: IFileInfo[]): Promise<void> {
+    // Separar arquivos normais e ZIPs
+    const normalFiles: IFileInfo[] = [];
+    const zipFiles: IFileInfo[] = [];
+
+    for (const file of files) {
+      if (!validateDFileExists(file)) {
+        await removeFiles(file.filepath);
+        fileLogger.info(`Arquivo não encontrado: ${file.filepath}`);
+        this.processedCount++;
+        continue;
+      }
+
+      if (file.extension.toLowerCase() === '.zip') {
+        zipFiles.push(file);
+      } else if (['.xml', '.pdf', '.txt'].includes(file.extension.toLowerCase())) {
+        normalFiles.push(file);
+      }
+    }
+
+    // Processar arquivos normais em lotes
+    for (let i = 0; i < normalFiles.length; i += this.batchSize) {
+      if (this.isCancelled) return;
+
+      if (this.isPaused) {
+        await this.sendMessage(
+          'Envio pausado',
+          this.progress,
+          this.processedCount,
+          this.max,
+          ProcessamentoStatus.Paused
+        );
+        while (this.isPaused && !this.isCancelled) {
+          await timeout(500);
+        }
+        if (this.isCancelled) return;
+        await this.sendMessage('Retomando envio...', this.progress, this.processedCount, this.max);
+      }
+
+      if (!(await this.ensureValidToken())) {
+        throw new Error('Falha na autenticação');
+      }
+
+      const batch = normalFiles.slice(i, i + this.batchSize);
+      await this.processBatchWithRetry(batch);
+    }
+
+    // Processar ZIPs
+    for (const zipFile of zipFiles) {
+      if (this.isCancelled) return;
+
+      if (this.isPaused) {
+        await this.sendMessage(
+          'Envio pausado',
+          this.progress,
+          this.processedCount,
+          this.max,
+          ProcessamentoStatus.Paused
+        );
+        while (this.isPaused && !this.isCancelled) {
+          await timeout(500);
+        }
+        if (this.isCancelled) return;
+        await this.sendMessage('Retomando envio...', this.progress, this.processedCount, this.max);
+      }
+
+      if (!(await this.ensureValidToken())) {
+        throw new Error('Falha na autenticação');
+      }
+
+      // Adiciona o ZIP ao array files para usar processFileWithRetry
+      const index = this.files.length;
+      this.files.push(zipFile);
+      const currentProgress = (this.processedCount / this.max) * 100;
+      await this.processFileWithRetry(index, currentProgress);
+      this.processedCount++;
+    }
+  }
+
 
   async processBatchWithRetry(batch: IFileInfo[]) {
     if (batch.length === 0) return;
@@ -682,6 +655,10 @@ export class InvoiceTask {
     this.filesInCompletedBatches = 0;
     this.connection = connection;
     this.tokenExpireTime = 0;
+    this.totalFilesEstimate = 0;
+    this.directoriesProcessed = 0;
+    this.files = [];
+    this.max = 0;
     this.historic = {
       startDate: new Date(),
       endDate: null,

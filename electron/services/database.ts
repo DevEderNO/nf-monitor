@@ -614,3 +614,108 @@ export async function removeFilesBatch(ids: number[]): Promise<number> {
   });
   return result.count;
 }
+
+// ==================== INCREMENTAL PROCESSING FUNCTIONS ====================
+
+/**
+ * Get or create a basePath and return its ID
+ */
+export async function getOrCreateBasePath(dirPath: string): Promise<number> {
+  const existing = await prisma.basePath.findUnique({ where: { path: dirPath } });
+  if (existing) return existing.id;
+
+  const created = await prisma.basePath.create({ data: { path: dirPath } });
+  return created.id;
+}
+
+/**
+ * Get files for a specific basePath only (not all files in DB)
+ */
+export async function getFilesByBasePath(dirPath: string): Promise<Map<string, { id: number; wasSend: boolean; isValid: boolean; dataSend: Date | null }>> {
+  const basePath = await prisma.basePath.findUnique({ where: { path: dirPath } });
+  if (!basePath) return new Map();
+
+  const files = await prisma.file.findMany({
+    where: { basePathId: basePath.id },
+    select: { id: true, filename: true, wasSend: true, isValid: true, dataSend: true },
+  });
+
+  return new Map(files.map(f => [f.filename, { id: f.id, wasSend: f.wasSend, isValid: f.isValid, dataSend: f.dataSend }]));
+}
+
+/**
+ * Add files for a specific basePath (incremental, no full table scan)
+ */
+export async function addFilesForBasePath(
+  files: { filename: string; extension: string; size: number; modifiedtime: Date | null; isDirectory: boolean; isFile: boolean }[],
+  dirPath: string,
+  existingHashes: Set<string>
+): Promise<number> {
+  if (files.length === 0) return 0;
+
+  const basePathId = await getOrCreateBasePath(dirPath);
+
+  const filesToInsert: {
+    basePathId: number;
+    filename: string;
+    extension: string;
+    wasSend: boolean;
+    dataSend: null;
+    isValid: boolean;
+    bloqued: boolean;
+    size: number;
+    isDirectory: boolean;
+    isFile: boolean;
+    modifiedtime: Date | null;
+  }[] = [];
+
+  for (const file of files) {
+    const hashedName = hashFilename(file.filename);
+    if (!existingHashes.has(hashedName)) {
+      filesToInsert.push({
+        basePathId,
+        filename: hashedName,
+        extension: file.extension,
+        wasSend: false,
+        dataSend: null,
+        isValid: true,
+        bloqued: false,
+        size: file.size,
+        isDirectory: file.isDirectory,
+        isFile: file.isFile,
+        modifiedtime: file.modifiedtime,
+      });
+    }
+  }
+
+  if (filesToInsert.length === 0) return 0;
+
+  try {
+    return (await prisma.file.createMany({ data: filesToInsert }))?.count ?? 0;
+  } catch {
+    // Fallback for constraint violations
+    let count = 0;
+    for (const file of filesToInsert) {
+      try {
+        await prisma.file.create({ data: file });
+        count++;
+      } catch {
+        // Skip duplicates
+      }
+    }
+    return count;
+  }
+}
+
+/**
+ * Get pending files count for progress tracking
+ */
+export async function getPendingFilesCount(): Promise<number> {
+  return await prisma.file.count({
+    where: {
+      wasSend: false,
+      isValid: true,
+      extension: { in: ['.xml', '.pdf', '.txt', '.zip'] },
+    },
+  });
+}

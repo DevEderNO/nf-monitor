@@ -389,3 +389,76 @@ function validatePfx(fileInfo: IFileInfo): boolean {
     return false;
   }
 }
+
+// ==================== INCREMENTAL PROCESSING FUNCTIONS ====================
+
+export interface IDiskFile {
+  filepath: string;
+  filename: string;
+  extension: string;
+  size: number;
+  modifiedtime: Date | null;
+  isDirectory: boolean;
+  isFile: boolean;
+}
+
+/**
+ * List files in a single directory (non-recursive)
+ * Returns only files, not subdirectories
+ */
+export async function listFilesInDirectory(dirPath: string): Promise<IDiskFile[]> {
+  const files: IDiskFile[] = [];
+
+  try {
+    const items = await fs.readdir(dirPath, { withFileTypes: true });
+
+    for (const item of items) {
+      if (item.isFile()) {
+        const fullPath = path.join(dirPath, item.name);
+        const extension = path.extname(item.name).toLowerCase();
+
+        if (!VALID_EXTENSIONS.has(extension)) continue;
+
+        try {
+          const stats = await fs.stat(fullPath);
+          files.push({
+            filepath: fullPath,
+            filename: item.name,
+            extension,
+            size: stats.size,
+            modifiedtime: stats.mtime,
+            isDirectory: false,
+            isFile: true,
+          });
+        } catch {
+          // File inaccessible, skip
+        }
+      }
+    }
+  } catch {
+    // Directory inaccessible
+  }
+
+  return files;
+}
+
+/**
+ * List subdirectories in a directory (non-recursive)
+ */
+export async function listSubdirectories(dirPath: string): Promise<string[]> {
+  const subdirs: string[] = [];
+
+  try {
+    const items = await fs.readdir(dirPath, { withFileTypes: true });
+
+    for (const item of items) {
+      if (item.isDirectory()) {
+        subdirs.push(path.join(dirPath, item.name));
+      }
+    }
+  } catch {
+    // Directory inaccessible
+  }
+
+  return subdirs;
+}
