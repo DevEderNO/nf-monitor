@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, Notification } from 'electron';
+import { BrowserWindow, ipcMain, Notification, shell } from 'electron';
 import { selectDirectories } from './services/file-operation-service';
 import { encrypt } from './lib/cryptography';
 import { signIn } from './lib/axios';
@@ -188,5 +188,15 @@ export async function registerListeners(win: BrowserWindow | null) {
 
   ipcMain.on('show-notification', async (_, { title, body }) => {
     new Notification({ title, body }).show();
+  });
+
+  ipcMain.handle('open-sittax-web', async () => {
+    const auth = await getAuth();
+    if (auth?.token) {
+      const url = `https://app.sittax.com.br/autologin?token=${encodeURIComponent(auth.token)}`;
+      await shell.openExternal(url);
+      return true;
+    }
+    return false;
   });
 }
